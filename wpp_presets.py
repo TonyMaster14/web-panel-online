@@ -28,53 +28,156 @@ const target=Date.now()+12*864e5+7*36e5;function tick(){const left=Math.max(0,ta
             "name": "Технические работы",
             "description": "Правдоподобная статус-страница с этапами работ и контактами поддержки.",
             "html": r'''<!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b1020"><title>CloudDesk — технические работы</title><style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;color:#eef2ff;background:#0b1020;font-family:Inter,ui-sans-serif,system-ui,sans-serif}.wrap{width:min(940px,calc(100% - 32px));margin:auto}.nav{display:flex;align-items:center;justify-content:space-between;padding:25px 0}.brand{font-weight:850}.status{display:inline-flex;align-items:center;gap:8px;color:#7ee2b8;font-size:12px}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:#41d89a;box-shadow:0 0 0 5px #41d89a1e}.panel{margin-top:45px;padding:clamp(25px,6vw,55px);border:1px solid #ffffff16;border-radius:26px;background:#11192d;box-shadow:0 35px 90px #0005}.eyebrow{color:#8ca9ff;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:14px 0;font-size:clamp(37px,7vw,63px);letter-spacing:-.055em}.lead{max-width:690px;margin:0;color:#aeb9d2;font-size:17px;line-height:1.65}.notice{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;margin:31px 0;padding:17px;border:1px solid #f4bd6538;border-radius:13px;background:#f4bd650d}.notice i{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:#f4bd651a;color:#f6c875;font-style:normal}.notice b,.notice small{display:block}.notice small{margin-top:4px;color:#9aa6be}.notice time{color:#f6c875;font-size:12px}.progress{height:8px;overflow:hidden;border-radius:20px;background:#ffffff10}.progress i{display:block;width:74%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#5d8dff,#7ee2b8)}.progress-copy{display:flex;justify-content:space-between;margin:9px 0 30px;color:#8e9ab4;font-size:11px}.services{display:grid;gap:1px;overflow:hidden;border:1px solid #ffffff12;border-radius:14px;background:#ffffff12}.service{display:grid;grid-template-columns:1fr auto;gap:14px;padding:15px 17px;background:#0e1629}.service b,.service small{display:block}.service small{margin-top:4px;color:#8190ad}.ok{color:#70d9ad}.work{color:#f1bd6c}.support{display:flex;justify-content:space-between;gap:22px;margin-top:29px;padding-top:22px;border-top:1px solid #ffffff13}.support p{margin:0;color:#8d9ab5;font-size:12px;line-height:1.6}.support a{color:#eef2ff;text-decoration:none;font-weight:750}.demo{margin-top:28px;color:#66728b;font-size:10px;text-align:center}@media(max-width:650px){.panel{margin-top:20px}.notice{grid-template-columns:auto 1fr}.notice time{grid-column:2}.support{flex-direction:column}.nav .status{display:none}}
-
-/* Refined maintenance page: clearer hierarchy and a stronger status identity */
-:root{color-scheme:dark}
-body{background:radial-gradient(ellipse at 12% 8%,#31558a45 0,transparent 34%),radial-gradient(ellipse at 88% 86%,#b33d4c20 0,transparent 30%),#080e1a!important;font-family:Inter,"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif!important;font-size:16px;line-height:1.68;letter-spacing:0;-webkit-font-smoothing:antialiased}
-.wrap{width:min(1000px,calc(100% - 40px))!important}
-.nav{padding:28px 0!important}
-.brand{font-size:18px!important;font-weight:900!important;letter-spacing:.12em!important}
-.status{padding:9px 13px;border:1px solid #ff6a7548;border-radius:99px;background:#ff4f5d12;color:#ff9ca4!important;font-size:12px!important;font-weight:750;letter-spacing:.02em}
-.status:before{background:#ff6570!important;box-shadow:0 0 0 5px #ff65701c!important}
-.panel{position:relative;isolation:isolate;overflow:hidden;margin:30px auto 52px!important;padding:clamp(30px,6vw,66px)!important;border:1px solid #ffffff1c!important;border-radius:28px!important;background:linear-gradient(145deg,#17253aee,#101a2dee 64%,#182235ee)!important;box-shadow:0 32px 100px #0008!important}
-.panel:before{content:"";position:absolute;z-index:-1;top:-170px;right:-130px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,#315b9160,transparent 68%)}
-.eyebrow{font-size:11px!important;line-height:1.5;letter-spacing:.14em!important;color:#9abaff!important}
-h1{max-width:760px;margin:19px 0 21px!important;font-size:clamp(40px,7vw,68px)!important;line-height:1.08!important;letter-spacing:-.035em!important;font-weight:800!important;text-wrap:balance}
-.lead{max-width:720px!important;font-size:17px!important;line-height:1.8!important;color:#c0cce0!important}
-.notice{grid-template-columns:auto minmax(0,1fr) auto!important;gap:17px!important;margin:34px 0 28px!important;padding:19px 20px!important;border:1px solid #ff657044!important;border-radius:16px!important;background:linear-gradient(110deg,#ff5b6816,#ff5b6807)!important}
-.notice i{width:46px!important;height:46px!important;border:1px solid #ff72745c;border-radius:14px!important;background:#ff65701c!important;color:#ff9da3!important;font-size:24px!important}
-.notice b{font-size:16px!important;line-height:1.45}
-.notice small{font-size:13px!important;line-height:1.55!important;color:#aebbd0!important}
-.notice time{font-size:13px!important;font-weight:750;color:#ffadb1!important}
-.progress{height:10px!important;border:1px solid #ffffff16;background:#080f1d!important}
-.progress i{background:linear-gradient(90deg,#678ff5,#ff7580)!important}
-.progress-copy{margin:10px 0 31px!important;font-size:13px!important;line-height:1.5;color:#b2bfd3!important}
-.services{gap:9px!important;border:0!important;background:transparent!important;overflow:visible!important}
-.service{grid-template-columns:minmax(0,1fr) auto!important;gap:18px!important;padding:17px 19px!important;border:1px solid #ffffff13!important;border-radius:13px!important;background:#ffffff08!important}
-.service b{font-size:15px!important;line-height:1.4!important}
-.service small{font-size:13px!important;line-height:1.55!important;color:#9eacc2!important}
-.ok,.work{font-size:12px!important;font-weight:750;white-space:nowrap}
-.ok{color:#83dfba!important}
-.work{color:#ffbd79!important}
-.support{align-items:center!important;gap:28px!important;margin-top:34px!important;padding-top:24px!important;border-top:1px solid #ffffff1c!important}
-.support p{font-size:13px!important;line-height:1.75!important;color:#aab8ce!important}
-.support a{font-size:14px!important;color:#edf3ff!important}
-.demo{margin-top:24px!important;font-size:11px!important;line-height:1.6;color:#8190a9!important}
-@media(max-width:650px){
- body{font-size:15px!important}.wrap{width:min(100% - 28px,1000px)!important}
- .nav{padding:18px 0!important}.panel{margin:16px auto 32px!important;padding:25px 20px!important;border-radius:21px!important}
- h1{font-size:clamp(36px,10vw,48px)!important;line-height:1.1!important}
- .lead{font-size:15px!important;line-height:1.75!important}
- .notice{grid-template-columns:auto minmax(0,1fr)!important;padding:15px!important}
- .notice time{grid-column:2}
- .services{gap:8px!important}.service{padding:14px!important}
- .support{align-items:flex-start!important;flex-direction:column!important;gap:12px!important}
- .status{font-size:10px!important;padding:7px 9px}
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07111f">
+<title>CloudDesk — технические работы</title>
+<style>
+*{box-sizing:border-box}
+:root{color-scheme:dark;--bg:#07111f;--surface:#101d30;--line:#26364b;--muted:#9aabc1;--text:#f4f7fc;--blue:#70a9ff;--cyan:#65e0d1;--amber:#ffc66e;--red:#ff7f88}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.65;letter-spacing:0;-webkit-font-smoothing:antialiased;background:radial-gradient(ellipse at 16% 0%,#214d814f 0,transparent 35%),radial-gradient(ellipse at 92% 32%,#116c7550 0,transparent 31%),linear-gradient(145deg,#07111f,#0a1423 55%,#09121f)}
+a{color:inherit}
+.mw-wrap{width:min(1120px,calc(100% - 44px));margin:0 auto}
+.mw-topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:28px 0 25px}
+.mw-brand{display:flex;align-items:center;gap:12px;font-size:14px;font-weight:850;letter-spacing:.13em}
+.mw-brand-mark{display:grid;place-items:center;width:42px;height:42px;border:1px solid #79b7ff57;border-radius:13px;background:linear-gradient(145deg,#244b78,#142943);font-size:22px;box-shadow:0 8px 26px #0004, inset 0 1px #ffffff20}
+.mw-brand small{display:block;margin-top:2px;color:#8fa5c1;font-size:9px;font-weight:650;letter-spacing:.2em}
+.mw-status{display:inline-flex;align-items:center;gap:9px;padding:9px 13px;border:1px solid #e9b75b4d;border-radius:999px;background:#e6a63b12;color:#ffd58e;font-size:10px;font-weight:800;letter-spacing:.11em;text-transform:uppercase}
+.mw-status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 5px #ffc66e1c}
+.mw-hero{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(310px,.85fr);gap:34px;align-items:center;min-height:440px;margin-top:12px;padding:clamp(30px,5.5vw,66px);overflow:hidden;border:1px solid #ffffff1a;border-radius:28px;background:linear-gradient(125deg,#14243aef,#101e31ed 58%,#132b3ced);box-shadow:0 30px 100px #0005}
+.mw-hero:before{content:"";position:absolute;right:-150px;top:-230px;width:570px;height:570px;border:1px solid #74b5ff1c;border-radius:50%;box-shadow:0 0 0 34px #74b5ff08,0 0 0 72px #74b5ff06}
+.mw-hero:after{content:"";position:absolute;right:9%;bottom:-250px;width:360px;height:360px;border-radius:50%;background:#3fc9c51a;filter:blur(15px)}
+.mw-copy,.mw-console{position:relative;z-index:1;min-width:0}
+.mw-kicker{display:inline-flex;align-items:center;gap:9px;color:#9ec4ff;font-size:10px;font-weight:850;letter-spacing:.17em;text-transform:uppercase}
+.mw-kicker:before{content:"";width:20px;height:1px;background:var(--blue)}
+.mw-title{max-width:650px;margin:19px 0 18px;font-size:clamp(42px,6vw,69px);font-weight:820;line-height:1.045;letter-spacing:-.045em;text-wrap:balance}
+.mw-title em{color:#83b8ff;font-style:normal}
+.mw-lead{max-width:590px;margin:0;color:#b8c7da;font-size:16px;line-height:1.85}
+.mw-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:28px}
+.mw-link{display:inline-flex;align-items:center;gap:9px;min-height:43px;padding:0 17px;border:1px solid #ffffff21;border-radius:10px;background:#ffffff0a;color:#e9f2ff;text-decoration:none;font-size:12px;font-weight:750}
+.mw-link.primary{border-color:#6daaff;background:linear-gradient(120deg,#6daaff,#65d7d2);color:#071522;box-shadow:0 8px 24px #4f9ce633}
+.mw-link span{font-size:16px}
+.mw-console{padding:22px;border:1px solid #85b9ff2a;border-radius:20px;background:linear-gradient(150deg,#0a1728e8,#11263aeb);box-shadow:0 18px 55px #0005, inset 0 1px #ffffff15}
+.mw-console-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:17px;border-bottom:1px solid #ffffff15}
+.mw-console-label{color:#9fb2cc;font-size:10px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
+.mw-live{display:inline-flex;align-items:center;gap:6px;color:#7de0c8;font-size:10px;font-weight:750}
+.mw-live:before{content:"";width:6px;height:6px;border-radius:50%;background:#6de0b9;box-shadow:0 0 0 4px #6de0b91b}
+.mw-console-title{margin:20px 0 5px;font-size:19px;font-weight:760;letter-spacing:-.025em}
+.mw-console-note{margin:0;color:#8fa3bd;font-size:12px;line-height:1.6}
+.mw-progress-line{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:24px 0 10px}
+.mw-progress-line span{color:#a9bad0;font-size:11px}
+.mw-progress-line b{color:#8fe3d7;font-size:15px;font-variant-numeric:tabular-nums}
+.mw-progress{height:9px;overflow:hidden;border:1px solid #ffffff16;border-radius:20px;background:#06101e}
+.mw-progress i{display:block;width:74%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#699cff,#63ded0);box-shadow:0 0 18px #59cbd477}
+.mw-eta{display:flex;justify-content:space-between;gap:12px;margin-top:11px;color:#8298b3;font-size:10px}
+.mw-eta b{color:#e5edf9;font-weight:700}
+.mw-steps{display:flex;gap:7px;margin-top:23px}
+.mw-step{height:4px;flex:1;border-radius:9px;background:#26394f}
+.mw-step.done{background:#67ddc6}
+.mw-step.active{background:linear-gradient(90deg,#6daaff 40%,#344a64 40%)}
+.mw-section{margin:36px 0 0}
+.mw-section-head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:16px}
+.mw-section-head p{margin:0;color:#8da2bd;font-size:11px}
+.mw-section-title{margin:0;font-size:22px;font-weight:760;letter-spacing:-.025em}
+.mw-timeline{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.mw-phase{position:relative;min-height:142px;padding:19px;border:1px solid #ffffff15;border-radius:15px;background:linear-gradient(145deg,#122137,#0e1b2d)}
+.mw-phase-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mw-phase-number{color:#7693b7;font:700 10px ui-monospace,monospace;letter-spacing:.08em}
+.mw-phase-mark{display:grid;place-items:center;width:25px;height:25px;border-radius:8px;background:#5ddbc51c;color:#79e4cf;font-size:13px}
+.mw-phase.current .mw-phase-mark{background:#f4bd6b1b;color:#ffcc80}
+.mw-phase h3{margin:13px 0 5px;font-size:14px;font-weight:750;letter-spacing:-.01em}
+.mw-phase p{margin:0;color:#91a3ba;font-size:11px;line-height:1.6}
+.mw-phase.current{border-color:#e9b75b52;background:linear-gradient(145deg,#2b2a2a,#172236)}
+.mw-status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+.mw-system{display:flex;align-items:center;gap:12px;padding:17px;border:1px solid #ffffff13;border-radius:14px;background:#101e30cc}
+.mw-system-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 auto;border:1px solid #7cb7ff2b;border-radius:11px;background:#6caaff12;color:#9fc5ff;font-size:17px}
+.mw-system b,.mw-system small{display:block}
+.mw-system b{font-size:12px;font-weight:750}
+.mw-system small{margin-top:3px;color:#8fa4bd;font-size:10px;line-height:1.5}
+.mw-system-state{margin-left:auto;color:#7de0bd;font-size:9px;font-weight:800;white-space:nowrap}
+.mw-bottom{display:grid;grid-template-columns:1fr auto;align-items:center;gap:24px;margin:26px 0 18px;padding:22px 24px;border:1px solid #6eaaff2b;border-radius:16px;background:linear-gradient(100deg,#142a40,#102033)}
+.mw-bottom h2{margin:0 0 4px;font-size:15px;font-weight:750}
+.mw-bottom p{margin:0;color:#98abc3;font-size:11px;line-height:1.65}
+.mw-contact{display:inline-flex;align-items:center;gap:9px;padding:11px 15px;border:1px solid #ffffff25;border-radius:10px;color:#e7f0fd;font-size:11px;font-weight:750;text-decoration:none;white-space:nowrap}
+.mw-footer{display:flex;justify-content:space-between;gap:15px;padding:0 2px 28px;color:#687f9c;font-size:9px;letter-spacing:.04em}
+@media(max-width:850px){.mw-hero{grid-template-columns:1fr;gap:28px}.mw-console{max-width:520px}.mw-status-grid{grid-template-columns:1fr}.mw-system{padding:14px 16px}}
+@media(max-width:620px){
+ .mw-wrap{width:min(100% - 28px,1120px)}
+ .mw-topbar{padding:18px 0;align-items:flex-start}
+ .mw-brand{font-size:12px}.mw-brand-mark{width:37px;height:37px;border-radius:11px}
+ .mw-status{padding:8px 10px;font-size:8px;letter-spacing:.07em}
+ .mw-hero{min-height:0;margin-top:5px;padding:28px 21px;border-radius:21px}
+ .mw-title{font-size:clamp(38px,11vw,53px)}
+ .mw-lead{font-size:14px;line-height:1.75}
+ .mw-console{padding:18px;border-radius:16px}
+ .mw-section{margin-top:28px}
+ .mw-section-head{align-items:flex-start;flex-direction:column;gap:5px}
+ .mw-section-title{font-size:19px}
+ .mw-timeline{grid-template-columns:1fr;gap:8px}
+ .mw-phase{min-height:0;padding:15px}
+ .mw-phase h3{margin:9px 0 3px}
+ .mw-bottom{grid-template-columns:1fr;gap:15px;padding:19px}
+ .mw-contact{justify-content:center}
+ .mw-footer{flex-direction:column;gap:4px;padding-bottom:20px}
 }
-</style></head><body><header class="wrap nav"><div class="brand">CLOUDDESK</div><div class="status">Идут технические работы</div></header><main class="wrap panel"><span class="eyebrow">Плановое обслуживание</span><h1>Сервис временно недоступен</h1><p class="lead">Обновляем базу данных и сетевое оборудование. Данные пользователей в безопасности, повторная авторизация не потребуется.</p><div class="notice"><i>⚙️</i><div><b>Работы идут по графику</b><small>Начало: 02:00 · Екатеринбург (UTC+5)</small></div><time>Завершение до 04:30</time></div><div class="progress"><i></i></div><div class="progress-copy"><span>Выполнено 74%</span><span>Осталось около 35 минут</span></div><section class="services"><div class="service"><div><b>Личный кабинет</b><small>Вход и изменение настроек</small></div><span class="work">Обслуживание</span></div><div class="service"><div><b>API и интеграции</b><small>Запросы продолжают обрабатываться</small></div><span class="ok">Работает</span></div><div class="service"><div><b>Хранение данных</b><small>Резервные копии проверены</small></div><span class="ok">Работает</span></div></section><footer class="support"><p>Если вопрос срочный, сообщите код инцидента <b>MW-2048</b>.</p><p><a href="mailto:support@example.com">support@example.com</a><br><a href="tel:+73430000000">+7 (343) 000-00-00</a></p></footer><div class="demo">Демонстрационные контакты — замените их перед публикацией</div></main></body></html>''',
+@media(prefers-reduced-motion:no-preference){.mw-progress i{animation:mw-pulse 3s ease-in-out infinite alternate}@keyframes mw-pulse{from{filter:brightness(.92)}to{filter:brightness(1.14)}}}
+</style>
+</head>
+<body>
+<div class="mw-wrap">
+<header class="mw-topbar">
+  <div class="mw-brand"><span class="mw-brand-mark">⚙️</span><span>CLOUDDESK<small>SERVICE STATUS</small></span></div>
+  <div class="mw-status">Плановое обслуживание</div>
+</header>
+<main>
+<section class="mw-hero">
+  <div class="mw-copy">
+    <span class="mw-kicker">Техническое обновление · MW-2048</span>
+    <h1 class="mw-title">Мы скоро <em>вернёмся</em>.</h1>
+    <p class="mw-lead">Обновляем инфраструктуру, чтобы сервис работал быстрее и стабильнее. Сейчас часть функций временно недоступна. Ваши данные в безопасности — повторная авторизация не потребуется.</p>
+    <div class="mw-actions">
+      <a class="mw-link primary" href="mailto:support@example.com"><span>✉</span> Связаться с поддержкой</a>
+      <a class="mw-link" href="#status"><span>⌄</span> Статус работ</a>
+    </div>
+  </div>
+  <aside class="mw-console" id="status">
+    <div class="mw-console-head"><span class="mw-console-label">Ход обслуживания</span><span class="mw-live">В процессе</span></div>
+    <h2 class="mw-console-title">Система обновляется</h2>
+    <p class="mw-console-note">Основные компоненты уже прошли проверку. Выполняем финальные настройки.</p>
+    <div class="mw-progress-line"><span>Общий прогресс</span><b>74%</b></div>
+    <div class="mw-progress"><i></i></div>
+    <div class="mw-eta"><span>Начало: 02:00 · Екатеринбург</span><b>До 04:30</b></div>
+    <div class="mw-steps"><i class="mw-step done"></i><i class="mw-step done"></i><i class="mw-step active"></i><i class="mw-step"></i></div>
+  </aside>
+</section>
+<section class="mw-section">
+  <div class="mw-section-head"><h2 class="mw-section-title">Этапы обслуживания</h2><p>План работ · 10 ноября 2026</p></div>
+  <div class="mw-timeline">
+    <article class="mw-phase"><div class="mw-phase-top"><span class="mw-phase-number">ЭТАП 01</span><span class="mw-phase-mark">✓</span></div><h3>Подготовка системы</h3><p>Резервное копирование и проверка оборудования завершены.</p></article>
+    <article class="mw-phase"><div class="mw-phase-top"><span class="mw-phase-number">ЭТАП 02</span><span class="mw-phase-mark">✓</span></div><h3>Обновление платформы</h3><p>Установка обновлений и настройка сетевой инфраструктуры завершены.</p></article>
+    <article class="mw-phase current"><div class="mw-phase-top"><span class="mw-phase-number">ЭТАП 03</span><span class="mw-phase-mark">⚙</span></div><h3>Финальная проверка</h3><p>Проверяем доступность сервисов перед полным запуском.</p></article>
+  </div>
+</section>
+<section class="mw-section">
+  <div class="mw-section-head"><h2 class="mw-section-title">Состояние компонентов</h2><p>Последнее обновление статуса — сейчас</p></div>
+  <div class="mw-status-grid">
+    <div class="mw-system"><span class="mw-system-icon">▦</span><span><b>Личный кабинет</b><small>Вход и настройки</small></span><span class="mw-system-state">Проверка</span></div>
+    <div class="mw-system"><span class="mw-system-icon">⌘</span><span><b>API и интеграции</b><small>Обмен данными</small></span><span class="mw-system-state">Работает</span></div>
+    <div class="mw-system"><span class="mw-system-icon">◈</span><span><b>Хранение данных</b><small>Резервные копии</small></span><span class="mw-system-state">Работает</span></div>
+  </div>
+</section>
+<section class="mw-bottom">
+  <div><h2>Нужна помощь?</h2><p>Если вопрос срочный, напишите нам. Команда поддержки остаётся на связи во время обслуживания.</p></div>
+  <a class="mw-contact" href="mailto:support@example.com">support@example.com <span>↗</span></a>
+</section>
+</main>
+<footer class="mw-footer"><span>© 2026 CLOUDDESK · СТРАНИЦА ТЕХНИЧЕСКОГО ОБСЛУЖИВАНИЯ</span><span>Демонстрационные контакты — замените перед публикацией</span></footer>
+</div>
+</body>
+</html>''',
         },
         {
             "id": "loading",
