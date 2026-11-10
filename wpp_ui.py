@@ -1097,13 +1097,13 @@ html.wpp-navigating{cursor:progress}html.wpp-navigating .workspace>main{pointer-
 # Page actions belong to the blocks they affect. This removes the empty strip
 # above dashboards and tables while keeping every action visible on mobile.
 CSS += '''
-subscription-connection-flag{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:13px;line-height:1}.subscription-connection-protocol{display:inline-flex;align-items:center;justify-content:center;gap:5px}
+.resource-deck{position:relative}.resource-deck .resource:last-child{padding-right:166px!important}.dashboard-inline-tools{position:absolute;z-index:2;right:28px;top:50%;display:flex;align-items:center;gap:7px;margin:0;transform:translateY(-50%)}.dashboard-inline-tools .live-indicator{margin:0;padding:7px 9px;background:color-mix(in srgb,var(--surface) 88%,transparent)}.dashboard-inline-tools button{display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:7px}.dashboard-inline-tools button .ico{margin:0}
 .clients-summary{grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:center}.clients-summary-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 14px}.clients-summary-actions button{min-height:38px;white-space:nowrap}.clients-summary-actions>button:first-child{width:38px;padding:8px}
 .connection-list-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.connection-list-actions i{font-style:normal}.connection-list-actions button{padding:9px 13px;font-size:11px;text-transform:none;letter-spacing:0;white-space:nowrap}
 .local-node-head>.nodes-count{margin-left:0;padding:7px 10px;background:var(--input)}.local-node-head>.nodes-count strong{font-size:19px}.local-node-head>.nodes-count span{font-size:8px}.updates-hero .actions{align-items:center;flex-wrap:nowrap}.updates-hero #refreshAll{white-space:nowrap}
 @media(max-width:1150px){.clients-summary{grid-template-columns:repeat(4,minmax(0,1fr))}.clients-summary-actions{grid-column:1/-1;justify-content:flex-end;padding:12px 14px 0;border-top:1px solid var(--line)}}
 @media(max-width:1050px){.connection-list-head{grid-template-columns:minmax(230px,1fr) 170px minmax(180px,auto)}.connection-list-head>span:nth-child(3){display:none}.connection-list-head>.connection-list-actions{display:flex!important}}
-@media(max-width:560px){}@media(max-width:680px){.connection-list-head{display:flex;justify-content:flex-end;padding:0 0 9px}.connection-list-head>span:not(.connection-list-actions),.connection-list-actions>i{display:none}.connection-list-actions{width:100%;justify-content:flex-end}.connection-list-actions button{width:100%}.clients-summary{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:16px}.clients-summary-actions{grid-column:1/-1;padding:12px 10px 0}.clients-summary-actions .primary{flex:1}.local-node-head>.nodes-count{display:flex}.updates-hero{align-items:flex-start}.updates-hero .actions{align-items:flex-end;flex-direction:column}.updates-hero .pill{display:none}}
+@media(max-width:900px){.resource-deck .resource:last-child{padding-right:166px!important}}@media(max-width:560px){.resource-deck .resource:last-child{padding-right:126px!important}.dashboard-inline-tools{right:18px}.dashboard-inline-tools .live-indicator b{display:none}}@media(max-width:680px){.connection-list-head{display:flex;justify-content:flex-end;padding:0 0 9px}.connection-list-head>span:not(.connection-list-actions),.connection-list-actions>i{display:none}.connection-list-actions{width:100%;justify-content:flex-end}.connection-list-actions button{width:100%}.clients-summary{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:16px}.clients-summary-actions{grid-column:1/-1;padding:12px 10px 0}.clients-summary-actions .primary{flex:1}.local-node-head>.nodes-count{display:flex}.updates-hero{align-items:flex-start}.updates-hero .actions{align-items:flex-end;flex-direction:column}.updates-hero .pill{display:none}}
 '''
 
 # Dashboard visual system: every metric and content panel follows the same
@@ -1120,23 +1120,6 @@ CSS += '''
 #dashboardContent .overview-stat:before{top:16px;bottom:16px;background:var(--accent);opacity:.8}
 #dashboardContent .overview-stat span,#dashboardContent .resource-copy small{font-size:10px;line-height:1.45}
 #dashboardContent .overview-stat b{margin-top:6px;font-size:25px;line-height:1.2}
-#dashboardContent .overview-stats .overview-stat{height:94px;min-height:94px;box-sizing:border-box}
-#dashboardContent .overview-stat-total{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;padding:16px 18px!important}
-#dashboardContent .overview-stat-total-copy{min-width:0}
-#dashboardContent .overview-stat-total-copy>span{display:block}
-#dashboardContent .overview-stat-total-copy>b{display:block}
-#dashboardContent .overview-stat-total .dashboard-inline-tools{display:flex;align-items:center;justify-content:center;gap:8px;width:auto;margin:0;padding:0;white-space:nowrap}
-#dashboardContent .dashboard-inline-tools .live-indicator{display:inline-flex;align-items:center;gap:6px;margin:0;padding:0;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;font-size:10px;line-height:1;color:var(--green);white-space:nowrap}
-#dashboardContent .dashboard-inline-tools .live-indicator b{font-weight:600}
-#dashboardContent .dashboard-inline-tools .live-indicator i{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent)}
-#dashboardContent .dashboard-inline-tools .live-indicator.stale{color:var(--amber)}
-#dashboardContent .dashboard-inline-tools .live-indicator.stale i{background:var(--amber);box-shadow:none}
-#dashboardContent .dashboard-inline-tools .live-indicator.offline{color:var(--red)}
-#dashboardContent .dashboard-inline-tools .live-indicator.offline i{background:var(--red);box-shadow:none}
-#dashboardContent .dashboard-inline-tools .dashboard-inline-age{font-size:9px;line-height:1;color:var(--muted);white-space:nowrap}
-#dashboardContent .dashboard-inline-tools button{display:grid;place-items:center;width:26px;height:26px;min-height:26px;padding:5px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--muted);cursor:pointer}
-#dashboardContent .dashboard-inline-tools button:hover{color:var(--accent);border-color:var(--accent)}
-#dashboardContent .dashboard-inline-tools button .ico{width:14px;height:14px;margin:0}
 #dashboardContent .resource-copy strong{font-size:13px;line-height:1.35}
 #dashboardContent .dashboard-grid>.card,#dashboardContent .two-col.equal>.card,#dashboardContent>.card:not(.resource-deck){margin-bottom:var(--dashboard-gap);padding:18px}
 #dashboardContent .card-title{min-height:40px;margin-bottom:16px;padding-bottom:12px}
@@ -1148,7 +1131,7 @@ CSS += '''
 #dashboardContent .detail-line{padding:11px 0;border-bottom:1px solid var(--line)}
 #dashboardContent .detail-line:last-child{border-bottom:0}
 @media(max-width:900px){#dashboardContent .dashboard-grid>.card,#dashboardContent .two-col.equal>.card{height:auto}}
-@media(max-width:560px){#dashboardContent{--dashboard-gap:10px;--dashboard-radius:13px}#dashboardContent .resource-deck .resource,#dashboardContent .overview-stat{min-height:82px}#dashboardContent .overview-stats .overview-stat{height:82px;min-height:82px}#dashboardContent .resource-deck .resource{padding:14px 16px!important}#dashboardContent .overview-stat{padding:14px 16px}#dashboardContent .overview-stat-total{grid-template-columns:minmax(0,1fr) auto;column-gap:5px;padding:10px 10px!important}#dashboardContent .overview-stat-total .dashboard-inline-tools{display:grid;grid-template-columns:auto 22px;grid-template-areas:"live refresh" "age refresh";gap:2px 4px;justify-content:center}#dashboardContent .dashboard-inline-tools .live-indicator{grid-area:live;gap:4px;font-size:8px}#dashboardContent .dashboard-inline-tools .dashboard-inline-age{grid-area:age;font-size:7px;white-space:normal}#dashboardContent .dashboard-inline-tools button{grid-area:refresh;width:22px;height:22px;min-height:22px}#dashboardContent .card-title{min-height:0}}
+@media(max-width:560px){#dashboardContent{--dashboard-gap:10px;--dashboard-radius:13px}#dashboardContent .resource-deck .resource,#dashboardContent .overview-stat{min-height:82px}#dashboardContent .resource-deck .resource{padding:14px 16px!important}#dashboardContent .overview-stat{padding:14px 16px}#dashboardContent .card-title{min-height:0}}
 '''
 
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
@@ -1280,14 +1263,7 @@ def _dashboard_body_legacy(data, subs, profiles, traffic, path, domain, csrf, pr
     direct=[u for u in profiles if not u.get('subscription_id')]
     active=sum(aggregate(s['live_profile_ids'],traffic,s.get('enabled',True))['active'] for s in subs)+sum(aggregate([u['id']],traffic,u.get('enabled',True))['active'] for u in direct)
     total_up=sum(max(0,int(v.get('up',0))) for v in traffic.values() if isinstance(v,dict)); total_down=sum(max(0,int(v.get('down',0))) for v in traffic.values() if isinstance(v,dict))
-    stats=[]
-    for label,value in [('Клиенты',len(subs)+len(direct)),('Подписок',len(subs)),('Передают трафик',active),('Всего трафика',size(total_up+total_down))]:
-        if label=='Всего трафика':
-            tools_html=('<div class="dashboard-inline-tools"><span id="liveIndicator" class="live-indicator"><i></i><b>Онлайн</b></span><small id="liveAge" class="dashboard-inline-age">Обновлено: сейчас</small><button id="refreshDashboard" type="button" title="Обновить данные" aria-label="Обновить данные">'+icon('refresh')+'</button></div>')
-            stats.append(f'<div class="overview-stat overview-stat-total"><div class="overview-stat-total-copy"><span>{label}</span><b>{value}</b></div>{tools_html}</div>')
-        else:
-            stats.append(f'<div class="overview-stat"><span>{label}</span><b>{value}</b></div>')
-    stats=''.join(stats)
+    stats=''.join(f'<div class="overview-stat"><span>{label}</span><b>{value}</b></div>' for label,value in [('Клиенты',len(subs)+len(direct)),('Подписок',len(subs)),('Передают трафик',active),('Всего трафика',size(total_up+total_down))])
     services=latest.get('services',{}); names={'xray':'Xray · VLESS / Hysteria2','naive':'NaiveProxy','mieru':'Mieru','relay':'Telegram WEB Proxy / MTProto','openflux':'OpenFlux · Яндекс / Mail.ru / MAX','caddy':'Caddy · HTTPS','panel':'Панель управления'}
     def service_badge(key,label):
         state=services.get(key,{}).get('state','unknown')
@@ -1335,6 +1311,10 @@ def dashboard_body(data, subs, profiles, traffic, path, domain, csrf, proxy_link
                    f'</section></div><div class="two-col equal">')
     body = re.sub(r'<div class="update-box">.*?</div></section></div><section class="card version-manager">.*?</section><div class="two-col equal">',
                   replacement, body, count=1, flags=re.S)
+    tools = f'''<div class="dashboard-inline-tools"><span id="liveIndicator" class="live-indicator"><i></i><b>Онлайн</b><small id="liveAge">сейчас</small></span><button id="refreshDashboard" type="button" title="Обновить данные" aria-label="Обновить данные">{icon('refresh')}</button></div>'''
+    return body.replace('<section class="card resource-deck live-block" data-live-block="resources"><div class="resource-grid">',
+                        '<section class="card resource-deck">'+tools+'<div class="resource-grid live-block" data-live-block="resources">', 1)
+
     return body
 
 
