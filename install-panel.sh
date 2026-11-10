@@ -2697,9 +2697,10 @@ def direct_profile_config(user,secret):
     # plain VLESS link: surface a retryable error instead.
     profiles=routing_store.load(ROUTING_FILE).get("profiles",{})
     profile=profiles.get(str(connection["id"]))
+    profile_title=str(user.get("name") or title)
     if isinstance(profile,dict) and profile.get("enabled",True):
-        return routing_store.xray_config(link,profile,title)
-    return routing_store.plain_xray_config(link,title)
+        return routing_store.xray_config(link,profile,profile_title)
+    return routing_store.plain_xray_config(link,profile_title)
 def subscription_device_name(user_agent):
     value=str(user_agent or "").lower()
     if "android" in value: return "Android"
@@ -4022,7 +4023,7 @@ class Handler(BaseHTTPRequestHandler):
             failover=bool(lines)
             if failover:
                 try:
-                    auto_config=routing_store.failover_xray_config(lines,merged_remote,"🧭 Автовыбор")
+                    auto_config=routing_store.failover_xray_config(lines,merged_remote,"🇪🇺 Автовыбор")
                     xray_configs.insert(0,auto_config)
                 except routing_store.RoutingError: pass
             if requested_format in ("xray","xray-json","json") or (happ and (selected_routing or failover)):
