@@ -100,5 +100,5 @@ def preview_document(source, externalize):
     # Preview the exact document without rewriting tags or JSON-LD.
     # Only the selected photo hosts are allowed for image rendering; scripts,
     # connections, frames, forms and all other network destinations stay blocked.
-    csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob: https://p2.zoon.ru https://ceramum.ru https://beloostrov.groupmmc.ru; font-src data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+    csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob: https://p2.zoon.ru https://ceramum.ru https://beloostrov.groupmmc.ru https://spautopro.ru https://medsi.ru; font-src data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
     return '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '">' + source
