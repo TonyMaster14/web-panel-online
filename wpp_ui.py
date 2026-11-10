@@ -276,7 +276,9 @@ CSS += """
 .signin-emblem{width:100%;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
 .signin-emblem div{width:100%;display:flex;justify-content:center;text-align:center}
 .signin-emblem div span{display:block;text-align:center;font-size:17px;font-weight:800;letter-spacing:.11em;color:var(--text)}
-.login-secure{position:absolute;top:0;right:0}
+.login-card-head{flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:0}
+.login-secure{position:static;align-self:center;margin:0}
+@media(max-width:560px){.login-card-head{flex-direction:column;align-items:center;gap:14px}.login-secure{display:inline-flex;position:static;margin:0}}
 """
 
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
