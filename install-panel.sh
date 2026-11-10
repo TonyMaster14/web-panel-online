@@ -4724,4 +4724,224 @@ tls_block = [
     "\t\t}\n",
     "\t}\n",
     "\t# WPP TLS WITHOUT PORT 80 END\n",
-    "
+    "\n",
+]
+lines[site_start+1:site_start+1] = tls_block
+Path(p).write_text("".join(lines),encoding="utf-8")
+PY
+
+if grep -Eq '\{\$(TPROXY_HOSTNAME|ACME_EMAIL)\}' "$CADDYFILE"; then
+    echo "ERROR: unresolved Caddy environment placeholders remain."
+    sed -n '1,100p' "$CADDYFILE" || true
+    exit 1
+fi
+
+caddy fmt --overwrite "$CADDYFILE" >/dev/null 2>&1 || true
+
+if ! caddy validate --config "$CADDYFILE" --adapter caddyfile; then
+    echo
+    echo "ERROR: Caddy validation failed."
+    sed -n '1,100p' "$CADDYFILE" || true
+    exit 1
+fi
+
+systemctl daemon-reload
+echo "      Activating Caddy..."
+if ! systemctl restart caddy.service; then
+    systemctl --no-pager --full status caddy.service >&2 || true
+    journalctl -u caddy.service -n 60 --no-pager >&2 || true
+    die "Caddy failed to start."
+fi
+systemctl enable web-proxy-panel-firewall.service
+systemctl restart web-proxy-panel-firewall.service
+systemctl enable web-proxy-panel-traffic.timer web-panel-proxy-metrics.timer
+systemctl enable --now web-panel-proxy-auto-update.timer
+systemctl enable --now web-panel-proxy-component-auto-update.timer
+systemctl stop web-proxy-panel-traffic.timer web-panel-proxy-metrics.timer
+systemctl reset-failed web-proxy-panel-traffic.service web-panel-proxy-metrics.service 2>/dev/null || true
+systemctl enable tproxy-panel.service
+systemctl restart tproxy-panel.service
+
+echo "      Initializing user/secret manager..."
+"$MANAGER" init
+
+echo "      Checking initial traffic collection..."
+systemctl restart web-proxy-panel-traffic.service || {
+    journalctl -u web-proxy-panel-traffic.service -n 30 --no-pager >&2 || true
+    die "Traffic collection failed; update cannot be considered successful."
+}
+echo "      Checking initial VPS metrics..."
+systemctl restart web-panel-proxy-metrics.service || {
+    journalctl -u web-panel-proxy-metrics.service -n 30 --no-pager >&2 || true
+    die "VPS metrics failed; update cannot be considered successful."
+}
+systemctl restart web-proxy-panel-traffic.timer web-panel-proxy-metrics.timer
+systemctl is-active --quiet web-panel-proxy-auto-update.timer || die "Automatic update timer did not start."
+systemctl is-active --quiet web-panel-proxy-component-auto-update.timer || die "Component update timer did not start."
+for timer in web-proxy-panel-traffic.timer web-panel-proxy-metrics.timer; do
+    systemctl is-active --quiet "$timer" || die "Collector timer did not start: $timer"
+    timer_state="$(systemctl show --property=SubState --value "$timer")"
+    case "$timer_state" in
+        waiting|running) ;;
+        *) die "Collector timer has no future trigger: $timer ($timer_state)" ;;
+    esac
+done
+
+chown -R root:tproxy /srv/tproxy-site
+find /srv/tproxy-site -type d -exec chmod 0750 {} +
+find /srv/tproxy-site -type f -exec chmod 0640 {} +
+
+echo "[5/6] Starting service..."
+systemctl restart caddy.service
+if [[ -f /etc/web-proxy-panel/mtproxy-economy ]]; then
+    systemctl disable --now tproxy-server.service mtproxy.service >/dev/null 2>&1 || true
+else
+    systemctl restart tproxy-server.service
+    systemctl restart mtproxy.service
+fi
+
+# Re-publish the retained author source through the current CSP-safe renderer.
+# This automatically repairs pages saved by the affected release where the
+# HTML loaded but its inline styles and scripts were blocked by the browser.
+WEBPROXY_DOMAIN="$DOMAIN" \
+WEBPROXY_MTPROTO_HOST="$MTPROTO_HOST" \
+WEBPROXY_PANEL_PATH="$PANEL_PATH" \
+    python3 "$APP_FILE" --repair-site
+
+# Ensure no stale copy of this exact panel occupies 127.0.0.1:8090.
+systemctl stop tproxy-panel.service 2>/dev/null || true
+pkill -f '[/]opt/tproxy-panel/panel\.py' 2>/dev/null || true
+sleep 0.3
+
+if ss -lntp 2>/dev/null | grep -Eq ':8090\\b'; then
+    echo "ERROR: 127.0.0.1:8090 is still occupied before starting the panel."
+    ss -lntp 2>/dev/null | grep -E ':8090\\b' || true
+    exit 1
+fi
+
+systemctl start tproxy-panel.service
+sleep 1
+
+required_units=(caddy.service tproxy-panel.service)
+if [[ ! -f /etc/web-proxy-panel/mtproxy-economy ]]; then
+    required_units+=(tproxy-server.service mtproxy.service)
+fi
+for unit in "${required_units[@]}"; do
+    systemctl is-active --quiet "$unit" || {
+        echo "ERROR: $unit failed to become active."
+        systemctl --no-pager --full status "$unit" || true
+        if [[ "$unit" == "tproxy-panel.service" ]]; then
+            echo "--- Current panel journal ---"
+            journalctl -u tproxy-panel.service --since "2 minutes ago" -n 120 --no-pager || true
+        fi
+        exit 1
+    }
+done
+
+if ss -lntp 2>/dev/null | grep -E ':80[[:space:]]' | grep -q 'caddy'; then
+    echo "ERROR: Caddy still occupies TCP/80 after applying the HTTPS-only configuration."
+    ss -lntp 2>/dev/null | grep -E ':(80|443)[[:space:]]' || true
+    exit 1
+fi
+if ! /usr/local/sbin/web-panel-proxy-sync-tls --force; then
+    echo "ERROR: TLS certificate validation failed after switching ACME to TCP/443."
+    journalctl -u caddy.service -n 80 --no-pager >&2 || true
+    exit 1
+fi
+
+echo "[6/6] Checking panel service and route..."
+if ! systemctl is-active --quiet tproxy-panel.service; then
+    echo "ERROR: tproxy-panel.service is not active."
+    systemctl --no-pager --full status tproxy-panel.service || true
+    journalctl -u tproxy-panel.service --since "10 minutes ago" -n 80 --no-pager || true
+    exit 1
+fi
+
+if ! curl -fsS --max-time 5 "http://127.0.0.1:8090${PANEL_PATH}/__health" >/dev/null; then
+    echo "ERROR: panel is not answering on 127.0.0.1:8090."
+    ss -lntp 2>/dev/null | grep -E ':8090\b' || true
+    journalctl -u tproxy-panel.service --since "10 minutes ago" -n 80 --no-pager || true
+    exit 1
+fi
+
+if ! curl -k -fsS --max-time 10 "https://${DOMAIN}${PANEL_PATH}/__health" >/dev/null; then
+    echo "ERROR: Caddy panel route returned an error."
+    echo "--- Caddy route ---"
+    grep -n -A4 -B2 "${PANEL_PATH}" "$CADDYFILE" || true
+    echo "--- panel service ---"
+    systemctl --no-pager --full status tproxy-panel.service || true
+    journalctl -u tproxy-panel.service --since "10 minutes ago" -n 50 --no-pager || true
+    exit 1
+fi
+
+# Retire components owned by the withdrawn experimental integrations only
+# after the stable panel, Caddy and proxy services have passed health checks.
+if [[ -e /etc/web-proxy-panel/mieru-ufw-owned ]]; then
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+        while read -r old_port; do
+            [[ "$old_port" =~ ^[0-9]+$ ]] || continue
+            (( old_port >= 1 && old_port <= 65535 )) || continue
+            ufw --force delete allow "${old_port}/tcp" >/dev/null 2>&1 || true
+        done < /etc/web-proxy-panel/mieru-ufw-owned
+    fi
+    rm -f /etc/web-proxy-panel/mieru-ufw-owned
+fi
+if [[ -e /etc/web-proxy-panel/mita-package-owned ]]; then
+    command -v mita >/dev/null 2>&1 && mita stop >/dev/null 2>&1 || true
+    apt-get -o DPkg::Lock::Timeout=600 remove -y mita >/dev/null || die "Could not remove the WPP-owned Mieru package."
+    rm -f /etc/web-proxy-panel/mita-package-owned
+    if ! getent group mita >/dev/null 2>&1; then
+        groupadd --system mita
+        touch /etc/web-proxy-panel/mita-group-owned
+    fi
+    if ! id -u mita >/dev/null 2>&1; then
+        useradd --system --gid mita --home-dir /var/lib/mita --create-home --shell /usr/sbin/nologin mita
+        touch /etc/web-proxy-panel/mita-user-owned
+    fi
+fi
+rm -f /etc/web-proxy-panel/mieru-server.json /etc/web-proxy-panel/mieru-port
+if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
+    rm -rf -- /opt/web-panel-proxy/caddy-naive
+    rm -f /etc/web-proxy-panel/naive-caddy-owned
+fi
+
+echo
+echo "============================================================"
+if [[ "$UPDATING" == "1" ]]; then
+echo "          WEB PANEL ONLINE V 3.0.0 UPDATED"
+else
+echo "         WEB PANEL ONLINE V 3.0.0 IS READY"
+fi
+echo "============================================================"
+echo
+echo "Panel URL:"
+echo "  https://${DOMAIN}${PANEL_PATH}/login"
+echo
+NODE_API_TOKEN="$(python3 - "$DOMAIN" <<'PY'
+import sys
+sys.path.insert(0,"/opt/tproxy-panel")
+import wpp_nodes
+try:
+    key=open("/var/lib/tproxy-panel/api.key",encoding="ascii").read().strip()
+    print(wpp_nodes.make_connection_token(sys.argv[1],key))
+except (OSError,ValueError):
+    pass
+PY
+)"
+if [[ "$UPDATING" != "1" && "$NODE_API_TOKEN" == wppnode1_* ]]; then
+echo "Node API token:"
+echo "  ${NODE_API_TOKEN}"
+echo
+fi
+echo "Administrator login:"
+echo "  ${ADMIN}"
+echo
+if [[ "$UPDATING" == "1" ]]; then
+echo "Administrator password: retained (unchanged)"
+echo
+else
+echo "Administrator password:"
+echo "  ${PASS}"
+echo
+fi
+echo "============================================================"
