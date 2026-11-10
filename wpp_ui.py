@@ -786,8 +786,20 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
     location_label=str(location_label or '').strip()
     def connection_display(item):
         return str(item.get('name','Подключение'))
+    def connection_country_flag(item):
+        node_location=item.get('node_location')
+        country_code=(str(node_location.get('country_code','UN')).upper()
+                      if isinstance(node_location,dict) else str(location_code or 'UN').upper())
+        if not re.fullmatch(r'[A-Z]{2}',country_code) or country_code=='UN':
+            return ''
+        return f'<span class="subscription-connection-flag" aria-hidden="true">{esc(node_flag(country_code))}</span> '
     subscription_connections=[item for item in usable if item.get('protocol') in ('vless','hysteria')]
-    subscription_choices=''.join(f'''<label class="choice-card"><input type="checkbox" name="connection_{esc(item.get('id',''))}" value="1" data-sub-connection data-label="{esc(connection_display(item))}" data-protocol="{esc(item.get('protocol',''))}" {'checked' if item.get('id') in ('vless-direct','hysteria-primary') else ''}><span><strong>{esc(connection_display(item))}</strong><small>{'VLESS XHTTP' if item.get('protocol')=='vless' else 'Hysteria2'} · серверное подключение</small></span></label>''' for item in subscription_connections)
+    subscription_choices=[]
+    for item in subscription_connections:
+        flag=connection_country_flag(item)
+        protocol_label='VLESS XHTTP' if item.get('protocol')=='vless' else 'Hysteria2'
+        subscription_choices.append(f'''<label class="choice-card"><input type="checkbox" name="connection_{esc(item.get('id',''))}" value="1" data-sub-connection data-label="{esc(connection_display(item))}" data-protocol="{esc(item.get('protocol',''))}" {'checked' if item.get('id') in ('vless-direct','hysteria-primary') else ''}><span><strong>{flag}{esc(connection_display(item))}</strong><small>{protocol_label} · серверное подключение</small></span></label>''')
+    subscription_choices=''.join(subscription_choices)
     sub_start=creation.index('<section class="create-step" id="subscriptionFields">')
     picker_start=creation.index('<div class="protocol-picker">',sub_start)
     device_start=creation.index('<div class="device-row">',picker_start)
