@@ -149,6 +149,46 @@ def location_prefix(value):
     return icon + ' ' + value['country_name']
 
 
+COUNTRY_ALIASES = {
+    'сша': 'US', 'соединенные штаты': 'US', 'соединённые штаты': 'US',
+    'оаэ': 'AE', 'голландия': 'NL', 'англия': 'GB',
+    'соединенное королевство': 'GB', 'соединённое королевство': 'GB',
+    'united states': 'US', 'usa': 'US', 'united arab emirates': 'AE',
+    'united kingdom': 'GB', 'uk': 'GB', 'netherlands': 'NL',
+    'germany': 'DE', 'finland': 'FI', 'france': 'FR', 'sweden': 'SE',
+    'norway': 'NO', 'denmark': 'DK', 'poland': 'PL', 'czechia': 'CZ',
+    'czech republic': 'CZ', 'austria': 'AT', 'switzerland': 'CH',
+    'spain': 'ES', 'italy': 'IT', 'lithuania': 'LT', 'latvia': 'LV',
+    'estonia': 'EE', 'romania': 'RO', 'bulgaria': 'BG', 'turkey': 'TR',
+    'kazakhstan': 'KZ', 'russia': 'RU', 'ukraine': 'UA', 'japan': 'JP',
+    'singapore': 'SG', 'hong kong': 'HK', 'canada': 'CA',
+    'ireland': 'IE', 'iceland': 'IS', 'belgium': 'BE',
+}
+
+
+def country_location(value, fallback=None):
+    """Resolve a manually entered country name or ISO code to a flag-ready location."""
+    raw = re.sub(r'\\s+', ' ', str(value or '').strip())
+    if not raw:
+        if isinstance(fallback, dict):
+            current = location(fallback)
+            if current['country_code'] != 'UN':
+                return current
+        raise NodeError('Укажите страну ноды, например «Нидерланды».')
+    normalized = raw.casefold()
+    code = COUNTRY_ALIASES.get(normalized, '')
+    if not code and re.fullmatch(r'[A-Za-z]{2}', raw):
+        candidate = raw.upper()
+        if candidate in COUNTRY_NAMES:
+            code = candidate
+    if not code:
+        code = next((key for key, name in COUNTRY_NAMES.items()
+                     if name.casefold() == normalized), '')
+    if not code or code not in COUNTRY_NAMES:
+        raise NodeError('Не удалось определить страну. Выберите страну из списка подсказок.')
+    return location({'country_code': code, 'country_name': COUNTRY_NAMES[code]})
+
+
 def load_location(path):
     try:
         with open(path, encoding='utf-8') as stream:
