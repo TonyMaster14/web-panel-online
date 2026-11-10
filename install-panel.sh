@@ -598,6 +598,7 @@ USERS="/etc/web-proxy-panel/users.json"
 CONNECTIONS="/etc/web-proxy-panel/connections.json"
 PROFILES="/etc/tproxy-server/profiles.json"
 PRIMARY_SECRET="/etc/web-proxy-panel/primary-secret"
+PRIMARY_DISABLED="/etc/web-proxy-panel/primary-disabled"
 MT_ENV="/etc/mtproxy/mtproxy.env"
 UNIT_DIR="/etc/systemd/system"
 FIREWALL_SCRIPT="/usr/local/sbin/web-proxy-panel-user-firewall"
@@ -1595,7 +1596,52 @@ def federation_purge():
         raise
     print(json.dumps({"ok":True,"deleted":removed}))
 
+def delete_primary_proxy():
+    if os.path.exists(PRIMARY_DISABLED): return False
+    with open(PROFILES,encoding="utf-8") as stream:
+        old_profiles=stream.read()
+    profiles=json.loads(old_profiles)
+    if not isinstance(profiles,dict) or not isinstance(profiles.get("profiles"),list):
+        raise RuntimeError("Не удалось прочитать список профилей WEB Proxy.")
+    previous=profiles["profiles"]
+    kept=[item for item in previous if not (
+        isinstance(item,dict)
+        and not str(item.get("name","")).startswith("panel:")
+        and (item.get("name")=="default" or str(item.get("backend",""))=="127.0.0.1:2398")
+    )]
+    new_profiles=json.dumps({**profiles,"profiles":kept},ensure_ascii=True,indent=2)+"\n"
+    was_active=run("systemctl","is-active","--quiet","tproxy-server.service").returncode==0
+    try:
+        if kept:
+            check_path=PROFILES+".delete-check"
+            try:
+                atomic_text(check_path,new_profiles,0o400,"tproxy")
+                checked=run("/usr/local/bin/tproxy-server","-config","/etc/tproxy-server/config.json",
+                            "-profiles-file",check_path,"-check",timeout=60)
+                if checked.returncode:
+                    raise RuntimeError("Оставшиеся WEB Proxy профили не прошли проверку: "+
+                                       (checked.stderr or checked.stdout)[-1200:])
+            finally:
+                try: os.unlink(check_path)
+                except FileNotFoundError: pass
+        atomic_text(PROFILES,new_profiles,0o400,"tproxy")
+        if was_active:
+            if kept:
+                run("systemctl","restart","tproxy-server.service",check=True)
+                if run("systemctl","is-active","--quiet","tproxy-server.service").returncode:
+                    raise RuntimeError("WEB Proxy не запустился после удаления основного профиля.")
+            else:
+                run("systemctl","stop","tproxy-server.service",check=True)
+        atomic_text(PRIMARY_DISABLED,"disabled\n",0o600)
+    except Exception:
+        atomic_text(PROFILES,old_profiles,0o400,"tproxy")
+        if was_active: run("systemctl","restart","tproxy-server.service",check=False)
+        raise
+    return True
+
+
 def delete(uid):
+    if uid=="primary": return delete_primary_proxy()
     before=load()
     if any(u.get("id")==uid and u.get("subscription_id") for u in before["users"]):
         raise RuntimeError("Управляйте этим профилем через вкладку Подписки.")
@@ -1649,6 +1695,7 @@ def edit_user(uid,enabled=None,name=None):
             raise
 
 def edit_primary_secret(secret):
+    if os.path.exists(PRIMARY_DISABLED): raise ValueError("Основной WEB Proxy удалён.")
     secret=normalize_proxy_secret(secret)
     with open(PRIMARY_SECRET,encoding="ascii") as f: old_secret=f.read().strip()
     if secret==old_secret: return
@@ -2205,6 +2252,7 @@ DOMAIN=os.environ.get("WEBPROXY_DOMAIN","")
 MTPROTO_HOST=os.environ.get("WEBPROXY_MTPROTO_HOST",DOMAIN)
 PANEL_PATH=os.environ.get("WEBPROXY_PANEL_PATH","")
 PRIMARY="/etc/web-proxy-panel/primary-secret"
+PRIMARY_DISABLED="/etc/web-proxy-panel/primary-disabled"
 PROFILES="/etc/tproxy-server/profiles.json"
 USERS="/etc/web-proxy-panel/users.json"
 CONNECTIONS_FILE="/etc/web-proxy-panel/connections.json"
@@ -2331,9 +2379,14 @@ def save(d):
     with open(t,"w",encoding="utf-8") as f: json.dump(d,f,ensure_ascii=True,indent=2)
     os.chmod(t,0o600); os.replace(t,DATA)
 def primary():
+    if os.path.exists(PRIMARY_DISABLED): return ""
     try:
         with open(PRIMARY,encoding="utf-8") as f: return f.read().strip()
     except Exception: return ""
+def primary_profile():
+    secret=primary()
+    if not secret: return []
+    return [{"id":"primary","name":"Основной WEB Proxy","secret":secret,"protocol":"web","enabled":True,"backend_port":443}]
 def users():
     try:
         with open(USERS,encoding="utf-8") as f: return json.load(f).get("users",[])
@@ -3086,7 +3139,7 @@ class Handler(BaseHTTPRequestHandler):
             try: hours=int(parse_qs(urlparse(self.path).query).get("hours",["1"])[0])
             except ValueError: hours=1
             if hours not in (1,6,24): hours=1
-            profiles=[{"id":"primary","name":"Основной WEB Proxy","secret":primary(),"protocol":"web","enabled":True,"backend_port":443}]+users()
+            profiles=primary_profile()+users()
             body=dashboard_body(server_metrics.dashboard_data(hours),subscription_registry(),profiles,traffic(),
                                 PANEL_PATH,DOMAIN,self.csrf(),proxy_link,web_updates.current_version(),hours)
             if path.endswith("/dashboard-data"):
@@ -3108,7 +3161,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path==PANEL_PATH+'/clients-state':
-            profiles=[{'id':'primary','name':'Основной WEB Proxy','secret':primary(),'protocol':'web','enabled':True,'backend_port':443}]+users()
+            profiles=primary_profile()+users()
             records=client_records(subscription_registry(),profiles,traffic(),DOMAIN,proxy_link)
             clients=[{'id':r['id'],'name':r['name'],'kind':r['kind'],'enabled':r['enabled'],
                 'protocols':r['protocols'],'devices':r['devices'],'limit':r['limit'],**r['totals']} for r in records]
@@ -3126,7 +3179,7 @@ class Handler(BaseHTTPRequestHandler):
             for connection in user_connections:
                 if isinstance(connection,dict) and not isinstance(connection.get("node_location"),dict):
                     connection["node_location"]=default_node_location
-            profiles=[{"id":"primary","name":"Основной WEB Proxy","secret":primary(),"protocol":"web","enabled":True,"backend_port":443}]+current_users
+            profiles=primary_profile()+current_users
             try: routing_profiles=routing_store.load(ROUTING_FILE).get("profiles",{})
             except routing_store.RoutingError: routing_profiles={}
             body=users_ui(subscription_registry(),profiles,traffic(),PANEL_PATH,DOMAIN,self.csrf(),proxy_link,
@@ -3205,7 +3258,7 @@ class Handler(BaseHTTPRequestHandler):
                           q in (x.get("device_secrets") if isinstance(x.get("device_secrets"),list) else [])),None))
             if uid and matching:
                 q=matching.get("secret",""); protocol=matching.get("protocol",""); port=str(matching.get("backend_port",0))
-            if q==primary(): matching={"protocol":"web","backend_port":443,"name":"Основной WEB Proxy"}
+            if primary() and q==primary(): matching={"protocol":"web","backend_port":443,"name":"Основной WEB Proxy"}
             if matching and matching.get("protocol") in awg.PROTOCOLS and not AWG_AVAILABLE:
                 self.send_html("Not found",404); return
             if not matching or protocol!=matching.get("protocol","web"):
