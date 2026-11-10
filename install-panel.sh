@@ -2916,7 +2916,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options","nosniff"); self.send_header("Content-Length",str(len(b)))
         self.end_headers(); self.wfile.write(b)
     def send_logo(self,b):
-        self.send_response(200); self.send_header("Content-Type","image/png"); self.send_header("Cache-Control","public, max-age=86400"); self.send_header("Content-Length",str(len(b))); self.end_headers(); self.wfile.write(b)
+        self.send_response(200); self.send_header("Content-Type","image/png"); self.send_header("Cache-Control","no-store"); self.send_header("Content-Length",str(len(b))); self.end_headers(); self.wfile.write(b)
     def send_mp4(self,path):
         try: size=os.path.getsize(path)
         except OSError:
