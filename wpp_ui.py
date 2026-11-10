@@ -431,7 +431,7 @@ def connection_key_card(title, subtitle, value, qr_url, qr_title, protocols, por
 
 
 def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, connections=None,
-                  routing_profiles=None, direct_profile_url=None):
+                  routing_profiles=None, direct_profile_url=None, location_label=''):
     """Large creation-style editor with every client key available separately."""
     source=record['source']; uid=str(record['id']); sid=esc(uid); sub=record['kind']=='subscription'
     title=esc(record['name']); enabled=bool(record.get('enabled',True))
@@ -455,7 +455,8 @@ def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, con
                 connection_name=connection_names.get(str(profile.get('connection_id','')),'')
                 profile_name=connection_name or str(profile.get('name') or labels.get(proto,proto))
                 suffix=(' · ключ '+str(key_number)) if len(secrets)>1 else ''
-                link=proxy_link(proto,secret,port,source['name']+' · '+profile_name+suffix,profile.get('username',''))
+                link_name=location_label if proto in ('vless','hysteria') and str(location_label or '').strip() else source['name']+' · '+profile_name+suffix
+                link=proxy_link(proto,secret,port,link_name,profile.get('username',''))
                 qr=path+'/__qr?'+urlencode({'secret':secret,'protocol':proto,
                     'port':port if proto in ('hysteria','mtproto','naive','mieru') else 443})
                 state='Работает отдельно от общей ссылки' if profile.get('enabled',True) else 'Сейчас отключён'
@@ -497,7 +498,8 @@ def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, con
                 source.get('name',label),[proto],port))
         else:
             for number,secret in enumerate(secrets,1):
-                link=proxy_link(proto,secret,port,source.get('name',label)+' · '+str(number),'')
+                link_name=location_label if proto in ('vless','hysteria') and str(location_label or '').strip() else source.get('name',label)+' · '+str(number)
+                link=proxy_link(proto,secret,port,link_name,'')
                 key_title=label+' · ключ '+str(number)
                 route_profile=(routing_profiles or {}).get(str(source.get('connection_id','')))
                 routed=(proto in ('vless','hysteria') and isinstance(route_profile,dict)
@@ -506,7 +508,7 @@ def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, con
                     routed_link=direct_profile_url(source,secret)
                     import_link=happ_import_link(routed_link)
                     routed_qr=path+'/direct-profile-qr?'+urlencode({'id':uid,'secret':secret,'import':'happ'})
-                    config=routing_store.xray_config(link,route_profile,source.get('name',label))
+                    config=routing_store.xray_config(link,route_profile,location_label or source.get('name',label))
                     key_cards.append(connection_key_card(
                         key_title+' · JSON с маршрутизацией',
                         'Нажмите «Добавить в Happ» или импортируйте эту ссылку. Она передаёт полный JSON одного подключения.',
@@ -712,7 +714,7 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
                       f'<b>{size(total)}</b><small>↑ {size(t["up"])} · ↓ {size(t["down"])}</small>{split}')
         rows.append(f'''<tr data-client data-id="{sid}" data-kind="{kind}" data-protocols="{esc(' '.join(r['protocols']))}" data-name="{name}" data-enabled="{int(bool(enabled))}" data-active="{int(bool(t['active']))}" data-created="{int(r['created'])}" data-traffic="{int(total)}" data-link="{esc(r['link'])}"><td class="select-col"><input type="checkbox" data-select-client aria-label="Выбрать — {name}" {'disabled' if primary else ''}></td><td class="client-name" data-label="Клиент"><div class="client-identity"><span class="client-initial" aria-hidden="true">{esc(r['name'].strip()[:1].upper() or '•')}</span><div><strong>{name}</strong><small>{'Подписка' if sub else 'Основное подключение' if primary else 'Отдельная ссылка'}</small>{badge(t['active'],enabled)}</div></div></td><td class="state-col" data-label="Доступ">{state}</td><td class="activity-col" data-label="Активность">{badge(t['active'],enabled)}</td><td class="protocol-col" data-label="Протоколы">{client_protocols(r['protocols'])}</td><td class="traffic-cell" data-label="Трафик">{traffic_cell}</td><td class="hwid-cell" data-label="Устройства">{used}<small>{device_hint}</small></td><td class="actions-col" data-label="Действия"><div class="row-actions">{action}</div></td></tr>''')
         dialogs.append(client_editor(r,profiles,path,domain,csrf,traffic,proxy_link,connections,
-                                     routing_profiles,direct_profile_url))
+                                     routing_profiles,direct_profile_url,location_label))
     flux_profiles=openflux_profiles or []
     for profile in flux_profiles:
         pid=str(profile.get('id','')); sid=esc('openflux-'+pid); name=esc(profile.get('name','OpenFlux'))
