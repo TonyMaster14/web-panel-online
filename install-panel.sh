@@ -2181,7 +2181,7 @@ from collections import defaultdict, deque
 from wpp_subscriptions import PREFIX as SUB_PREFIX
 from wpp_subscription_dashboard import render as subscription_dashboard
 from wpp_panel_extras import preview_document
-from wpp_ui import CSS as PANEL_CSS, COMMON_JS as PANEL_COMMON_JS, page_layout, login_ui, dashboard_body, dashboard_page, users_ui, editor_ui, openflux_ui, client_records, nodes_ui, updates_ui, openflux_import_uri, cdn_doctor_ui, connections_ui, routing_ui
+from wpp_ui import CSS as PANEL_CSS, COMMON_JS as PANEL_COMMON_JS, page_layout, login_ui, dashboard_body, dashboard_page, users_ui, editor_ui, openflux_ui, client_glances, client_records, nodes_ui, updates_ui, openflux_import_uri, cdn_doctor_ui, connections_ui, routing_ui
 from wpp_ui import happ_import_link
 from wpp_presets import presets as preset_library
 import wpp_metrics as server_metrics
