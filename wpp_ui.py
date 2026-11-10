@@ -496,8 +496,17 @@ def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, con
                 native,path+'/__qr?'+urlencode({**query,'format':'native'}),
                 source.get('name',label),[proto],port))
         else:
+            # Keep the client/profile name in the JSON remarks, but use the
+            # detected node country as the VLESS/Hysteria outbound name in Happ.
+            node_link_name=source.get('name',label)
+            location=source.get('node_location')
+            if proto in ('vless','hysteria') and isinstance(location,dict):
+                country_code=str(location.get('country_code','UN')).upper()
+                country_name=str(location.get('country_name') or location.get('name') or '').strip()
+                if re.fullmatch(r'[A-Z]{2}',country_code) and country_code!='UN' and country_name:
+                    node_link_name=node_flag(country_code)+' '+country_name
             for number,secret in enumerate(secrets,1):
-                link=proxy_link(proto,secret,port,source.get('name',label)+' · '+str(number),'')
+                link=proxy_link(proto,secret,port,node_link_name,'')
                 key_title=label+' · ключ '+str(number)
                 route_profile=(routing_profiles or {}).get(str(source.get('connection_id','')))
                 routed=(proto in ('vless','hysteria') and isinstance(route_profile,dict)
