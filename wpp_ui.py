@@ -755,10 +755,10 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
     if not location_name:
         location_name='Не удалось определить'
     node_auto_field=f'''<div class="node-auto-field" aria-label="Автоматически определённая страна"><span class="node-auto-flag">{esc(node_flag(location_code))}</span><strong>{esc(location_name)}</strong><span class="badge on">Авто</span></div>'''
-    account_name_input='''<input id="accountName" name="name" placeholder="Например, Александр или Телефон" maxlength="80" required autocomplete="off">'''
-    if account_name_input not in creation:
+    account_name_match=re.search(r'<input\\b(?=[^>]*\\bid=["\\']accountName["\\'])[^>]*>',creation)
+    if account_name_match is None:
         raise RuntimeError("Could not locate account-name input to insert detected node")
-    creation=creation.replace(account_name_input,account_name_input+node_auto_field,1)
+    creation=creation[:account_name_match.end()]+node_auto_field+creation[account_name_match.end():]
     creation=creation.replace('<input type="hidden" id="accountKind"', '<div id="createError" class="create-error" role="alert" hidden></div><input type="hidden" id="accountKind"',1)
     occupied_awg={str(profile.get('connection_id','')) for profile in profiles
                   if not profile.get('subscription_id') and profile.get('protocol') in ('awg20','awg31')}
