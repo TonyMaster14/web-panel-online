@@ -4065,7 +4065,8 @@ class Handler(BaseHTTPRequestHandler):
             if matched is None:
                 self.send_data("Not found",404); return
             config=direct_profile_config(matched,matched_secret)
-            title=str(config.get("remarks") or "VLESS")
+            # Keep the user's profile title independent from the server remark.
+            title=str(matched.get("name") or "VPN")
             headers={"profile-title":"base64:"+base64.b64encode(title.encode()).decode(),
                      "profile-update-interval":"6",
                      "profile-web-page-url":direct_profile_url(matched,matched_secret)}
