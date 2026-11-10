@@ -272,7 +272,13 @@ def collect_once():
 def dashboard_data(hours=1):
     data = read_state()
     cutoff = int(time.time()) - hours * 3600
-    return {'latest': data.get('latest', {}), 'history': [p for p in data.get('history', []) if p.get('time', 0) >= cutoff],
+    # Service state is operational status, not a historical metric. Read it
+    # when the dashboard asks for data so stopped/removed protocols disappear
+    # promptly instead of waiting for the background metrics sampling cycle.
+    latest = dict(data.get('latest', {}))
+    latest['services'] = service_snapshot()
+    latest['services_checked'] = int(time.time())
+    return {'latest': latest, 'history': [p for p in data.get('history', []) if p.get('time', 0) >= cutoff],
             'collector_error': read_state(ERROR)}
 
 
