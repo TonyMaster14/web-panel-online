@@ -4077,9 +4077,22 @@ class Handler(BaseHTTPRequestHandler):
             # Keep the Happ profile title (client/device name) separate from
             # config.remarks, which is the server/node name inside the profile.
             title=str(matched.get("name") or "VLESS")
+            usage=traffic().get(str(matched.get("id","")), {})
+            raw_up=max(0,int(usage.get("up",0) or 0))
+            raw_down=max(0,int(usage.get("down",0) or 0))
+            quota_base=max(0,int(matched.get("traffic_quota_base",0) or 0))
+            quota_used=max(0,raw_up+raw_down-quota_base)
+            # traffic_quota_base is stored as a combined upload+download
+            # baseline. Preserve the exact combined usage shown by Happ while
+            # applying the legacy baseline against download first.
+            upload=min(raw_up,quota_used)
+            download=max(0,quota_used-upload)
+            quota=max(0,int(matched.get("traffic_limit_bytes",0) or 0))
+            userinfo=f"upload={upload}; download={download}; total={quota}; expire=0"
             headers={"profile-title":"base64:"+base64.b64encode(title.encode()).decode(),
                      "profile-update-interval":"6",
-                     "profile-web-page-url":direct_profile_url(matched,matched_secret)}
+                     "profile-web-page-url":direct_profile_url(matched,matched_secret),
+                     "subscription-userinfo":userinfo}
             query=parse_qs(urlparse(self.path).query)
             if query.get("download",[""])[0]=="1":
                 headers["Content-Disposition"]='attachment; filename="wpp-routing.json"'

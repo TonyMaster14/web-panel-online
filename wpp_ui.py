@@ -185,7 +185,7 @@ function clearImage(){image.onload=null;image.onerror=null;image.hidden=true;ima
 function loadQr(){const generation=++serial;clearImage();canvas.classList.remove('has-error');status.hidden=false;status.textContent='Создаём QR…';canvas.setAttribute('aria-busy','true');retry.hidden=true;image.onload=()=>{if(generation!==serial)return;image.hidden=false;status.hidden=true;canvas.setAttribute('aria-busy','false')};image.onerror=()=>{if(generation!==serial)return;clearImage();canvas.classList.add('has-error');status.textContent='Не удалось создать QR. Обновите список и попробуйте ещё раз.';retry.hidden=false;canvas.setAttribute('aria-busy','false')};const separator=endpoint.includes('?')?'&':'?';image.src=endpoint+separator+'_qr='+generation+'-'+Date.now()}
 const wide=matchMedia('(min-width:1440px)');let opener=null;
 function selectedRow(q){document.querySelectorAll('[data-client]').forEach(row=>{const chosen=row===q?.closest('[data-client]');row.classList.toggle('qr-selected',chosen);const b=row.querySelector('[data-qr]');if(b)b.setAttribute('aria-expanded',String(chosen))})}
-function openQr(q){let info;try{info=JSON.parse(q.dataset.qrInfo)}catch(e){return}opener=q;endpoint=q.dataset.qr;document.getElementById('qrClientName').textContent=info.name;document.getElementById('qrInitial').textContent=Array.from(info.name.trim())[0]?.toLocaleUpperCase('ru')||'•';document.getElementById('qrKind').textContent=info.kind==='routing'?'JSON с маршрутизацией · Happ':info.kind==='subscription'?'Ссылка подписки':'Отдельное подключение';const protocols=document.getElementById('qrProtocol');protocols.replaceChildren();info.protocols.split(' · ').forEach(p=>{const badge=document.createElement('span');badge.className='pill';badge.textContent=p;protocols.appendChild(badge)});document.getElementById('qrHost').textContent=info.host;document.getElementById('qrPortRow').hidden=info.port===null;document.getElementById('qrPort').textContent=info.port??'';document.getElementById('qrStepOne').textContent=info.kind==='routing'?'Отсканируйте QR в Happ или скопируйте ссылку.':info.openflux?'Отсканируйте QR в приложении OpenFlux':info.web?'Сканируйте камерой другого устройства.':'Отсканируйте в совместимом приложении';document.getElementById('qrStepTwo').textContent=info.kind==='routing'?'Happ загрузит JSON одного подключения с DNS и правилами.':info.openflux?'Профиль добавится автоматически.':info.web?'Откройте ссылку в Telegram.':'или скопируйте ссылку.';link.value=info.link;copyStatus.textContent='';copy.disabled=false;document.getElementById('qrLinkDetails').open=false;selectedRow(q);const dock=wide.matches&&!q.closest('dialog')&&!document.querySelector('dialog:modal');if(dialog.open&&dialog.classList.contains('docked')!==dock){dialog.close();return}dialog.classList.toggle('docked',dock);if(!dialog.open){if(dock)dialog.show();else dialog.showModal()}loadQr()}
+function openQr(q){let info;try{info=JSON.parse(q.dataset.qrInfo)}catch(e){return}opener=q;endpoint=q.dataset.qr;document.getElementById('qrClientName').textContent=info.name;document.getElementById('qrInitial').textContent=Array.from(info.name.trim())[0]?.toLocaleUpperCase('ru')||'•';document.getElementById('qrKind').textContent=info.kind==='routing'?'JSON с маршрутизацией · Happ':info.kind==='happ'?'Профиль Happ':info.kind==='subscription'?'Ссылка подписки':'Отдельное подключение';const protocols=document.getElementById('qrProtocol');protocols.replaceChildren();info.protocols.split(' · ').forEach(p=>{const badge=document.createElement('span');badge.className='pill';badge.textContent=p;protocols.appendChild(badge)});document.getElementById('qrHost').textContent=info.host;document.getElementById('qrPortRow').hidden=info.port===null;document.getElementById('qrPort').textContent=info.port??'';document.getElementById('qrStepOne').textContent=(info.kind==='routing'||info.kind==='happ')?'Отсканируйте QR в Happ или скопируйте ссылку.':info.openflux?'Отсканируйте QR в приложении OpenFlux':info.web?'Сканируйте камерой другого устройства.':'Отсканируйте в совместимом приложении';document.getElementById('qrStepTwo').textContent=info.kind==='routing'?'Happ загрузит JSON одного подключения с DNS и правилами.':info.kind==='happ'?'Happ загрузит профиль и данные о лимите трафика.':info.openflux?'Профиль добавится автоматически.':info.web?'Откройте ссылку в Telegram.':'или скопируйте ссылку.';link.value=info.link;copyStatus.textContent='';copy.disabled=false;document.getElementById('qrLinkDetails').open=false;selectedRow(q);const dock=wide.matches&&!q.closest('dialog')&&!document.querySelector('dialog:modal');if(dialog.open&&dialog.classList.contains('docked')!==dock){dialog.close();return}dialog.classList.toggle('docked',dock);if(!dialog.open){if(dock)dialog.show();else dialog.showModal()}loadQr()}
 document.addEventListener('click',e=>{const q=e.target.closest('[data-qr]');if(q)openQr(q)});
 // Switching layout closes the private card instead of leaving a modal trapped off-screen.
 wide.addEventListener('change',()=>{if(dialog.open)dialog.close()});
@@ -431,7 +431,7 @@ def connection_key_card(title, subtitle, value, qr_url, qr_title, protocols, por
                   f'<button type="button" data-copy="{esc(json_value)}">Скопировать JSON</button></details>'
                   if json_value else '')
     copy_label=('Скопировать конфигурацию' if multiline else
-                'Скопировать для Happ' if kind=='routing' else
+                'Скопировать для Happ' if kind in ('routing','happ') else
                 'Скопировать ссылку подписки' if kind=='subscription' else 'Скопировать ссылку')
     return f'''<article class="access-key-card"><div class="access-key-head"><div><b>{esc(title)}</b><small>{esc(subtitle)}</small></div>{client_protocols(protocols)}</div>{control}<div class="actions">{open_button}<button type="button" class="primary" data-copy="{esc(value)}">{copy_label}</button><button type="button" {qr_attributes(qr_url,qr_title,value,protocols,kind,user_port=port)}>Показать QR</button>{download_button}</div>{json_preview}</article>'''
 
@@ -521,17 +521,24 @@ def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, con
                 route_profile=(routing_profiles or {}).get(str(source.get('connection_id','')))
                 routed=(proto in ('vless','hysteria') and isinstance(route_profile,dict)
                         and route_profile.get('enabled',True) and callable(direct_profile_url))
-                if routed:
-                    routed_link=direct_profile_url(source,secret)
-                    import_link=happ_import_link(routed_link)
-                    routed_qr=path+'/direct-profile-qr?'+urlencode({'id':uid,'secret':secret,'import':'happ'})
-                    config=routing_store.xray_config(link,route_profile,source.get('name',label))
-                    key_cards.append(connection_key_card(
-                        key_title+' · JSON с маршрутизацией',
-                        'Нажмите «Добавить в Happ» или импортируйте эту ссылку. Она передаёт полный JSON одного подключения.',
-                        import_link,routed_qr,source.get('name',label)+' · с маршрутизацией',
-                        [proto],port,download=routed_link+'?format=single&download=1',kind='routing',
-                        open_url=import_link,json_value=json.dumps(config,ensure_ascii=False,indent=2)))
+                if proto in ('vless','hysteria') and callable(direct_profile_url):
+                    profile_url=direct_profile_url(source,secret)
+                    import_link=happ_import_link(profile_url)
+                    happ_qr=path+'/direct-profile-qr?'+urlencode({'id':uid,'secret':secret,'import':'happ'})
+                    if routed:
+                        config=routing_store.xray_config(link,route_profile,source.get('name',label))
+                        key_cards.append(connection_key_card(
+                            key_title+' · JSON с маршрутизацией',
+                            'Профиль Happ с DNS и правилами маршрутизации.',
+                            import_link,happ_qr,source.get('name',label)+' · с маршрутизацией',
+                            [proto],port,download=profile_url+'?format=single&download=1',kind='routing',
+                            open_url=import_link,json_value=json.dumps(config,ensure_ascii=False,indent=2)))
+                    else:
+                        key_cards.append(connection_key_card(
+                            key_title+' · Happ',
+                            'Профиль Happ с отображением использованного и доступного трафика.',
+                            import_link,happ_qr,source.get('name',label)+' · Happ',
+                            [proto],port,kind='happ',open_url=import_link))
                 qr=path+'/__qr?'+urlencode({'secret':secret,'protocol':proto,
                     'port':port if proto in ('hysteria','mtproto','naive','mieru') else 443})
                 key_cards.append(connection_key_card(key_title,
