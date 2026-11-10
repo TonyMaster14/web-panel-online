@@ -18,6 +18,7 @@ SERVICES = {'xray': 'web-panel-proxy-xray.service', 'panel': 'tproxy-panel.servi
             'caddy': 'caddy.service', 'relay': 'tproxy-server.service',
             'naive': 'web-panel-proxy-naive.service',
             'mieru': 'web-panel-proxy-mieru.service'}
+OPENFLUX_CONFIG = Path('/etc/web-proxy-panel/openflux/config.json')
 OPENFLUX_PROFILES = Path('/etc/web-proxy-panel/openflux/profiles')
 MTPROXY_ECONOMY = Path('/etc/web-proxy-panel/mtproxy-economy')
 
@@ -61,7 +62,7 @@ def _service_fields_many(units):
     if not units:
         return {}
     run = subprocess.run([
-        'systemctl', 'show', '--no-pager', '-p', 'Id', '-p', 'ActiveState',
+        'systemctl', 'show', '--no-pager', '-p', 'Id', '-p', 'LoadState', '-p', 'ActiveState',
         '-p', 'MemoryCurrent', '-p', 'TasksCurrent',
         '-p', 'ExecMainStartTimestampMonotonic', *units,
     ], capture_output=True, text=True, timeout=5,
@@ -77,6 +78,7 @@ def _service_fields_many(units):
             return int(value) if value.isdigit() and int(value) < 2**63 else None
         result[unit] = {
             'state': fields.get('ActiveState', 'unknown'),
+            'load_state': fields.get('LoadState', 'unknown'),
             'memory': numeric('MemoryCurrent'), 'tasks': numeric('TasksCurrent'),
             'start_us': numeric('ExecMainStartTimestampMonotonic'),
         }
@@ -94,19 +96,53 @@ def _openflux_units():
     return units
 
 
+def _openflux_transport(unit):
+    if unit == 'web-panel-proxy-openflux.service':
+        config_path = OPENFLUX_CONFIG
+    else:
+        prefix = 'web-panel-proxy-openflux-'
+        suffix = '.service'
+        if not unit.startswith(prefix) or not unit.endswith(suffix):
+            return None
+        profile_id = unit[len(prefix):-len(suffix)]
+        if not re.fullmatch(r'[0-9a-f]{16}', profile_id):
+            return None
+        config_path = OPENFLUX_PROFILES / profile_id / 'config.json'
+    try:
+        config = json.loads(config_path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(config, dict):
+        return None
+    transport = str(config.get('transport', 'yandex')).strip().lower()
+    return {'yandex': 'Яндекс', 'mailru': 'Mail.ru',
+            'telemost': 'Телемост', 'oneme': 'MAX'}.get(transport)
+
+
 def _openflux_snapshot(units, fields):
     states = [fields.get(unit, {'state': 'unknown'}) for unit in units]
-    active = [value for value in states if value.get('state') == 'active']
+    active_units = [
+        unit for unit in units
+        if fields.get(unit, {}).get('state') == 'active'
+        and fields.get(unit, {}).get('load_state', 'loaded') != 'not-found'
+    ]
+    active = [fields[unit] for unit in active_units]
     selected = active or states
     numbers = lambda key: [value[key] for value in selected if value.get(key) is not None]
     starts = numbers('start_us')
     memories = numbers('memory')
     tasks = numbers('tasks')
+    transports = []
+    for unit in active_units:
+        label = _openflux_transport(unit)
+        if label and label not in transports:
+            transports.append(label)
     return {'state': 'active' if active else ('inactive' if states else 'unknown'),
             'memory': sum(memories) if memories else None,
             'tasks': sum(tasks) if tasks else None,
             'start_us': min(starts) if starts else None,
-            'active_profiles': len(active), 'profiles': len(units)}
+            'active_profiles': len(active), 'profiles': len(units),
+            'transports': transports}
 
 
 def service_snapshot():
@@ -169,10 +205,9 @@ def make_sample(traffic, previous, now=None):
     except ValueError: load = []
     service_checked = int(previous.get('services_checked', 0) or 0)
     services = previous.get('services') if isinstance(previous.get('services'), dict) else None
-    # Service state changes slowly during normal operation. Reusing the last
-    # snapshot avoids spawning systemctl on every metrics tick while keeping
-    # the dashboard state reasonably fresh.
-    if services is None or not (0 <= now - service_checked < 180):
+    # Refresh the batched service snapshot on every metrics sample so starts,
+    # stops and removed units are reflected promptly in the live dashboard.
+    if services is None or not (0 <= now - service_checked < 45):
         services = service_snapshot()
         service_checked = now
     return {'time': now, 'boot_id': boot, 'cpu_ticks': [total, idle], 'cpu_ticks_version': 2,
