@@ -3544,6 +3544,24 @@ class Handler(BaseHTTPRequestHandler):
                     result_enabled=updated["enabled"]
                     connection_store.upsert(CONNECTIONS_FILE,updated)
                     ctl_manager_json("connections-refresh",{})
+                elif operation=="reorder":
+                    previous_registry=connection_store.load(CONNECTIONS_FILE)
+                    try:
+                        requested_order=json.loads(form.get("order",""))
+                    except (TypeError,json.JSONDecodeError):
+                        raise connection_store.ConnectionError("Не удалось прочитать новый порядок подключений.")
+                    current_connections=previous_registry.get("connections",[])
+                    if not isinstance(requested_order,list) or not all(isinstance(item,dict) and item.get("id") for item in current_connections):
+                        raise connection_store.ConnectionError("Некорректный список подключений.")
+                    current_ids=[str(item["id"]) for item in current_connections]
+                    if (len(requested_order)!=len(current_ids)
+                            or any(not isinstance(cid,str) for cid in requested_order)
+                            or len(set(requested_order))!=len(requested_order)
+                            or set(requested_order)!=set(current_ids)):
+                        raise connection_store.ConnectionError("Список подключений изменился. Обновите страницу и повторите перестановку.")
+                    by_id={str(item["id"]):item for item in current_connections}
+                    previous_registry["connections"]=[by_id[cid] for cid in requested_order]
+                    connection_store.save(CONNECTIONS_FILE,previous_registry)
                 elif operation=="delete":
                     deleted_id=form.get("id","")
                     ctl_manager_json("connections-delete",{"id":deleted_id})
