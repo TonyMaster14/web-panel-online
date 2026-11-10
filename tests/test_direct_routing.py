@@ -133,6 +133,8 @@ class DirectRouting(unittest.TestCase):
         self.assertTrue(any(rule.get('outboundTag') == 'direct'
                             and 'domain:direct.example' in rule.get('domain', []) for rule in rules))
         outbound = next(value for value in config['outbounds'] if value.get('protocol') in ('vless', 'hysteria'))
+        expected_name = '🇳🇱 Нидерланды' if self.user.get('node_location') else '🌐 Test'
+        self.assertEqual(outbound['tag'], expected_name)
         self.assertEqual(outbound['settings']['vnext'][0]['users'][0]['id'], secret or self.user['secret'])
 
     def test_happ_fetches_one_complete_routed_config_without_panel_login(self):
@@ -155,6 +157,7 @@ class DirectRouting(unittest.TestCase):
         self.assert_routed(config)
 
     def use_real_timeweb_link_generator(self):
+        self.user.pop('node_location', None)
         connection = connections.validate({
             'id': 'timeweb-test', 'name': 'Timeweb', 'protocol': 'vless',
             'config': {'route': 'cdn', 'provider': 'timeweb',
