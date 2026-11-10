@@ -63,7 +63,7 @@ def _service_fields_many(units):
         return {}
     run = subprocess.run([
         'systemctl', 'show', '--no-pager', '-p', 'Id', '-p', 'LoadState', '-p', 'ActiveState',
-        '-p', 'MemoryCurrent', '-p', 'TasksCurrent',
+        '-p', 'UnitFileState', '-p', 'MemoryCurrent', '-p', 'TasksCurrent',
         '-p', 'ExecMainStartTimestampMonotonic', *units,
     ], capture_output=True, text=True, timeout=5,
         env={**os.environ, 'LC_ALL':'C', 'SYSTEMD_COLORS':'0'})
@@ -79,6 +79,7 @@ def _service_fields_many(units):
         result[unit] = {
             'state': fields.get('ActiveState', 'unknown'),
             'load_state': fields.get('LoadState', 'unknown'),
+            'unit_file_state': fields.get('UnitFileState', 'unknown'),
             'memory': numeric('MemoryCurrent'), 'tasks': numeric('TasksCurrent'),
             'start_us': numeric('ExecMainStartTimestampMonotonic'),
         }
@@ -137,7 +138,14 @@ def _openflux_snapshot(units, fields):
         label = _openflux_transport(unit)
         if label and label not in transports:
             transports.append(label)
+    available_states = [value for value in states if value.get('load_state', 'loaded') != 'not-found']
+    file_states = {value.get('unit_file_state', 'unknown') for value in available_states}
+    unit_file_state = ('disabled' if file_states and file_states <= {'disabled', 'masked'}
+                       else 'enabled' if 'enabled' in file_states
+                       else 'static' if 'static' in file_states else 'unknown')
     return {'state': 'active' if active else ('inactive' if states else 'unknown'),
+            'load_state': 'loaded' if available_states else 'not-found',
+            'unit_file_state': unit_file_state,
             'memory': sum(memories) if memories else None,
             'tasks': sum(tasks) if tasks else None,
             'start_us': min(starts) if starts else None,
@@ -151,7 +159,7 @@ def service_snapshot():
         fields = _service_fields_many([*SERVICES.values(), *openflux_units])
     except (OSError, subprocess.TimeoutExpired, ValueError):
         fields = {}
-    result = {name: fields.get(unit, {'state': 'unknown'}) for name, unit in SERVICES.items()}
+    result = {name: fields.get(unit, {'state': 'unknown', 'load_state': 'unknown'}) for name, unit in SERVICES.items()}
     if MTPROXY_ECONOMY.exists() and result.get('relay', {}).get('state') != 'active':
         result['relay'] = {**result.get('relay', {}), 'state': 'economy'}
     try:
