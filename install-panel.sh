@@ -4019,7 +4019,7 @@ class Handler(BaseHTTPRequestHandler):
             routing_entries=list(zip(lines[:local_count],local_routing))
             routing_entries.extend((line,merged_remote) for line in lines[local_count:])
             xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,"")
-            failover=bool(subscription.get("failover_enabled",True)) and bool(lines)
+            failover=bool(lines)
             if failover:
                 try:
                     auto_config=routing_store.failover_xray_config(lines,merged_remote,"🧭 Автовыбор")
