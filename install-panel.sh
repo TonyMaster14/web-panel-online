@@ -885,7 +885,10 @@ def maintain_firewall(d):
 def sync_profiles(d):
     with open(PROFILES,encoding="utf-8") as f:
         old=json.load(f)
-    keep=[p for p in old.get("profiles",[]) if not str(p.get("name","")).startswith("panel:")]
+    disabled=os.path.exists(PRIMARY_DISABLED)
+    keep=[p for p in old.get("profiles",[]) if not str(p.get("name","")).startswith("panel:")
+          and not (disabled and isinstance(p,dict)
+                   and (p.get("name")=="default" or str(p.get("backend",""))=="127.0.0.1:2398"))]
     for u in d["users"]:
         if u.get("enabled",True) and u.get("protocol","web")=="web":
             for index,secret in enumerate(direct_secrets(u),1):
