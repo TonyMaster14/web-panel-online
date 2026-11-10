@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="panel-logo.svg" alt="W P O — Web Panel Online" width="190">
+  <img src="panel-logo.svg?v=2" alt="W P O — Web Panel Online" width="190">
 </p>
 
 <h1 align="center">WEB PANEL ONLINE 3.0.0</h1>
