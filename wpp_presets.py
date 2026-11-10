@@ -61,6 +61,30 @@ h3{line-height:1.3;letter-spacing:-.01em}
 p{letter-spacing:0;line-height:1.72}
 nav a,.eyebrow{letter-spacing:.06em}
 .btn,button{letter-spacing:.01em}
+
+/* Presentation-only typography pass: no content, links or button behavior changed */
+
+/* Editorial typography refinement */
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif;font-size:16px;line-height:1.68;letter-spacing:0;-webkit-font-smoothing:antialiased}
+h1{line-height:1.1!important;letter-spacing:-.026em!important;font-weight:750;margin:20px 0 24px!important;text-wrap:balance}
+h2{line-height:1.22!important;letter-spacing:-.018em!important;font-weight:700;text-wrap:balance}
+h3{line-height:1.32!important;letter-spacing:-.01em!important;font-weight:680}
+p{line-height:1.72!important;letter-spacing:0}
+.hero p{font-size:17px!important;line-height:1.78!important}
+.eyebrow{font-size:11px!important;letter-spacing:.12em!important;line-height:1.5}
+.nav-links a{font-size:13px!important;line-height:1.5}
+.section h2{margin:12px 0 25px!important}
+.service h3{font-size:18px!important;margin:14px 0 9px!important}
+.service p{font-size:14px!important;line-height:1.68!important;min-height:3.5em}
+.service i{font-size:12px!important;letter-spacing:.045em}
+.service b{font-size:18px!important;line-height:1.3}
+.stats b{font-size:23px!important;line-height:1.25}
+.stats small,.booking label,.note,.contacts p,.foot{font-size:12px!important;line-height:1.6!important}
+.booking h2{line-height:1.22!important}
+.booking p{font-size:14px!important;line-height:1.75!important}
+.booking label{gap:7px!important}
+.contacts h3{font-size:18px!important}
+@media(max-width:760px){body{font-size:15px}h1{font-size:clamp(38px,9vw,54px)!important;line-height:1.1!important}.hero p{font-size:16px!important}.section h2{margin-bottom:19px!important}.service p{min-height:0}}
 </style></head><body><div class="top">Техническое обслуживание · Диагностика · Ремонт</div><header class="wrap nav"><div class="brand">NORTHLINE <span>/ GARAGE</span></div><nav class="nav-links"><a href="#services">Услуги</a><a href="#booking">Запись</a><a href="#contacts">Контакты</a><a href="tel:+78120001837">+7 (812) 000-18-37</a></nav></header><main class="wrap"><section class="hero"><div><span class="eyebrow">Сервис, которому доверяют</span><h1>Точная работа. <span style="color:#75b7ff">Уверенность</span> на каждом километре.</h1><p>Плановое обслуживание, компьютерная диагностика и ремонт автомобилей. Согласуем объём работ и стоимость до начала обслуживания.</p><a class="btn" href="#booking">Записаться в сервис</a></div><div class="visual" role="img" aria-label="Стилизованный силуэт автомобиля"><span>NORTHLINE GARAGE · SERVICE</span></div></section><div class="stats"><div><b>12 лет</b><small>опыта обслуживания</small></div><div><b>До 12 мес.</b><small>гарантия на работы</small></div><div><b>По записи</b><small>без лишнего ожидания</small></div></div><section class="section" id="services"><span class="eyebrow">Направления сервиса</span><h2>Всё необходимое для вашего автомобиля</h2><div class="services"><article class="service"><i>01 / ДИАГНОСТИКА</i><h3>Проверка автомобиля</h3><p>Компьютерная диагностика и осмотр основных систем.</p><b>от 1 500 ₽</b></article><article class="service"><i>02 / ОБСЛУЖИВАНИЕ</i><h3>ТО и замена расходников</h3><p>Масло, фильтры, технические жидкости и регламентные работы.</p><b>от 3 900 ₽</b></article><article class="service"><i>03 / РЕМОНТ</i><h3>Ходовая и тормоза</h3><p>Поиск неисправностей и ремонт с согласованием сметы.</p><b>от 2 500 ₽</b></article></div></section><section class="booking" id="booking"><div><span class="eyebrow">Онлайн-запись</span><h2>Подберём время для визита</h2><p>Оставьте номер и выберите услугу. Администратор подтвердит запись и уточнит детали.</p></div><form id="garageForm"><label>Ваше имя<input name="name" required placeholder="Ваше имя"></label><label>Телефон<input name="phone" type="tel" required placeholder="+7 (___) ___-__-__"></label><label>Марка автомобиля<input name="car" placeholder="Марка и модель"></label><label>Услуга<select name="service"><option>Диагностика</option><option>Техническое обслуживание</option><option>Ремонт ходовой</option></select></label><button class="btn" type="submit">Запросить запись</button><p class="note" id="garageStatus">Демонстрационная форма — подключите обработчик заявок перед публикацией.</p></form></section><section class="contacts" id="contacts"><div><h3>NORTHLINE GARAGE</h3><p>Санкт-Петербург, пр-т Энергетиков, 19<br>Пн–Сб: 09:00–21:00</p></div><div><a href="tel:+78120001837">+7 (812) 000-18-37</a><p>Адрес и телефон демонстрационные — замените перед публикацией.</p></div></section></main><footer class="wrap foot">NORTHLINE GARAGE · ДЕМОНСТРАЦИОННЫЙ ШАБЛОН</footer><script>document.getElementById('garageForm').addEventListener('submit',function(e){e.preventDefault();document.getElementById('garageStatus').textContent='Форма заполнена. Подключите обработчик для получения заявок.'})</script></body></html>''',
         },
         {
@@ -80,6 +104,29 @@ h3{line-height:1.3;letter-spacing:-.01em}
 p{letter-spacing:0;line-height:1.72}
 nav a,.eyebrow{letter-spacing:.06em}
 .btn,button{letter-spacing:.01em}
+
+/* Presentation-only typography pass: no content, links or button behavior changed */
+
+/* Elegant typography refinement */
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif;font-size:16px;line-height:1.68;letter-spacing:0;-webkit-font-smoothing:antialiased}
+h1{line-height:1.12!important;letter-spacing:-.025em!important;font-weight:500!important;margin:20px 0 25px!important;text-wrap:balance}
+h2{line-height:1.22!important;letter-spacing:-.018em!important;font-weight:500!important;text-wrap:balance}
+h3{line-height:1.32!important;letter-spacing:0!important}
+p{line-height:1.72!important;letter-spacing:0}
+.lead{font-size:17px!important;line-height:1.8!important}
+.eyebrow{font-size:11px!important;letter-spacing:.12em!important;line-height:1.5}
+.nav .phone{font-size:14px!important}
+.info small,.service small,.unit span,.note,.foot{font-size:12px!important;line-height:1.55!important}
+.info b{font-size:14px!important;line-height:1.55!important}
+.section h2{margin:12px 0 25px!important}
+.service h3{font-size:22px!important;line-height:1.3!important;margin:14px 0 9px!important}
+.service p{font-size:14px!important;line-height:1.7!important;min-height:3.5em}
+.service b{font-size:17px!important;line-height:1.35}
+.booking h2{font-size:32px!important;line-height:1.22!important}
+.booking p{font-size:14px!important;line-height:1.75!important}
+.booking label{font-size:12px!important;gap:7px!important}
+.foot{font-size:12px!important}
+@media(max-width:760px){body{font-size:15px}h1{font-size:clamp(39px,9.5vw,56px)!important;line-height:1.12!important}.lead{font-size:16px!important}.section h2{margin-bottom:19px!important}.service p{min-height:0}.booking h2{font-size:29px!important}}
 </style></head><body><header class="wrap nav"><div class="brand"><span class="logo">A</span> ATELIER BEAUTY</div><a class="phone" href="tel:+74950002641">+7 (343) 000-00-00</a></header><main class="wrap"><section class="hero"><div><span class="eyebrow">Салон красоты и заботы о себе</span><h1>Ваше время для <i>красоты</i> и вдохновения.</h1><p class="lead">Профессиональный уход, внимательные мастера и атмосфера, в которой можно остановиться, выдохнуть и посвятить время себе.</p><div class="timer"><div class="unit"><b>10:00–21:00</b><span>ежедневно</span></div><div class="unit"><b>3 зала</b><span>для процедур</span></div><div class="unit"><b>1 адрес</b><span>в центре города</span></div></div><div class="actions"><a class="btn" href="#booking">Записаться</a><a class="btn alt" href="#services">Наши услуги</a></div></div><aside><div class="photo" role="img" aria-label="Абстрактный интерьер салона"></div><div class="info"><div><small>Адрес</small><b>Москва<br>ул. Большая Дмитровка, 16</b></div><div><small>График</small><b>Ежедневно<br>10:00–21:00</b></div></div></aside></section><section class="section" id="services"><span class="eyebrow">Наши направления</span><h2>Уход, который подходит именно вам</h2><div class="services"><article class="service"><small>01 / ВОЛОСЫ</small><h3>Стрижка и укладка</h3><p>Подбор формы и укладка на каждый день или особый случай.</p><b>от 2 000 ₽</b></article><article class="service"><small>02 / ЦВЕТ</small><h3>Окрашивание</h3><p>Бережные техники, подбор оттенка и уход после процедуры.</p><b>от 4 500 ₽</b></article><article class="service"><small>03 / NAIL</small><h3>Маникюр</h3><p>Аккуратная обработка, покрытие и оформление ногтей.</p><b>от 1 700 ₽</b></article></div></section><section class="booking" id="booking"><div><span class="eyebrow">Запись к мастеру</span><h2>Выберите удобное время</h2><p>Оставьте номер телефона — администратор свяжется с вами и подтвердит запись.</p></div><form id="atelierForm"><label>Ваше имя<input name="name" required placeholder="Ваше имя"></label><label>Телефон<input name="phone" type="tel" required placeholder="+7 (___) ___-__-__"></label><label>Услуга<select name="service"><option>Стрижка и укладка</option><option>Окрашивание</option><option>Маникюр</option></select></label><label>Дата<input name="date" type="date" required></label><button class="btn" type="submit">Отправить заявку</button><p class="note" id="atelierStatus">Демонстрационная форма — подключите обработчик заявок перед публикацией.</p></form></section></main><footer class="wrap foot"><span>ATELIER BEAUTY</span><span>Демонстрационные контакты и цены — замените перед публикацией</span></footer><script>document.getElementById('atelierForm').addEventListener('submit',function(e){e.preventDefault();document.getElementById('atelierStatus').textContent='Форма заполнена. Подключите обработчик для получения заявок.'})</script></body></html>''',
         },
         {
@@ -99,6 +146,29 @@ h3{line-height:1.3;letter-spacing:-.01em}
 p{letter-spacing:0;line-height:1.72}
 nav a,.eyebrow{letter-spacing:.06em}
 .btn,button{letter-spacing:.01em}
+
+/* Presentation-only typography pass: no content, links or button behavior changed */
+
+/* Clear, readable service typography */
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif;font-size:16px;line-height:1.68;letter-spacing:0;-webkit-font-smoothing:antialiased}
+h1{line-height:1.1!important;letter-spacing:-.026em!important;font-weight:750!important;margin:20px 0 24px!important;text-wrap:balance}
+h2{line-height:1.23!important;letter-spacing:-.018em!important;font-weight:700!important;text-wrap:balance}
+h3{line-height:1.32!important;letter-spacing:0!important}
+p{line-height:1.72!important;letter-spacing:0}
+.lead{font-size:17px!important;line-height:1.78!important}
+.eyebrow{font-size:11px!important;letter-spacing:.12em!important;line-height:1.5}
+.status{font-size:13px!important}
+.notice{line-height:1.5}
+.notice b{font-size:15px!important;line-height:1.4}
+.notice small,.notice time{font-size:12px!important;line-height:1.55!important}
+.service b{font-size:15px!important;line-height:1.4}
+.service small{font-size:13px!important;line-height:1.65!important}
+.service strong{font-size:17px!important;line-height:1.35}
+.support h2,.booking h2{font-size:23px!important;line-height:1.25!important}
+.support p{font-size:14px!important;line-height:1.75!important}
+.booking label{font-size:12px!important;gap:7px!important}
+.note,.foot{font-size:12px!important;line-height:1.6!important}
+@media(max-width:650px){body{font-size:15px}h1{font-size:clamp(37px,9vw,52px)!important;line-height:1.1!important}.lead{font-size:16px!important}.support h2,.booking h2{font-size:21px!important}}
 </style></head><body><header class="wrap nav"><div class="brand">FIX<span>POINT</span></div><div class="status">Принимаем устройства ежедневно</div></header><main class="wrap"><section class="panel"><span class="eyebrow">Сервисный центр смартфонов</span><h1>Вернём вашему устройству рабочий ритм.</h1><p class="lead">Диагностика и ремонт смартфонов популярных марок. Сначала находим причину неисправности, согласуем стоимость — и только после этого приступаем к работе.</p><div class="notice"><i>✓</i><div><b>Первичная диагностика бесплатно</b><small>Согласуем работы и стоимость до начала ремонта</small></div><time>Без обязательств</time></div><div class="services"><article class="service"><b>Замена дисплея</b><small>Экран, сенсор и проверка изображения</small><strong>от 3 500 ₽</strong></article><article class="service"><b>Аккумулятор</b><small>Замена батареи и проверка зарядки</small><strong>от 2 000 ₽</strong></article><article class="service"><b>Разъём питания</b><small>Диагностика и восстановление контактов</small><strong>от 1 500 ₽</strong></article></div><div class="support"><div><h2>Гарантия на ремонт</h2><p>Условия и срок гарантии фиксируются в заказ-наряде. Используем проверенные комплектующие.</p></div><div><h2>Адрес сервисного центра</h2><p>Нижний Новгород, ул. Белинского, 56<br>Пн–Сб: 10:00–20:00<br><a href="tel:+78310007528">+7 (495) 000-00-00</a></p></div></div></section><section class="booking"><span class="eyebrow">Запись на диагностику</span><h2>Опишите неисправность</h2><form id="fixForm"><label>Ваше имя<input name="name" required placeholder="Ваше имя"></label><label>Телефон<input name="phone" type="tel" required placeholder="+7 (___) ___-__-__"></label><label>Модель устройства<input name="model" required placeholder="Модель смартфона"></label><label>Проблема<select name="problem"><option>Разбит экран</option><option>Быстро разряжается</option><option>Не заряжается</option><option>Не включается</option><option>Другая неисправность</option></select></label><button class="btn" type="submit">Отправить заявку</button><p class="note" id="fixStatus">Демонстрационная форма — подключите обработчик заявок перед публикацией.</p></form></section></main><footer class="wrap foot">FIXPOINT · ДЕМОНСТРАЦИОННЫЕ КОНТАКТЫ И ЦЕНЫ · ЗАМЕНИТЕ ПЕРЕД ПУБЛИКАЦИЕЙ</footer><script>document.getElementById('fixForm').addEventListener('submit',function(e){e.preventDefault();document.getElementById('fixStatus').textContent='Форма заполнена. Подключите обработчик для получения заявок.'})</script></body></html>''',
         },
         {
@@ -118,6 +188,34 @@ h3{line-height:1.3;letter-spacing:-.01em}
 p{letter-spacing:0;line-height:1.72}
 nav a,.eyebrow{letter-spacing:.06em}
 .btn,button{letter-spacing:.01em}
+
+/* Presentation-only typography pass: no content, links or button behavior changed */
+
+/* Calm, accessible clinic typography */
+body{font-family:Inter,"Segoe UI",system-ui,-apple-system,BlinkMacSystemFont,Arial,sans-serif;font-size:16px;line-height:1.68;letter-spacing:0;-webkit-font-smoothing:antialiased}
+h1{line-height:1.1!important;letter-spacing:-.026em!important;font-weight:750!important;margin:20px 0 24px!important;text-wrap:balance}
+h2{line-height:1.22!important;letter-spacing:-.018em!important;font-weight:700!important;text-wrap:balance}
+h3{line-height:1.32!important;letter-spacing:0!important}
+p{line-height:1.72!important;letter-spacing:0}
+.lead{font-size:17px!important;line-height:1.8!important}
+.eyebrow{font-size:11px!important;letter-spacing:.12em!important;line-height:1.5}
+.nav-links a{font-size:13px!important;line-height:1.5}
+.nav .call{font-size:13px!important}
+.stats b{font-size:23px!important;line-height:1.25}
+.stats small{font-size:12px!important;line-height:1.55!important}
+.section h2{margin:12px 0 25px!important}
+.service h3{font-size:18px!important;line-height:1.32!important;margin:14px 0 9px!important}
+.service p{font-size:14px!important;line-height:1.68!important;min-height:3.5em}
+.service b{font-size:18px!important;line-height:1.35}
+.service i{font-size:12px!important}
+.step b{font-size:14px!important;line-height:1.4}
+.step p{font-size:13px!important;line-height:1.68!important}
+.appointment h2{font-size:31px!important;line-height:1.22!important}
+.appointment p{font-size:14px!important;line-height:1.75!important}
+.appointment label{font-size:12px!important;gap:7px!important}
+.note,.foot,.contacts p{font-size:12px!important;line-height:1.65!important}
+.contacts h3{font-size:18px!important}
+@media(max-width:760px){body{font-size:15px}h1{font-size:clamp(38px,9vw,52px)!important;line-height:1.1!important}.lead{font-size:16px!important}.section h2{margin-bottom:19px!important}.service p{min-height:0}.appointment h2{font-size:27px!important}}
 </style></head><body><header class="wrap nav"><div class="brand"><span>МЕД</span>ЛИНИЯ</div><nav class="nav-links"><a href="#services">Обследования</a><a href="#about">Как это работает</a><a href="#contacts">Контакты</a><a class="call" href="tel:+78460003467">+7 (343) 000-00-00</a></nav></header><main class="wrap"><section class="hero"><div><span class="eyebrow">Центр медицинской диагностики</span><h1>Внимание к деталям. Забота о <span style="color:#239c83">здоровье.</span></h1><p class="lead">Лабораторные исследования, инструментальная диагностика и консультации специалистов. Помогаем пройти обследование организованно и в комфортной обстановке.</p><div class="actions"><a class="btn" href="#appointment">Записаться</a><a class="btn alt" href="#services">Направления</a></div></div><div class="visual" role="img" aria-label="Фотография ресепшена медицинского центра"><span>Диагностика · Консультация · Результаты</span></div></section><div class="stats"><div class="stat"><b>20+</b><small>направлений обследований</small></div><div class="stat"><b>7 дней</b><small>приём по предварительной записи</small></div><div class="stat"><b>В одном месте</b><small>диагностика и консультации</small></div></div><section class="section" id="services"><span class="eyebrow">Основные направления</span><h2>Обследования и консультации</h2><div class="services"><article class="service"><i>01</i><h3>Лабораторные анализы</h3><p>Исследования по назначению специалиста и забор биоматериала.</p><b>от 450 ₽</b></article><article class="service"><i>02</i><h3>УЗИ-диагностика</h3><p>Ультразвуковые исследования на современном оборудовании.</p><b>от 1 800 ₽</b></article><article class="service"><i>03</i><h3>Консультация врача</h3><p>Обсуждение жалоб, результатов и дальнейшего плана обследования.</p><b>от 2 200 ₽</b></article></div><div class="steps" id="about"><article class="step"><b>01 · Запись</b><p>Выберите удобное время и направление обследования.</p></article><article class="step"><b>02 · Приём</b><p>Администратор расскажет о подготовке, если она необходима.</p></article><article class="step"><b>03 · Результат</b><p>Результаты исследований можно обсудить с профильным врачом.</p></article></div></section><section class="appointment" id="appointment"><div><span class="eyebrow">Онлайн-запись</span><h2>Выберите удобное время</h2><p>Оставьте контакты — администратор подтвердит запись и подскажет, нужна ли подготовка.</p></div><form id="diagForm"><label>Ваше имя<input name="name" required placeholder="Ваше имя"></label><label>Телефон<input name="phone" type="tel" required placeholder="+7 (___) ___-__-__"></label><label>Направление<select name="service"><option>Лабораторные анализы</option><option>УЗИ-диагностика</option><option>Консультация врача</option></select></label><label>Дата<input name="date" type="date" required></label><button class="btn" type="submit">Отправить заявку</button><p class="note" id="diagStatus">Демонстрационная форма — подключите обработчик заявок перед публикацией.</p></form></section><section class="contacts" id="contacts"><div><h3>МедЛиния — центр диагностики</h3><p>Самара, ул. Осипенко, 38<br>Ежедневно: 08:00–21:00</p></div><div><a href="tel:+78460003467">+7 (343) 000-00-00</a><p>Демонстрационные контакты и цены — замените перед публикацией. Медицинские решения принимает лечащий врач.</p></div></section></main><footer class="wrap foot">МЕДЛИНИЯ · ДЕМОНСТРАЦИОННЫЙ ШАБЛОН</footer><script>document.getElementById('diagForm').addEventListener('submit',function(e){e.preventDefault();document.getElementById('diagStatus').textContent='Форма заполнена. Подключите обработчик для получения заявок.'})</script></body></html>''',
         },
     ])
