@@ -272,9 +272,10 @@ CSS += """
 .mini-brand{display:grid;place-items:center}
 .mini-brand img{width:80%;height:80%;object-fit:contain;border-radius:7px}
 .login-card .signin-logo{transform:scale(.84);transform-origin:center}
-.login-card-head{position:relative;min-height:112px;justify-content:center;margin-bottom:28px}
-.signin-emblem{flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
-.signin-emblem div span{font-size:13px;letter-spacing:.12em;color:var(--text)}
+.login-card-head{position:relative;min-height:116px;justify-content:center;margin-bottom:28px}
+.signin-emblem{width:100%;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.signin-emblem div{width:100%;display:flex;justify-content:center;text-align:center}
+.signin-emblem div span{display:block;text-align:center;font-size:14px;font-weight:750;letter-spacing:.11em;color:var(--text)}
 .login-secure{position:absolute;top:0;right:0}
 """
 
