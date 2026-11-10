@@ -1,6 +1,12 @@
-# WEB PANEL ONLINE 3.0.0
+<p align="center">
+  <img src="panel-logo.png" alt="WPO — Web Panel Online" width="190">
+</p>
 
-Панель управления VPN- и proxy-подключениями на собственном VPS. Поддерживаются VLESS XHTTP, Hysteria2, AmneziaWG, NaiveProxy, Mieru, MTProto и экспериментальная интеграция OpenFlux.
+<h1 align="center">WEB PANEL ONLINE 3.0.0</h1>
+
+<p align="center">Панель управления VPN- и proxy-подключениями на собственном VPS. Поддерживаются VLESS XHTTP, Hysteria2, AmneziaWG, NaiveProxy, Mieru, MTProto и экспериментальная интеграция OpenFlux.</p>
+
+---
 
 ## Возможности
 
@@ -113,7 +119,3 @@ ss -lntup
 - Статус «Работает» у профиля OpenFlux означает, что его служба запущена; наличие интернет-трафика проверяется отдельно.
 - OpenFlux — экспериментальная IPv4-интеграция. Совместимость UDP зависит от клиента и режима; IPv6-туннель не предоставляется.
 - Скачиваемые резервные копии содержат пароли и ключи — храните их безопасно и не загружайте в публичный репозиторий.
-
-## Сторонние компоненты
-
-Сведения о лицензиях и исходных проектах встроенных сторонних компонентов находятся в [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
