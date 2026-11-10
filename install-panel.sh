@@ -3886,7 +3886,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     source=validate_html(get_preset(form.get("preset",""))["html"] if path.endswith("/draft-preset") else form.get("html",""))
                     if path.endswith("/preview-html"):
-                        self.send_json({"document":preview_document(source,externalize_inline_assets)}); return
+                        self.send_json({"document":preview_document(source,externalize_inline_assets,DOMAIN)}); return
                     with STATE_LOCK: install_private_file(SITE_DRAFT,source.encode("utf-8"))
                 self.redirect("/settings")
             except ValueError as exc:
