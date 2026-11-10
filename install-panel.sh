@@ -3099,6 +3099,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"services":server_metrics.service_snapshot()})
             return
 
+        if path==PANEL_PATH+"/clients-status":
+            profiles=[{"id":"primary","name":"Основной WEB Proxy","secret":primary(),"protocol":"web","enabled":True,"backend_port":443}]+users()
+            records=client_records(subscription_registry(),profiles,traffic(),DOMAIN,proxy_link)
+            shown=sorted(records,key=lambda r:(bool(r['totals']['active']),r['totals']['up']+r['totals']['down']),reverse=True)[:8]
+            html=client_glances(shown,PANEL_PATH)+f'<small>Показано {len(shown)} из {len(records)} · сначала передающие данные</small>'
+            self.send_json({"html":html})
+            return
+
         if path==PANEL_PATH+'/clients-state':
             profiles=[{'id':'primary','name':'Основной WEB Proxy','secret':primary(),'protocol':'web','enabled':True,'backend_port':443}]+users()
             records=client_records(subscription_registry(),profiles,traffic(),DOMAIN,proxy_link)
