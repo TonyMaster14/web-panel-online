@@ -1371,26 +1371,18 @@ def _dashboard_body_legacy(data, subs, profiles, traffic, path, domain, csrf, pr
             stats.append(f'<div class="overview-stat"><span>{label}</span><b>{value}</b></div>')
     stats=''.join(stats)
     services=latest.get('services',{}); names={'xray':'Xray · VLESS / Hysteria2','naive':'NaiveProxy','mieru':'Mieru','relay':'Telegram WEB Proxy / MTProto','openflux':'OpenFlux','caddy':'Caddy · HTTPS','panel':'Панель управления'}
-    def service_badge(label, status):
-        if status.get('state') == 'active':
-            badge = '<span class="badge on">Запущен</span>'
-        elif status.get('state') == 'inactive':
-            state = status.get('unit_file_state')
-            label_state = 'Отключён' if state in ('disabled', 'masked') else 'Остановлен'
-            badge = '<span class="badge">'+label_state+'</span>'
-        else:
-            badge = '<span class="badge">Статус неизвестен</span>'
-        return '<div class="service-line"><span>'+label+'</span>'+badge+'</div>'
+    def service_badge(label):
+        return '<div class="service-line"><span>'+label+'</span><span class="badge on">Запущен</span></div>'
     service_rows=[]
     for key,label in names.items():
         status=services.get(key,{})
-        if status.get('load_state')=='not-found':
+        if status.get('state')!='active' or status.get('load_state')=='not-found':
             continue
         if key=='openflux':
             transports=status.get('transports',[])
             if isinstance(transports,list) and transports:
                 label+=' · '+' / '.join(str(value) for value in transports)
-        service_rows.append(service_badge(label, status))
+        service_rows.append(service_badge(label))
     services_html=''.join(service_rows)
     xray=services.get('xray',{}); start=xray.get('start_us'); xu=max(0,latest.get('uptime',0)-start/1e6) if start and latest.get('uptime') else None
     detail=[('Время работы VPS',duration(latest.get('uptime'))),('Время работы Xray',duration(xu)),('Память Xray',size(xray.get('memory'))),('Задачи Xray',str(xray.get('tasks') if xray.get('tasks') is not None else '—')),('Нагрузка · 1 / 5 / 15 мин.',' / '.join(f'{v:.2f}' for v in latest.get('load',[])) or '—')]
