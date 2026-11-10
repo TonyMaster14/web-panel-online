@@ -1263,7 +1263,12 @@ def _dashboard_body_legacy(data, subs, profiles, traffic, path, domain, csrf, pr
     direct=[u for u in profiles if not u.get('subscription_id')]
     active=sum(aggregate(s['live_profile_ids'],traffic,s.get('enabled',True))['active'] for s in subs)+sum(aggregate([u['id']],traffic,u.get('enabled',True))['active'] for u in direct)
     total_up=sum(max(0,int(v.get('up',0))) for v in traffic.values() if isinstance(v,dict)); total_down=sum(max(0,int(v.get('down',0))) for v in traffic.values() if isinstance(v,dict))
-    stats=''.join(f'<div class="overview-stat{\' overview-stat-total\' if label==\'Всего трафика\' else \'\'}"><span>{label}</span><b>{value}</b>{(\'<div class="dashboard-inline-tools"><span id="liveIndicator" class="live-indicator"><i></i><b>Онлайн</b><small id="liveAge">сейчас</small></span><button id="refreshDashboard" type="button" title="Обновить данные" aria-label="Обновить данные">\'+icon(\'refresh\')+\'</button></div>\') if label==\'Всего трафика\' else \'\'}</div>' for label,value in [('Клиенты',len(subs)+len(direct)),('Подписок',len(subs)),('Передают трафик',active),('Всего трафика',size(total_up+total_down))])
+    stats=[]
+    for label,value in [('Клиенты',len(subs)+len(direct)),('Подписок',len(subs)),('Передают трафик',active),('Всего трафика',size(total_up+total_down))]:
+        total_class=' overview-stat-total' if label=='Всего трафика' else ''
+        tools_html=('<div class="dashboard-inline-tools"><span id="liveIndicator" class="live-indicator"><i></i><b>Онлайн</b><small id="liveAge">сейчас</small></span><button id="refreshDashboard" type="button" title="Обновить данные" aria-label="Обновить данные">'+icon('refresh')+'</button></div>' if label=='Всего трафика' else '')
+        stats.append(f'<div class="overview-stat{total_class}"><span>{label}</span><b>{value}</b>{tools_html}</div>')
+    stats=''.join(stats)
     services=latest.get('services',{}); names={'xray':'Xray · VLESS / Hysteria2','naive':'NaiveProxy','mieru':'Mieru','relay':'Telegram WEB Proxy / MTProto','openflux':'OpenFlux · Яндекс / Mail.ru / MAX','caddy':'Caddy · HTTPS','panel':'Панель управления'}
     def service_badge(key,label):
         state=services.get(key,{}).get('state','unknown')
