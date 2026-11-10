@@ -502,17 +502,20 @@ def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, con
                 link=proxy_link(proto,secret,port,link_name,'')
                 key_title=label+' · ключ '+str(number)
                 route_profile=(routing_profiles or {}).get(str(source.get('connection_id','')))
-                routed=(proto in ('vless','hysteria') and isinstance(route_profile,dict)
-                        and route_profile.get('enabled',True) and callable(direct_profile_url))
+                routed=(proto in ('vless','hysteria') and callable(direct_profile_url))
                 if routed:
                     routed_link=direct_profile_url(source,secret)
                     import_link=happ_import_link(routed_link)
                     routed_qr=path+'/direct-profile-qr?'+urlencode({'id':uid,'secret':secret,'import':'happ'})
-                    config=routing_store.xray_config(link,route_profile,location_label or source.get('name',label))
+                    node_title=location_label or source.get('name',label)
+                    if isinstance(route_profile,dict) and route_profile.get('enabled',True):
+                        config=routing_store.xray_config(link,route_profile,node_title)
+                    else:
+                        config=routing_store.plain_xray_config(link,node_title)
                     key_cards.append(connection_key_card(
-                        key_title+' · JSON с маршрутизацией',
-                        'Нажмите «Добавить в Happ» или импортируйте эту ссылку. Она передаёт полный JSON одного подключения.',
-                        import_link,routed_qr,source.get('name',label)+' · с маршрутизацией',
+                        key_title+' · JSON-профиль Happ',
+                        'Профиль Happ: название клиента и название сервера передаются отдельно.',
+                        import_link,routed_qr,source.get('name',label),
                         [proto],port,download=routed_link+'?format=single&download=1',kind='routing',
                         open_url=import_link,json_value=json.dumps(config,ensure_ascii=False,indent=2)))
                 qr=path+'/__qr?'+urlencode({'secret':secret,'protocol':proto,
@@ -565,8 +568,7 @@ def client_records(subs, profiles, traffic, domain, proxy_link, routing_profiles
         raw_link=link
         route_profile=(routing_profiles or {}).get(str(u.get('connection_id','')))
         routing_url=''
-        if (proto in ('vless','hysteria') and isinstance(route_profile,dict)
-                and route_profile.get('enabled',True) and callable(direct_profile_url)):
+        if proto in ('vless','hysteria') and callable(direct_profile_url):
             routing_url=direct_profile_url(u,u.get('secret',''))
             link=happ_import_link(routing_url)
         records.append(dict(id=u['id'],name=u['name'],kind='direct',protocols=[proto],
@@ -698,7 +700,7 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
                 'port':r['source'].get('backend_port',443) if proto in ('hysteria','mtproto','naive','mieru') else 443}))
         disabled='disabled title="Основное подключение установки"' if primary else ''
         state=f'<button class="access-switch" type="button" role="switch" aria-label="Доступ — {name}" aria-checked="{str(bool(enabled)).lower()}" data-state="{sid}" data-kind="{kind}" {disabled}></button>'
-        copy_title='Копировать для Happ · JSON с маршрутизацией' if routed else 'Копировать'
+        copy_title='Копировать профиль для Happ' if routed else 'Копировать'
         qr_kind='routing' if routed else kind
         action=f'<button class="icon-btn" {qr_attributes(qr,r["name"],r["link"],r["protocols"],qr_kind,user_port=r["source"].get("backend_port"))} aria-label="QR — {name}" title="QR">{icon("qr")}</button><button class="icon-btn" data-copy="{esc(r["link"])}" aria-label="Скопировать — {name}" title="{copy_title}">{icon("copy")}</button><button class="icon-btn" data-open-client="{sid}" aria-label="Настройки — {name}" title="Настройки">{icon("edit")}</button>'
         if not primary or not sub:
