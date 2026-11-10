@@ -74,7 +74,7 @@ h1{max-width:760px;margin:19px 0 21px!important;font-size:clamp(40px,7vw,68px)!i
  .support{align-items:flex-start!important;flex-direction:column!important;gap:12px!important}
  .status{font-size:10px!important;padding:7px 9px}
 }
-</style></head><body><header class="wrap nav"><div class="brand">CLOUDDESK</div><div class="status">Идут технические работы</div></header><main class="wrap panel"><span class="eyebrow">Плановое обслуживание</span><h1>Сервис временно недоступен</h1><p class="lead">Обновляем базу данных и сетевое оборудование. Данные пользователей в безопасности, повторная авторизация не потребуется.</p><div class="notice"><i>🛑</i><div><b>Работы идут по графику</b><small>Начало: 02:00 · Екатеринбург (UTC+5)</small></div><time>Завершение до 04:30</time></div><div class="progress"><i></i></div><div class="progress-copy"><span>Выполнено 74%</span><span>Осталось около 35 минут</span></div><section class="services"><div class="service"><div><b>Личный кабинет</b><small>Вход и изменение настроек</small></div><span class="work">Обслуживание</span></div><div class="service"><div><b>API и интеграции</b><small>Запросы продолжают обрабатываться</small></div><span class="ok">Работает</span></div><div class="service"><div><b>Хранение данных</b><small>Резервные копии проверены</small></div><span class="ok">Работает</span></div></section><footer class="support"><p>Если вопрос срочный, сообщите код инцидента <b>MW-2048</b>.</p><p><a href="mailto:support@example.com">support@example.com</a><br><a href="tel:+73430000000">+7 (343) 000-00-00</a></p></footer><div class="demo">Демонстрационные контакты — замените их перед публикацией</div></main></body></html>''',
+</style></head><body><header class="wrap nav"><div class="brand">CLOUDDESK</div><div class="status">Идут технические работы</div></header><main class="wrap panel"><span class="eyebrow">Плановое обслуживание</span><h1>Сервис временно недоступен</h1><p class="lead">Обновляем базу данных и сетевое оборудование. Данные пользователей в безопасности, повторная авторизация не потребуется.</p><div class="notice"><i>⚙️</i><div><b>Работы идут по графику</b><small>Начало: 02:00 · Екатеринбург (UTC+5)</small></div><time>Завершение до 04:30</time></div><div class="progress"><i></i></div><div class="progress-copy"><span>Выполнено 74%</span><span>Осталось около 35 минут</span></div><section class="services"><div class="service"><div><b>Личный кабинет</b><small>Вход и изменение настроек</small></div><span class="work">Обслуживание</span></div><div class="service"><div><b>API и интеграции</b><small>Запросы продолжают обрабатываться</small></div><span class="ok">Работает</span></div><div class="service"><div><b>Хранение данных</b><small>Резервные копии проверены</small></div><span class="ok">Работает</span></div></section><footer class="support"><p>Если вопрос срочный, сообщите код инцидента <b>MW-2048</b>.</p><p><a href="mailto:support@example.com">support@example.com</a><br><a href="tel:+73430000000">+7 (343) 000-00-00</a></p></footer><div class="demo">Демонстрационные контакты — замените их перед публикацией</div></main></body></html>''',
         },
         {
             "id": "loading",
@@ -284,7 +284,7 @@ def _decorate_preset(item):
     html = result.get("html", "")
     preset_id = result.get("id", "")
     base = {
-        "countdown": "☕", "cars": "🚘", "cats-repair": "🛑", "loading": "🏥",
+        "countdown": "☕", "cars": "🚘", "cats-repair": "⚙️", "loading": "🏥",
         "auto-service": "🔧", "beauty-salon": "💗", "phone-repair": "📱",
         "medical-diagnostics": "🩺",
     }.get(preset_id, "✨")
@@ -302,7 +302,7 @@ def _decorate_preset(item):
             return "👩‍⚕️" if preset_id in ("loading", "medical-diagnostics") else "👩‍🔧" if preset_id in ("auto-service", "phone-repair") else "💇"
         if any(word in plain for word in ("услуг", "направлен", "ремонт", "обслуж")):
             return {"cars":"🚘","auto-service":"🔧","beauty-salon":"💇","phone-repair":"🪛",
-                    "loading":"🩺","medical-diagnostics":"🩺","countdown":"☕","cats-repair":"🛑"}.get(preset_id, base)
+                    "loading":"🩺","medical-diagnostics":"🩺","countdown":"☕","cats-repair":"⚙️"}.get(preset_id, base)
         return base
 
     def decorate(match):
