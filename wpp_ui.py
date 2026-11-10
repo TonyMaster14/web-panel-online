@@ -1121,16 +1121,19 @@ CSS += '''
 #dashboardContent .overview-stat span,#dashboardContent .resource-copy small{font-size:10px;line-height:1.45}
 #dashboardContent .overview-stat b{margin-top:6px;font-size:25px;line-height:1.2}
 #dashboardContent .overview-stats .overview-stat{height:94px;min-height:94px;box-sizing:border-box}
-#dashboardContent .overview-stat-total{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:6px 12px!important;text-align:center}
-#dashboardContent .overview-stat-total>span,#dashboardContent .overview-stat-total>b{width:100%;text-align:center}
-#dashboardContent .overview-stat-total>b{margin-top:1px;font-size:22px;line-height:1.1}
-#dashboardContent .overview-stat-total .dashboard-inline-tools{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:3px}
-#dashboardContent .dashboard-inline-tools .live-indicator{display:inline-flex;align-items:center;gap:6px;margin:0;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--surface) 88%,transparent);font-size:10px;color:var(--muted);white-space:nowrap}
+#dashboardContent .overview-stat-total{display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:0;padding:8px 16px!important;text-align:left}
+#dashboardContent .overview-stat-total>span,#dashboardContent .overview-stat-total>b{width:100%;text-align:left}
+#dashboardContent .overview-stat-total>b{margin-top:2px;font-size:23px;line-height:1.08}
+#dashboardContent .overview-stat-total .dashboard-inline-tools{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:4px;padding-left:16px}
+#dashboardContent .dashboard-inline-tools .live-indicator{display:inline-flex;align-items:center;gap:6px;margin:0;padding:0;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;font-size:10px;color:var(--green);white-space:nowrap}
+#dashboardContent .dashboard-inline-tools .live-indicator b{font-weight:600}
 #dashboardContent .dashboard-inline-tools .live-indicator i{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent)}
+#dashboardContent .dashboard-inline-tools .live-indicator.stale{color:var(--amber)}
 #dashboardContent .dashboard-inline-tools .live-indicator.stale i{background:var(--amber);box-shadow:none}
+#dashboardContent .dashboard-inline-tools .live-indicator.offline{color:var(--red)}
 #dashboardContent .dashboard-inline-tools .live-indicator.offline i{background:var(--red);box-shadow:none}
-#dashboardContent .dashboard-inline-tools .live-indicator small{font-size:9px;color:var(--muted)}
-#dashboardContent .dashboard-inline-tools button{display:grid;place-items:center;width:26px;height:26px;min-height:26px;padding:5px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--muted)}
+#dashboardContent .dashboard-inline-tools .dashboard-inline-age{font-size:9px;line-height:1;color:var(--muted);white-space:nowrap}
+#dashboardContent .dashboard-inline-tools button{display:grid;place-items:center;width:26px;height:26px;min-height:26px;padding:5px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--muted);cursor:pointer}
 #dashboardContent .dashboard-inline-tools button:hover{color:var(--accent);border-color:var(--accent)}
 #dashboardContent .dashboard-inline-tools button .ico{width:14px;height:14px;margin:0}
 #dashboardContent .resource-copy strong{font-size:13px;line-height:1.35}
@@ -1144,7 +1147,7 @@ CSS += '''
 #dashboardContent .detail-line{padding:11px 0;border-bottom:1px solid var(--line)}
 #dashboardContent .detail-line:last-child{border-bottom:0}
 @media(max-width:900px){#dashboardContent .dashboard-grid>.card,#dashboardContent .two-col.equal>.card{height:auto}}
-@media(max-width:560px){#dashboardContent{--dashboard-gap:10px;--dashboard-radius:13px}#dashboardContent .resource-deck .resource,#dashboardContent .overview-stat{min-height:82px}#dashboardContent .overview-stats .overview-stat{height:82px;min-height:82px}#dashboardContent .resource-deck .resource{padding:14px 16px!important}#dashboardContent .overview-stat{padding:14px 16px}#dashboardContent .card-title{min-height:0}}
+@media(max-width:560px){#dashboardContent{--dashboard-gap:10px;--dashboard-radius:13px}#dashboardContent .resource-deck .resource,#dashboardContent .overview-stat{min-height:82px}#dashboardContent .overview-stats .overview-stat{height:82px;min-height:82px}#dashboardContent .resource-deck .resource{padding:14px 16px!important}#dashboardContent .overview-stat{padding:14px 16px}#dashboardContent .overview-stat-total{padding:5px 12px!important}#dashboardContent .overview-stat-total>b{font-size:20px}#dashboardContent .overview-stat-total .dashboard-inline-tools{gap:5px;margin-top:3px;padding-left:7px}#dashboardContent .dashboard-inline-tools .live-indicator{gap:4px;font-size:9px}#dashboardContent .dashboard-inline-tools .dashboard-inline-age{font-size:8px}#dashboardContent .dashboard-inline-tools button{width:24px;height:24px;min-height:24px}#dashboardContent .card-title{min-height:0}}
 '''
 
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
@@ -1279,7 +1282,7 @@ def _dashboard_body_legacy(data, subs, profiles, traffic, path, domain, csrf, pr
     stats=[]
     for label,value in [('Клиенты',len(subs)+len(direct)),('Подписок',len(subs)),('Передают трафик',active),('Всего трафика',size(total_up+total_down))]:
         if label=='Всего трафика':
-            tools_html=('<div class="dashboard-inline-tools"><span id="liveIndicator" class="live-indicator"><i></i><b>Онлайн</b><small id="liveAge">Обновлено: сейчас</small></span><button id="refreshDashboard" type="button" title="Обновить данные" aria-label="Обновить данные">'+icon('refresh')+'</button></div>')
+            tools_html=('<div class="dashboard-inline-tools"><span id="liveIndicator" class="live-indicator"><i></i><b>Онлайн</b></span><small id="liveAge" class="dashboard-inline-age">Обновлено: сейчас</small><button id="refreshDashboard" type="button" title="Обновить данные" aria-label="Обновить данные">'+icon('refresh')+'</button></div>')
             stats.append(f'<div class="overview-stat overview-stat-total"><span>{label}</span><b>{value}</b>{tools_html}</div>')
         else:
             stats.append(f'<div class="overview-stat"><span>{label}</span><b>{value}</b></div>')
