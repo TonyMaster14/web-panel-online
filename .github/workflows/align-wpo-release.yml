@@ -1,0 +1,23 @@
+name: Align WPO 3.0.0 release with final logo fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/align-wpo-release.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  align-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update the release tag to the preceding commit
+        run: |
+          set -euo pipefail
+          target="$(git rev-parse HEAD^)"
+          git push origin "${target}:refs/tags/v3.0.0" --force
