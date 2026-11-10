@@ -2691,7 +2691,11 @@ def direct_profile_config(user,secret):
     if connection is None or not connection.get("enabled",True):
         raise LookupError("Connection is unavailable")
     labels={"vless":"VLESS","hysteria":"Hysteria2"}
-    title=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
+    # A standalone profile may belong to a remote node. Prefer its saved
+    # node metadata; the local VPS country is only a fallback for legacy users.
+    node_location=selected.get("node_location")
+    title=node_api.location_prefix(node_location if isinstance(node_location,dict)
+                                   else node_api.load_location(LOCATION_FILE))
     link=proxy_link(selected["protocol"],secret,selected.get("backend_port",443),title,selected.get("username",""))
     # A broken routing store must not silently downgrade a routed profile to a
     # plain VLESS link: surface a retryable error instead.
