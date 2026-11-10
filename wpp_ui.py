@@ -755,7 +755,7 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
     if not location_name:
         location_name='Не удалось определить'
     node_auto_field=f'''<div class="node-auto-field" aria-label="Автоматически определённая страна"><span class="node-auto-flag">{esc(node_flag(location_code))}</span><strong>{esc(location_name)}</strong><span class="badge on">Авто</span></div>'''
-    account_name_match=re.search(r'<input\\b(?=[^>]*\\bid=["\\']accountName["\\'])[^>]*>',creation)
+    account_name_match=re.search(r"<input\b(?=[^>]*\bid=['\"]accountName['\"])[^>]*>",creation)
     if account_name_match is None:
         raise RuntimeError("Could not locate account-name input to insert detected node")
     creation=creation[:account_name_match.end()]+node_auto_field+creation[account_name_match.end():]
