@@ -38,6 +38,18 @@ def clean_name(value, maximum=80):
     return value
 
 
+def clean_node_location(value):
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise SubscriptionError('Некорректная страна ноды.')
+    code = str(value.get('country_code', '')).upper()
+    if not re.fullmatch(r'[A-Z]{2}', code) or code == 'UN':
+        raise SubscriptionError('Укажите страну ноды из списка.')
+    country = clean_name(value.get('country_name') or value.get('name') or '', 80)
+    return {'country_code': code, 'country_name': country, 'name': country}
+
+
 def limits(value):
     try:
         number = int(value)
@@ -134,6 +146,9 @@ def mutate(data, request):
                'connections':specs,
                'protocols':list(dict.fromkeys(item['protocol'] for item in specs)), 'devices': [],
                'created_at': int(time.time())}
+        node_location = clean_node_location(request.get('node_location'))
+        if node_location:
+            sub['node_location'] = node_location
         accounts(data).append(sub)
     else:
         sub = find_account(data, request.get('id'))
@@ -152,6 +167,10 @@ def mutate(data, request):
                 raise SubscriptionError('Сначала отзовите лишние устройства, затем уменьшите лимит.')
             sub['name'] = clean_name(request.get('name', sub['name']))
             sub['max_devices'] = limit
+            if 'node_location' in request:
+                node_location = clean_node_location(request.get('node_location'))
+                if node_location:
+                    sub['node_location'] = node_location
             if 'failover_enabled' in request:
                 sub['failover_enabled'] = bool(request['failover_enabled'])
             specs=connection_specs(request.get('connections'),sub.get('protocols')) if 'connections' in request else connection_specs(sub.get('connections'),request.get('protocols',sub.get('protocols')))
