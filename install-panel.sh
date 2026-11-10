@@ -1609,6 +1609,8 @@ def delete_primary_proxy():
         and not str(item.get("name","")).startswith("panel:")
         and (item.get("name")=="default" or str(item.get("backend",""))=="127.0.0.1:2398")
     )]
+    if len(kept)==len(previous):
+        raise RuntimeError("Основной WEB Proxy не найден в активной конфигурации. Ничего не удалено.")
     new_profiles=json.dumps({**profiles,"profiles":kept},ensure_ascii=True,indent=2)+"\n"
     was_active=run("systemctl","is-active","--quiet","tproxy-server.service").returncode==0
     try:
