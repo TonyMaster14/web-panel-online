@@ -168,7 +168,7 @@ COUNTRY_ALIASES = {
 
 def country_location(value, fallback=None):
     """Resolve a manually entered country name or ISO code to a flag-ready location."""
-    raw = re.sub(r'\\s+', ' ', str(value or '').strip())
+    raw = re.sub(r'\s+', ' ', str(value or '').strip())
     if not raw:
         if isinstance(fallback, dict):
             current = location(fallback)
