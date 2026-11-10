@@ -9,8 +9,8 @@ DATA_FILE="${DATA_DIR}/data.json"
 SERVICE_FILE="/etc/systemd/system/tproxy-panel.service"
 FIREWALL_SERVICE_FILE="/etc/systemd/system/web-proxy-panel-firewall.service"
 APP_FILE="${APP_DIR}/panel.py"
-LOGO_SOURCE="${BASE}/panel-logo.png"
-LOGO_FILE="${APP_DIR}/panel-logo.png"
+LOGO_SOURCE="${BASE}/panel-logo.svg"
+LOGO_FILE="${APP_DIR}/panel-logo.svg"
 AWG_GUIDE_SOURCE="${BASE}/assets/awg-routing-guide.mp4"
 AWG_GUIDE_FILE="${APP_DIR}/awg-routing-guide.mp4"
 PRESET_ASSETS=(preset-cars.webp preset-car-graphite.webp preset-car-silver.webp preset-car-white.webp preset-car-blue.webp preset-car-red.webp preset-car-black.webp preset-coffee.webp)
@@ -115,7 +115,7 @@ if ! [[ "$DOMAIN" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$DOMAIN" == *.* ]]; th
 fi
 MTPROTO_HOST="${MTPROTO_HOST:-$DOMAIN}"
 [[ -s "$PRIMARY_SECRET" ]] || die "Primary install-time secret not found."
-[[ -s "$LOGO_SOURCE" ]] || die "Panel logo file is missing: panel-logo.png"
+[[ -s "$LOGO_SOURCE" ]] || die "Panel logo file is missing: panel-logo.svg"
 [[ -s "$AWG_GUIDE_SOURCE" ]] || die "AWG video guide is missing: assets/awg-routing-guide.mp4"
 for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
     [[ -s "$BASE/$module" ]] || die "Missing panel module: $module; extract the complete archive."
@@ -2213,7 +2213,7 @@ HYSTERIA_PORT=8443
 AWG_AVAILABLE=True
 MANAGER="/usr/local/sbin/web-proxy-panelctl"
 QR="/usr/bin/qrencode"
-LOGO="/opt/tproxy-panel/panel-logo.png"
+LOGO="/opt/tproxy-panel/panel-logo.svg"
 AWG_GUIDE="/opt/tproxy-panel/awg-routing-guide.mp4"
 FLAGS="/opt/tproxy-panel/flags"
 SITE_INDEX="/srv/tproxy-site/index.html"
@@ -2916,7 +2916,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options","nosniff"); self.send_header("Content-Length",str(len(b)))
         self.end_headers(); self.wfile.write(b)
     def send_logo(self,b):
-        self.send_response(200); self.send_header("Content-Type","image/png"); self.send_header("Cache-Control","no-store"); self.send_header("Content-Length",str(len(b))); self.end_headers(); self.wfile.write(b)
+        self.send_response(200); self.send_header("Content-Type","image/svg+xml"); self.send_header("Cache-Control","no-store"); self.send_header("Content-Length",str(len(b))); self.end_headers(); self.wfile.write(b)
     def send_mp4(self,path):
         try: size=os.path.getsize(path)
         except OSError:
@@ -3966,7 +3966,7 @@ class Handler(BaseHTTPRequestHandler):
                             continue
                 try:
                     with open(LOGO,"rb") as logo_stream:
-                        logo_data="data:image/png;base64,"+base64.b64encode(logo_stream.read()).decode()
+                        logo_data="data:image/svg+xml;base64,"+base64.b64encode(logo_stream.read()).decode()
                 except OSError:
                     logo_data=""
                 action_url=SUB_PREFIX+token+"/device-action"
