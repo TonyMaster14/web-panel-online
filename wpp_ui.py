@@ -337,14 +337,17 @@ def protocol_checks(sub, connections=None, node_locations=None):
             location=(node_locations or {}).get(str(item.get('id','')),sub.get('node_location',{}))
             country_code=str(location.get('country_code','UN')).upper() if isinstance(location,dict) else 'UN'
             flag=f'<span class="subscription-connection-flag">{node_flag(country_code)}</span>' if country_code!='UN' else ''
-            cards.append(f'''<label class="subscription-connection"><input type="checkbox" name="connection_{esc(item.get('id',''))}" value="1" {checked}><span class="subscription-connection-check">{icon('check')}</span><span class="subscription-connection-copy"><b>{flag}{esc(item.get('name','Подключение'))}</b><small>{esc(detail)}</small></span><span class="subscription-connection-protocol">{esc(protocol_title)}</span></label>''')
+            cards.append(f'''<label class="subscription-connection"><input type="checkbox" name="connection_{esc(item.get('id',''))}" value="1" {checked}><span class="subscription-connection-check">{icon('check')}</span><span class="subscription-connection-copy"><b>{esc(item.get('name','Подключение'))}</b><small>{esc(detail)}</small></span><span class="subscription-connection-protocol">{flag}{esc(protocol_title)}</span></label>''')
         return '<div class="subscription-connection-grid">'+''.join(cards)+'</div>'
+    location=sub.get('node_location',{})
+    country_code=str(location.get('country_code','UN')).upper() if isinstance(location,dict) else 'UN'
+    flag=f'<span class="subscription-connection-flag">{node_flag(country_code)}</span>' if country_code!='UN' else ''
     choices=[('vless','VLESS XHTTP'),('hysteria','Hysteria2')]
     cards=[]
     for protocol,title in choices:
         checked='checked' if protocol in sub.get('protocols',['vless','hysteria']) else ''
         detail='Напрямую через основной домен' if protocol=='vless' else 'Быстрое подключение через QUIC'
-        cards.append(f'''<label class="subscription-connection"><input type="checkbox" name="{protocol}" value="1" {checked}><span class="subscription-connection-check">{icon('check')}</span><span class="subscription-connection-copy"><b>{title}</b><small>{detail}</small></span><span class="subscription-connection-protocol">{title}</span></label>''')
+        cards.append(f'''<label class="subscription-connection"><input type="checkbox" name="{protocol}" value="1" {checked}><span class="subscription-connection-check">{icon('check')}</span><span class="subscription-connection-copy"><b>{title}</b><small>{detail}</small></span><span class="subscription-connection-protocol">{flag}{title}</span></label>''')
     return '<div class="subscription-connection-grid">'+''.join(cards)+'</div>'
 
 
@@ -1094,7 +1097,7 @@ html.wpp-navigating{cursor:progress}html.wpp-navigating .workspace>main{pointer-
 # Page actions belong to the blocks they affect. This removes the empty strip
 # above dashboards and tables while keeping every action visible on mobile.
 CSS += '''
-.overview-stat-total{min-height:126px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}.overview-stat-total>span,.overview-stat-total>b{width:100%;text-align:center}.overview-stat-total .dashboard-inline-tools{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:auto;padding-top:9px}.dashboard-inline-tools .live-indicator{margin:0;padding:7px 10px;background:color-mix(in srgb,var(--surface) 88%,transparent)}.subscription-connection-copy b{display:flex;align-items:center;gap:8px}.subscription-connection-flag{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:16px;line-height:1}.dashboard-inline-tools button{display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:7px}.dashboard-inline-tools button .ico{margin:0}
+.overview-stat-total{min-height:126px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-align:center}.overview-stat-total>span,.overview-stat-total>b{width:100%;text-align:center}.overview-stat-total .dashboard-inline-tools{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:auto;padding-top:9px}.dashboard-inline-tools .live-indicator{margin:0;padding:7px 10px;background:color-mix(in srgb,var(--surface) 88%,transparent)}.subscription-connection-flag{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:13px;line-height:1}.subscription-connection-protocol{display:inline-flex;align-items:center;justify-content:center;gap:5px}.dashboard-inline-tools button{display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:7px}.dashboard-inline-tools button .ico{margin:0}
 .clients-summary{grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:center}.clients-summary-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 14px}.clients-summary-actions button{min-height:38px;white-space:nowrap}.clients-summary-actions>button:first-child{width:38px;padding:8px}
 .connection-list-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.connection-list-actions i{font-style:normal}.connection-list-actions button{padding:9px 13px;font-size:11px;text-transform:none;letter-spacing:0;white-space:nowrap}
 .local-node-head>.nodes-count{margin-left:0;padding:7px 10px;background:var(--input)}.local-node-head>.nodes-count strong{font-size:19px}.local-node-head>.nodes-count span{font-size:8px}.updates-hero .actions{align-items:center;flex-wrap:nowrap}.updates-hero #refreshAll{white-space:nowrap}
