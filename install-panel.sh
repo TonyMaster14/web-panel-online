@@ -3097,12 +3097,17 @@ class Handler(BaseHTTPRequestHandler):
         if path==PANEL_PATH+"/users":
             current_users=users()
             registry=connection_store.ensure(CONNECTIONS_FILE,current_users)
+            user_connections=copy.deepcopy(registry["connections"])
+            default_node_location=node_api.load_location(LOCATION_FILE)
+            for connection in user_connections:
+                if isinstance(connection,dict) and not isinstance(connection.get("node_location"),dict):
+                    connection["node_location"]=default_node_location
             profiles=[{"id":"primary","name":"Основной WEB Proxy","secret":primary(),"protocol":"web","enabled":True,"backend_port":443}]+current_users
             try: routing_profiles=routing_store.load(ROUTING_FILE).get("profiles",{})
             except routing_store.RoutingError: routing_profiles={}
             body=users_ui(subscription_registry(),profiles,traffic(),PANEL_PATH,DOMAIN,self.csrf(),proxy_link,
-                          openflux.profile_states(),registry["connections"],
-                          node_api.location_prefix(node_api.load_location(LOCATION_FILE)),
+                          openflux.profile_states(),user_connections,
+                          node_api.location_prefix(default_node_location),
                           routing_profiles,direct_profile_url)
             self.send_html(layout("Клиенты",body,"users")); return
         if path==PANEL_PATH+"/connections":
