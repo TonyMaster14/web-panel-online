@@ -1206,7 +1206,7 @@ setInterval(pollClients,60000);
 
 def editor_ui(source, path, csrf, presets, has_draft):
     art={
-        'countdown':'☕','cars':'🚘','cats-repair':'🐾','loading':'🏥',
+        'countdown':'☕','cars':'🚘','cats-repair':'⚙️','loading':'🏥',
         'auto-service':'🔧','beauty-salon':'💗','phone-repair':'📱',
         'medical-diagnostics':'🩺'
     }
