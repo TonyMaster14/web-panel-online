@@ -1120,6 +1120,12 @@ CSS += '''
 #dashboardContent .overview-stat:before{top:16px;bottom:16px;background:var(--accent);opacity:.8}
 #dashboardContent .overview-stat span,#dashboardContent .resource-copy small{font-size:10px;line-height:1.45}
 #dashboardContent .overview-stat b{margin-top:6px;font-size:25px;line-height:1.2}
+#dashboardContent .overview-stat-total .dashboard-inline-tools .live-indicator{display:inline-flex;align-items:center;gap:7px;margin:0;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:10px;line-height:normal;font-weight:400;letter-spacing:normal;color:var(--muted);white-space:nowrap;background:color-mix(in srgb,var(--surface) 88%,transparent)}
+#dashboardContent .overview-stat-total .dashboard-inline-tools .live-indicator b{display:inline;margin:0;font-size:10px;line-height:normal;font-weight:550;letter-spacing:normal;color:inherit}
+#dashboardContent .overview-stat-total .dashboard-inline-tools .live-indicator small{display:inline;margin:0;font-size:10px;line-height:normal;font-weight:400;letter-spacing:normal;color:inherit}
+#dashboardContent .overview-stat-total .dashboard-inline-tools .live-indicator i{display:block;flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent)}
+#dashboardContent .overview-stat-total .dashboard-inline-tools .live-indicator.stale i{background:var(--amber);box-shadow:none}
+#dashboardContent .overview-stat-total .dashboard-inline-tools .live-indicator.offline i{background:var(--red);box-shadow:none}
 #dashboardContent .resource-copy strong{font-size:13px;line-height:1.35}
 #dashboardContent .dashboard-grid>.card,#dashboardContent .two-col.equal>.card,#dashboardContent>.card:not(.resource-deck){margin-bottom:var(--dashboard-gap);padding:18px}
 #dashboardContent .card-title{min-height:40px;margin-bottom:16px;padding-bottom:12px}
