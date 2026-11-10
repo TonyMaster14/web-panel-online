@@ -537,7 +537,7 @@ def live_subscriptions(subs, profiles):
 
 
 def client_records(subs, profiles, traffic, domain, proxy_link, routing_profiles=None,
-                   direct_profile_url=None):
+                   direct_profile_url=None, location_label=''):
     records=[]
     for s in live_subscriptions(subs,profiles):
         totals=aggregate(s.get('profile_ids',[]),traffic,s.get('enabled',True))
@@ -552,12 +552,8 @@ def client_records(subs, profiles, traffic, domain, proxy_link, routing_profiles
         if proto not in {'web','vless','hysteria','mtproto','awg20','awg31','naive','mieru'}:
             continue
         link_name=u['name']
-        location=u.get('node_location')
-        if proto in ('vless','hysteria') and isinstance(location,dict):
-            code=str(location.get('country_code','UN')).upper()
-            country=str(location.get('country_name') or location.get('name') or '').strip()
-            if re.fullmatch(r'[A-Z]{2}',code) and code!='UN' and country:
-                link_name=node_flag(code)+' '+country
+        if proto in ('vless','hysteria') and str(location_label or '').strip():
+            link_name=str(location_label).strip()
         try:
             link=proxy_link(proto,u['secret'],int(u.get('backend_port',443)),link_name,u.get('username',''))
         except (KeyError, TypeError, ValueError, RuntimeError):
@@ -686,7 +682,7 @@ location.reload();
 
 def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_profiles=None,
              connections=None, location_label='', routing_profiles=None, direct_profile_url=None):
-    records=client_records(subs,profiles,traffic,domain,proxy_link,routing_profiles,direct_profile_url)
+    records=client_records(subs,profiles,traffic,domain,proxy_link,routing_profiles,direct_profile_url,location_label)
     rows=[]; dialogs=[]
     for r in records:
         uid=r['id']; sid=esc(uid); name=esc(r['name']); t=r['totals']; enabled=r['enabled']; total=t['up']+t['down']
@@ -748,33 +744,26 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
     creation=creation.replace('<button type="button" class="quick-access" data-open-openflux><span class="quick-radio" aria-hidden="true"></span><span><b>OpenFlux</b><small>Отдельный профиль для iOS или Android</small></span></button>','')
     creation=creation.replace('</div><div class="quick-access-title">Сервисы</div>', '<label class="choice-card"><input type="radio" name="direct_protocol" value="naive"><span><strong>NaiveProxy</strong><small>HTTPS-прокси на отдельном TLS-порту</small></span></label><label class="choice-card"><input type="radio" name="direct_protocol" value="mieru"><span><strong>Mieru</strong><small>Маскируемый прокси на отдельном порту</small></span></label></div><div class="quick-access-title">Сервисы</div>',1)
 
-    # Country is independent from the client/profile name.  The default uses
-    # the detected panel location, while the operator may type another country.
-    country_names=[(code,title) for code,title in NODE_COUNTRIES if code!='UN']
-    default_country=location_label.split(' ',1)[1].strip() if ' ' in location_label else ''
-    default_code=next((code for code,title in country_names if title.casefold()==default_country.casefold()),'UN')
-    if default_code=='UN':
-        default_country=''
-    country_options=''.join(f'<option value="{esc(title)}"></option>' for _code,title in country_names)
-    country_map={}
-    for code,title in country_names:
-        country_map[title.casefold()]=code.lower()
-        country_map[code.lower()]=code.lower()
-    country_map.update({'голландия':'nl','англия':'gb','соединенное королевство':'gb',
-                        'соединённое королевство':'gb','united kingdom':'gb','uk':'gb',
-                        'netherlands':'nl','holland':'nl','germany':'de','finland':'fi',
-                        'france':'fr','united states':'us','usa':'us','canada':'ca',
-                        'sweden':'se','norway':'no','denmark':'dk','poland':'pl',
-                        'czechia':'cz','czech republic':'cz','austria':'at',
-                        'switzerland':'ch','spain':'es','italy':'it','japan':'jp',
-                        'singapore':'sg','united arab emirates':'ae'})
-    node_country_field=f'''<section class="create-step node-country-field"><label for="nodeCountry">Страна ноды</label><div class="node-country-control"><img id="nodeCountryFlag" src="{esc(path)}/__flag/{default_code.lower()}.svg" alt="🌐" width="30" height="22"><input id="nodeCountry" name="node_country" list="nodeCountryOptions" value="{esc(default_country)}" maxlength="80" required autocomplete="off" placeholder="Например, Нидерланды"></div><datalist id="nodeCountryOptions">{country_options}</datalist><small>Страна и флаг будут отображаться в Happ отдельно от имени клиента.</small></section>'''
+    location_label=str(location_label or '').strip()
+    auto_flag, separator, auto_country = location_label.partition(' ')
+    if not separator or not auto_country.strip():
+        auto_flag, auto_country = '🌐', 'Страна пока не определена'
+    node_auto_block=f'''<section class="create-step node-auto-detect"><label>Определённая нода</label><div class="node-auto-card"><span class="node-auto-flag">{esc(auto_flag)}</span><div class="node-auto-copy"><b>{esc(auto_country)}</b><small>Страна определяется автоматически по данным сервера ноды</small></div><span class="node-auto-status">● Авто</span></div></section>'''
     client_name_field='''<section class="create-step"><label for="accountName">Имя клиента или устройства</label><input id="accountName" name="name" placeholder="Например, Анна или Apple TV" maxlength="80" required autocomplete="off"></section>'''
     if client_name_field not in creation:
-        raise RuntimeError("Could not locate the client-name field to insert node country")
-    creation=creation.replace(client_name_field,client_name_field+node_country_field,1)
-    country_codes_json=json.dumps(country_map,ensure_ascii=False,separators=(',',':'))
-    node_country_script=f'''<script>(()=>{{const input=document.getElementById('nodeCountry'),flag=document.getElementById('nodeCountryFlag');if(!input||!flag)return;const codes={country_codes_json},prefix={json.dumps(path+'/__flag/')};function syncFlag(){{const value=input.value.trim().toLocaleLowerCase('ru-RU'),code=codes[value]||'un';flag.src=prefix+code+'.svg';flag.alt=code==='un'?'🌐':String.fromCodePoint(127397+code.toUpperCase().charCodeAt(0),127397+code.toUpperCase().charCodeAt(1))}}input.addEventListener('input',syncFlag);syncFlag()}})();</script>'''
+        raise RuntimeError("Could not locate the client-name field to insert node auto-detection")
+    creation=creation.replace(client_name_field,client_name_field+node_auto_block,1)
+    node_auto_style='''<style>
+.node-auto-detect{margin:0 0 17px;padding:0;border:0}
+.node-auto-detect>label{display:block;margin:0 0 7px;color:var(--text);font-size:11px;font-weight:650}
+.node-auto-card{display:flex;align-items:center;gap:12px;min-width:0;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent) 35%,var(--line));border-radius:11px;background:linear-gradient(100deg,color-mix(in srgb,var(--accent) 14%,var(--surface)),color-mix(in srgb,var(--accent) 5%,var(--surface)))}
+.node-auto-flag{display:grid;place-items:center;flex:0 0 36px;width:36px;height:30px;font-size:24px;line-height:1}
+.node-auto-copy{display:block;min-width:0;flex:1}
+.node-auto-copy b{display:block;color:var(--text);font-size:13px;font-weight:650;line-height:1.35}
+.node-auto-copy small{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.45}
+.node-auto-status{flex:0 0 auto;color:var(--green);font-size:9px;font-weight:650;white-space:nowrap}
+@media(max-width:540px){.node-auto-card{gap:9px;padding:11px}.node-auto-copy small{font-size:9px}}
+</style>'''
     creation=creation.replace('<input type="hidden" id="accountKind"', '<div id="createError" class="create-error" role="alert" hidden></div><input type="hidden" id="accountKind"',1)
     occupied_awg={str(profile.get('connection_id','')) for profile in profiles
                   if not profile.get('subscription_id') and profile.get('protocol') in ('awg20','awg31')}
@@ -799,7 +788,7 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
     connection_limits_script='''<script>(()=>{const select=document.getElementById('connectionTemplate'),devices=document.getElementById('directDevices'),traffic=document.getElementById('trafficLimit'),form=document.getElementById('createClientForm');if(!select||!devices||!form)return;function sync(){const protocol=select.selectedOptions[0]?.dataset.protocol||'',direct=form.querySelector('[name=access_mode][value=direct]')?.checked,single=['awg20','awg31','naive','mieru'].includes(protocol),external=['naive','mieru'].includes(protocol);if(single)devices.value='1';devices.max=single?'1':'20';devices.readOnly=single;if(traffic){if(direct&&external)traffic.value='0';traffic.disabled=!direct||external}}select.addEventListener('change',()=>setTimeout(sync,0));document.querySelectorAll('[name=access_mode]').forEach(input=>input.addEventListener('change',()=>setTimeout(sync,0)));sync()})();</script>'''
     client_script=CLIENTS_JS.replace("const openFluxShortcut=createForm.querySelector('[data-open-openflux]');if(openFluxShortcut)openFluxShortcut.addEventListener('click',()=>{createDialog.close();document.getElementById('newOpenFlux').showModal()});",'').replace("form.id==='openFluxCreateForm'", "form.id==='openFluxCreateForm'||form.id==='openFluxEditForm'")
     openflux_editor=f'''<dialog id="openFluxEdit" class="create-dialog"><div class="dialog-head"><div><h2>Редактирование OpenFlux</h2><small>Профиль обновится без удаления подключения</small></div><button type="button" data-close-openflux-edit aria-label="Закрыть">×</button></div><form id="openFluxEditForm" method="post" action="{esc(path)}/openflux-profile">{hidden(csrf,operation='update')}<input type="hidden" name="id"><div id="openFluxEditError" class="create-error" role="alert" hidden></div><label>Название профиля<input name="name" maxlength="80" required></label><div class="form-grid"><label>Транспорт<select name="transport"><option value="yandex">Яндекс Документы</option><option value="telemost">Яндекс Телемост</option><option value="mailru">Mail.ru Документы</option><option value="oneme">MAX</option></select></label><label>Устройство<select name="platform"><option value="ios">iOS</option><option value="android">Android</option></select></label></div><div data-openflux-edit-doc><label>Ссылка транспорта<input name="url" type="url" maxlength="2048" autocomplete="off" spellcheck="false"></label></div><div data-openflux-edit-max hidden><label>MAX Web token серверного аккаунта<input name="max_server_token" type="password" maxlength="4096" autocomplete="new-password" placeholder="Оставьте пустым, чтобы сохранить текущий"></label><label>MAX Web token клиентского аккаунта<input name="max_client_token" type="password" maxlength="4096" autocomplete="new-password" placeholder="Оставьте пустым, чтобы сохранить текущий"></label><label>UID серверного аккаунта MAX<input name="max_uid" inputmode="numeric" pattern="[1-9][0-9]{{0,18}}" maxlength="19"></label><p class="note">Пустые поля токенов сохранят текущие значения. Для перехода на MAX укажите оба токена.</p></div><div class="actions create-actions"><button type="button" data-close-openflux-edit>Отмена</button><button class="primary" type="submit">Сохранить изменения</button></div></form></dialog><script>(()=>{{const dialog=document.getElementById('openFluxEdit'),form=document.getElementById('openFluxEditForm'),error=document.getElementById('openFluxEditError'),doc=form?.querySelector('[data-openflux-edit-doc]'),max=form?.querySelector('[data-openflux-edit-max]'),maxOption=form?.querySelector('[name=transport] option[value=oneme]');if(!dialog||!form)return;let current=null;const decode=value=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(value),c=>c.charCodeAt(0))));function sync(){{const isMax=form.elements.transport.value==='oneme',wasMax=current?.transport==='oneme';doc.hidden=isMax;max.hidden=!isMax;form.elements.url.required=!isMax;form.elements.max_server_token.required=isMax&&!wasMax;form.elements.max_client_token.required=isMax&&!wasMax;form.elements.max_uid.required=isMax}}document.querySelectorAll('[data-edit-openflux]').forEach(button=>button.addEventListener('click',()=>{{current=decode(button.dataset.editOpenflux);form.reset();error.hidden=true;form.elements.id.value=current.id;form.elements.name.value=current.name;form.elements.transport.value=current.transport;form.elements.platform.value=current.platform;form.elements.url.value=current.url||'';form.elements.max_uid.value=current.max_uid||'';maxOption.disabled=Boolean(current.is_main);sync();dialog.showModal()}}));form.elements.transport.addEventListener('change',sync);document.querySelectorAll('[data-close-openflux-edit]').forEach(button=>button.addEventListener('click',()=>dialog.close()));form.addEventListener('submit',async event=>{{event.preventDefault();const submit=form.querySelector('[type=submit]');submit.disabled=true;error.hidden=true;try{{const response=await fetch(form.action,{{method:'POST',headers:{{'X-WPP-Async':'1','Accept':'application/json'}},body:new URLSearchParams(new FormData(form))}});if(response.redirected)throw new Error('Сессия завершена. Войдите заново.');let result;try{{result=await response.json()}}catch(parseError){{throw new Error('Панель вернула некорректный ответ.')}}if(!response.ok||!result.ok)throw new Error(result.message||'Не удалось сохранить профиль OpenFlux.');dialog.close();window.showPanelToast?.('Профиль OpenFlux сохранён.');setTimeout(()=>location.reload(),500)}}catch(reason){{error.textContent=reason.message||'Не удалось сохранить профиль OpenFlux.';error.hidden=false}}finally{{submit.disabled=false}}}});sync()}})();</script>'''
-    return '<div class="clients-layout"><div class="clients-content">'+content+'</div><div class="connection-slot">'+qr_dialog()+'</div></div>'+''.join(dialogs)+creation+confirmation+openflux_editor+client_script.replace('@@PATH@@',json.dumps(path)).replace('@@CSRF@@',json.dumps(csrf))+connection_script+connection_limits_script+node_country_script
+    return '<div class="clients-layout"><div class="clients-content">'+content+'</div><div class="connection-slot">'+qr_dialog()+'</div></div>'+''.join(dialogs)+creation+confirmation+openflux_editor+client_script.replace('@@PATH@@',json.dumps(path)).replace('@@CSRF@@',json.dumps(csrf))+connection_script+connection_limits_script+node_auto_style
 
 
 NODE_COUNTRIES = [
