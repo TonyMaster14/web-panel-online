@@ -686,9 +686,20 @@ def client_glances(records,path):
     rows=[]
     for r in records:
         t=r['totals']; kind='Подписка' if r['kind']=='subscription' else 'Отдельная ссылка'
-        rows.append(f'<div class="client-glance"><div><strong>{esc(r["name"])}</strong><small>{kind}</small></div>{client_protocols(r["protocols"])}<div class="traffic-value">{size(t["up"]+t["down"])}</div><a class="btn quiet" href="{esc(path)}/users#account-{esc(r["id"])}">Управление ↗</a></div>')
+        if r['kind']=='subscription':
+            qr=path+'/subscription-qr?'+urlencode({'id':r['id']})
+            qr_kind='subscription'
+            user_port=None
+        else:
+            source=r['source']; proto=r['protocols'][0]
+            port=int(source.get('backend_port',443))
+            qr=path+'/__qr?'+urlencode({'secret':source.get('secret',''),'protocol':proto,
+                'port':port if proto in ('hysteria','mtproto','naive','mieru') else 443})
+            qr_kind='direct'
+            user_port=port
+        access=qr_attributes(qr,r['name'],r['link'],r['protocols'],qr_kind,user_port=user_port)
+        rows.append(f'<div class="client-glance"><div><strong>{esc(r["name"])}</strong><small>{kind}</small></div>{client_protocols(r["protocols"])}<div class="traffic-value">{size(t["up"]+t["down"])}</div><button class="btn quiet" {access}>Доступ / QR</button></div>')
     return '<div class="dashboard-clients">'+(''.join(rows) or '<p class="empty">Клиентов пока нет</p>')+'</div>'
-
 
 def openflux_profiles_ui(profiles, path, csrf, include_creator=True):
     cards=[]
@@ -1410,7 +1421,10 @@ root.addEventListener('click',async e=>{{if(e.target.closest('#refreshDashboard'
 function componentVersionName(name,value){{const raw=String(value||'');if(name!=='openflux')return raw.replace(/^v/,'');if(/^v?0[.]13[.]0$/.test(raw))return '1.6.0';const nightly=raw.match(/^nightly-([0-9]{{4}})([0-9]{{2}})([0-9]{{2}})-/);return nightly?'Тестовая · '+nightly[3]+'.'+nightly[2]+'.'+nightly[1]:raw.replace(/^v/,'')}}
 function componentView(d){{const catalog=d.catalog||{{}},current=d.current||{{}},running=['queued','running'].includes(d.phase),active=d.component||'',percent=Math.max(0,Math.min(100,Number(d.progress)||0));for(const name of ['xray','openflux']){{const select=document.getElementById(name+'Release'),button=document.querySelector('[data-component-install="'+name+'"]'),versions=catalog[name]||[];if(versions.length){{const old=select.value;select.innerHTML=versions.map(v=>'<option value="'+v+'">'+componentVersionName(name,v)+'</option>').join('');if(versions.includes(old))select.value=old}}select.disabled=running||!versions.length;button.disabled=running||!versions.length;button.textContent=running&&active===name?'Установка '+percent+'%':'Установить';document.getElementById(name+'Current').textContent='Установлено: '+componentVersionName(name,current[name]||'неизвестно')}}const status=document.getElementById('componentStatus');status.textContent=d.phase==='failed'?(d.error_title||'Ошибка')+': '+(d.message||'Компонент не обновлён.')+' '+(d.hint||''):running?percent+'% · '+(d.step||'Установка')+' · '+(d.message||'Подождите…'):(d.message||'Выберите опубликованную версию GitHub.')}}
 document.getElementById('checkComponents').addEventListener('click',async e=>{{const b=e.currentTarget;b.disabled=true;try{{const r=await fetch('{esc(path)}/component-check',{{method:'POST',body:new URLSearchParams({{csrf:'{esc(csrf)}'}})}}),d=await r.json();if(!r.ok)throw new Error(d.message||'Ошибка загрузки версий');componentView(d)}}catch(err){{document.getElementById('componentStatus').textContent=err.message}}finally{{b.disabled=false}}}});document.querySelectorAll('[data-component-install]').forEach(button=>button.addEventListener('click',async()=>{{const component=button.dataset.componentInstall,target=document.getElementById(component+'Release').value;if(!confirm('Установить '+component+' '+target+'? При ошибке будет выполнен автоматический откат.'))return;button.disabled=true;try{{const r=await fetch('{esc(path)}/component-install',{{method:'POST',body:new URLSearchParams({{csrf:'{esc(csrf)}',component,target}})}}),d=await r.json();if(!r.ok)throw new Error(d.message||'Ошибка установки');componentView(d)}}catch(err){{document.getElementById('componentStatus').textContent=err.message}}}}));
-async function refreshComponentStatus(){{try{{const r=await fetch('{esc(path)}/component-status',{{cache:'no-store'}}),d=r.ok?await r.json():null;if(d)componentView(d)}}catch(e){{}}}}setInterval(refresh,30000);setInterval(updateClock,5000);setInterval(refreshComponentStatus,3000);document.addEventListener('visibilitychange',()=>{{if(!document.hidden){{refresh();refreshComponentStatus()}}}});fetch('{esc(path)}/update-status',{{cache:'no-store'}}).then(r=>r.ok&&!r.redirected?r.json():null).then(d=>{{if(d){{updateView(d);automaticUpdateCheck(d)}}}}).catch(()=>automaticUpdateCheck(null));refreshComponentStatus();
+async function refreshComponentStatus(){{try{{const r=await fetch('{esc(path)}/component-status',{{cache:'no-store'}}),d=r.ok?await r.json():null;if(d)componentView(d)}}catch(e){{}}}}let clientsBusy=false,servicesBusy=false;
+async function refreshClients(){if(clientsBusy||document.hidden)return;clientsBusy=true;try{const r=await fetch('{esc(path)}/clients-status',{cache:'no-store'});if(r.ok&&!r.redirected){const d=await r.json(),block=root.querySelector('[data-live-block="clients"]');if(block&&typeof d.html==='string')block.innerHTML=d.html}}catch(e){}finally{clientsBusy=false}}
+async function refreshServices(){if(servicesBusy||document.hidden)return;servicesBusy=true;try{const r=await fetch('{esc(path)}/services-status',{cache:'no-store'});if(r.ok&&!r.redirected){const d=await r.json(),block=root.querySelector('[data-live-block="services"]');if(block&&d.services){const labels={xray:'Xray · VLESS / Hysteria2',naive:'NaiveProxy',mieru:'Mieru',relay:'Telegram WEB Proxy / MTProto',openflux:'OpenFlux',caddy:'Caddy · HTTPS',panel:'Панель управления'};block.innerHTML=Object.entries(labels).filter(([key])=>d.services[key]?.state==='active'&&d.services[key]?.load_state!=='not-found').map(([key,label])=>'<div class="service-line"><span>'+label+'</span><span class="badge on">Запущен</span></div>').join('')}}}catch(e){}finally{servicesBusy=false}}
+setInterval(refresh,30000);setInterval(refreshClients,2000);setInterval(refreshServices,2000);setInterval(updateClock,5000);setInterval(refreshComponentStatus,3000);refreshClients();refreshServices();document.addEventListener('visibilitychange',()=>{{if(!document.hidden){{refresh();refreshComponentStatus()}}}});fetch('{esc(path)}/update-status',{{cache:'no-store'}}).then(r=>r.ok&&!r.redirected?r.json():null).then(d=>{{if(d){{updateView(d);automaticUpdateCheck(d)}}}}).catch(()=>automaticUpdateCheck(null));refreshComponentStatus();
 </script>'''
 
 
