@@ -3095,6 +3095,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_html(layout("Дашборд",dashboard_page(body,PANEL_PATH,self.csrf()),"dashboard"))
             return
 
+        if path==PANEL_PATH+"/services-status":
+            self.send_json({"services":server_metrics.service_snapshot()})
+            return
+
         if path==PANEL_PATH+'/clients-state':
             profiles=[{'id':'primary','name':'Основной WEB Proxy','secret':primary(),'protocol':'web','enabled':True,'backend_port':443}]+users()
             records=client_records(subscription_registry(),profiles,traffic(),DOMAIN,proxy_link)
