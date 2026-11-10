@@ -2701,10 +2701,11 @@ def direct_profile_config(user,secret):
     # plain VLESS link: surface a retryable error instead.
     profiles=routing_store.load(ROUTING_FILE).get("profiles",{})
     profile=profiles.get(str(connection["id"]))
-    profile_title=str(user.get("name") or title)
+    # In a single Happ JSON, remarks names the server entry. The profile
+    # title is supplied separately through the profile-title response header.
     if isinstance(profile,dict) and profile.get("enabled",True):
-        return routing_store.xray_config(link,profile,profile_title)
-    return routing_store.plain_xray_config(link,profile_title)
+        return routing_store.xray_config(link,profile,title)
+    return routing_store.plain_xray_config(link,title)
 def subscription_device_name(user_agent):
     value=str(user_agent or "").lower()
     if "android" in value: return "Android"
@@ -4068,7 +4069,9 @@ class Handler(BaseHTTPRequestHandler):
             if matched is None:
                 self.send_data("Not found",404); return
             config=direct_profile_config(matched,matched_secret)
-            title=str(config.get("remarks") or "VLESS")
+            # Keep the Happ profile title (client/device name) separate from
+            # config.remarks, which is the server/node name inside the profile.
+            title=str(matched.get("name") or "VLESS")
             headers={"profile-title":"base64:"+base64.b64encode(title.encode()).decode(),
                      "profile-update-interval":"6",
                      "profile-web-page-url":direct_profile_url(matched,matched_secret)}

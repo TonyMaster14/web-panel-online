@@ -57,19 +57,21 @@ class DirectRouting(unittest.TestCase):
         self.save_routing()
         self.user = {'id': 'a' * 16, 'name': 'Телефон', 'protocol': 'vless',
                      'secret': '11111111-1111-4111-8111-111111111111',
-                     'connection_id': 'vless-direct', 'backend_port': 443, 'enabled': True}
+                     'connection_id': 'vless-direct', 'backend_port': 443, 'enabled': True,
+                     'node_location': {'country_code': 'NL', 'country_name': 'Нидерланды', 'name': 'Нидерланды'}}
         self.profiles = [self.user]
         self.qr_payloads = []
 
         def proxy(protocol, secret, port=443, name='Proxy', username=''):
+            fragment = quote(name, safe='')
             if protocol == 'hysteria':
-                return f'hysteria2://{secret}@vpn.example:{port}/?sni=vpn.example'
-            return f'vless://{secret}@vpn.example:443?security=tls&type=xhttp&path=%2Ftest&mode=auto'
+                return f'hysteria2://{secret}@vpn.example:{port}/?sni=vpn.example#{fragment}'
+            return f'vless://{secret}@vpn.example:443?security=tls&type=xhttp&path=%2Ftest&mode=auto#{fragment}'
 
         namespace = dict(copy=copy, base64=base64, hashlib=hashlib, secrets=secrets,
                          json=json, re=re, parse_qs=parse_qs, urlparse=urlparse,
                          BaseHTTPRequestHandler=BaseHTTPRequestHandler,
-                         node_api=SimpleNamespace(API_PREFIX='/wpp-api'),
+                         node_api=SimpleNamespace(API_PREFIX='/wpp-api', location_prefix=lambda value: '🇳🇱 Нидерланды', load_location=lambda path: {'country_code':'NL','country_name':'Нидерланды'}),
                          SUB_PREFIX='/wpp-sub/', DIRECT_PROFILE_PREFIX='/wpp-direct/',
                          DOMAIN='vpn.example', PANEL_PATH='/panel-test',
                          CONNECTIONS_FILE=str(self.connection_file), ROUTING_FILE=str(self.routing_file),
@@ -130,7 +132,7 @@ class DirectRouting(unittest.TestCase):
         rules = config['routing']['rules']
         self.assertTrue(any(rule.get('outboundTag') == 'direct'
                             and 'domain:direct.example' in rule.get('domain', []) for rule in rules))
-        outbound = next(value for value in config['outbounds'] if value['tag'] == 'proxy')
+        outbound = next(value for value in config['outbounds'] if value.get('protocol') in ('vless', 'hysteria'))
         self.assertEqual(outbound['settings']['vnext'][0]['users'][0]['id'], secret or self.user['secret'])
 
     def test_happ_fetches_one_complete_routed_config_without_panel_login(self):
@@ -140,13 +142,17 @@ class DirectRouting(unittest.TestCase):
         self.assertIn('application/json', headers['Content-Type'])
         configs = json.loads(body)
         self.assertEqual(len(configs), 1)
+        self.assertEqual(configs[0]['remarks'], '🇳🇱 Нидерланды')
+        self.assertEqual(headers['profile-title'], 'base64:' + base64.b64encode('Телефон'.encode()).decode())
         self.assert_routed(configs[0])
 
     def test_download_returns_single_json_object_with_routing(self):
         status, headers, body = self.fetch('?format=single&download=1')
         self.assertEqual(status, 200)
         self.assertIn('attachment;', headers['Content-Disposition'])
-        self.assert_routed(json.loads(body))
+        config = json.loads(body)
+        self.assertEqual(config['remarks'], '🇳🇱 Нидерланды')
+        self.assert_routed(config)
 
     def use_real_timeweb_link_generator(self):
         connection = connections.validate({
@@ -190,6 +196,7 @@ class DirectRouting(unittest.TestCase):
         self.assertIn('attachment;', headers['Content-Disposition'])
         config = json.loads(body)
         self.assertNotIn('routing', config)
+        self.assertEqual(config['remarks'], '🌐 Test')
         self.assertTrue(config['outbounds'][0]['streamSettings']['xhttpSettings']['path']
                         .endswith('/stream/index.json'))
 
