@@ -783,7 +783,8 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
     device_start=creation.index('<div class="device-row">',picker_start)
     creation=creation[:picker_start]+'<div class="protocol-picker" id="subscriptionConnections">'+subscription_choices+'</div>'+creation[device_start:]
     creation=creation.replace('<span>Протоколы подписки</span>','<span>Подключения клиента</span>',1)
-    connection_options=''.join(f'<option value="{esc(item.get("id",""))}" data-protocol="{esc(item.get("protocol",""))}">{esc((location_label+" · ") if location_label else "")}{esc(connection_display(item))}</option>' for item in usable)
+    connection_flag=node_flag(location_code)
+    connection_options=''.join(f'<option value="{esc(item.get("id",""))}" data-protocol="{esc(item.get("protocol",""))}">{esc((connection_flag+" ") if connection_flag else "")}{esc(connection_display(item))}</option>' for item in usable)
     if not connection_options: connection_options='<option value="">Сначала создайте подключение</option>'
     selector=f'''<div class="connection-choice"><label for="connectionTemplate">Серверное подключение</label><select id="connectionTemplate" name="connection_id" required>{connection_options}</select><small>Порт принадлежит подключению. Занятые AWG-подключения здесь не показываются.</small></div>'''
     creation=creation.replace('<div class="create-step-title"><i>1</i><span>Выберите одно подключение</span></div>', '<div class="create-step-title"><i>1</i><span>Выберите одно подключение</span></div>'+selector,1)
