@@ -267,7 +267,7 @@ body:not(.login-page){font-size:15px;line-height:1.58}body:not(.login-page) :whe
 '''
 
 
-/* Keep the WPO mark comfortably inset inside the panel and sign-in frames. */
+# Keep the WPO mark comfortably inset inside the panel and sign-in frames.
 CSS += """
 .mini-brand{display:grid;place-items:center}
 .mini-brand img{width:80%;height:80%;object-fit:contain;border-radius:7px}
