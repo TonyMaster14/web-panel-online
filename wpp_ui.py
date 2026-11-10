@@ -275,8 +275,8 @@ CSS += """
 .login-card-head{position:relative;min-height:140px;justify-content:center;margin-bottom:28px}
 .signin-emblem{width:100%;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
 .signin-emblem div{width:100%;display:flex;justify-content:center;text-align:center}
-.signin-emblem div span{display:block;text-align:center;font-size:17px;font-weight:800;letter-spacing:.11em;color:var(--text)}
-.login-card-head{flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:0}
+.signin-emblem div span{display:block;text-align:center;font-size:19px;font-weight:800;letter-spacing:.11em;color:var(--text)}
+.login-card-head{flex-direction:column;align-items:center;justify-content:center;gap:19px;min-height:0}
 .login-secure{position:static;align-self:center;margin:0}
 @media(max-width:560px){.login-card-head{flex-direction:column;align-items:center;gap:14px}.login-secure{display:inline-flex;position:static;margin:0}}
 """
