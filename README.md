@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="panel-logo.png" alt="WPO — Web Panel Online" width="190">
+  <img src="panel-logo.svg" alt="WPO — Web Panel Online" width="190">
 </p>
 
 <h1 align="center">WEB PANEL ONLINE 3.0.0</h1>
 
-<p align="center">Панель управления VPN- и proxy-подключениями на собственном VPS. Поддерживаются VLESS XHTTP, Hysteria2, AmneziaWG, NaiveProxy, Mieru, MTProto и экспериментальная интеграция OpenFlux.</p>
+<p align="center">Панель управления VPN и Proxy подключениями на собственном VPS. Поддержка VLESS XHTTP, Hysteria2, AmneziaWG, NaiveProxy, Mieru, MTProto и экспериментальная интеграция OpenFlux.</p>
 
 ---
 
