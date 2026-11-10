@@ -1544,7 +1544,7 @@ def federation_sync(request):
     d["users"]=[u for u in d["users"] if u.get("federation_id")!=external_id or u.get("protocol") in protocols]
     for user in d["users"]:
         if user.get("federation_id")==external_id:
-            user["name"]=name+" · "+("VLESS" if user["protocol"]=="vless" else "Hysteria2")
+            user["name"]=name
             user["enabled"]=True
     for protocol in protocols:
         if any(u.get("federation_id")==external_id and u.get("protocol")==protocol for u in d["users"]):
@@ -1552,7 +1552,7 @@ def federation_sync(request):
         if protocol=="hysteria":
             tls=run(XRAY_TLS_SYNC)
             if tls.returncode: raise RuntimeError("Hysteria2 TLS certificate is not ready")
-        d["users"].append({"id":secrets.token_hex(8),"name":name+" · "+("VLESS" if protocol=="vless" else "Hysteria2"),
+        d["users"].append({"id":secrets.token_hex(8),"name":name,
             "protocol":protocol,"enabled":True,"secret":str(uuid.uuid4()),
             "backend_port":443 if protocol=="vless" else HYSTERIA_PORT,
             "federation_id":external_id,"created_at":int(time.time())})
@@ -2337,9 +2337,8 @@ def users():
     try:
         with open(USERS,encoding="utf-8") as f: return json.load(f).get("users",[])
     except Exception: return []
-def selected_connection_specs(form,node_location=None):
+def selected_connection_specs(form):
     registry=connection_store.ensure(CONNECTIONS_FILE,users())
-    country=node_api.location_prefix(node_location or node_api.load_location(LOCATION_FILE))
     selected=[]
     for item in registry.get("connections",[]):
         if not connection_store.selectable(item): continue
@@ -2692,13 +2691,12 @@ def direct_profile_config(user,secret):
     if connection is None or not connection.get("enabled",True):
         raise LookupError("Connection is unavailable")
     labels={"vless":"VLESS","hysteria":"Hysteria2"}
-    name=str(connection.get("name") or labels[selected["protocol"]])
-    link=proxy_link(selected["protocol"],secret,selected.get("backend_port",443),name,selected.get("username",""))
+    title=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
+    link=proxy_link(selected["protocol"],secret,selected.get("backend_port",443),title,selected.get("username",""))
     # A broken routing store must not silently downgrade a routed profile to a
     # plain VLESS link: surface a retryable error instead.
     profiles=routing_store.load(ROUTING_FILE).get("profiles",{})
     profile=profiles.get(str(connection["id"]))
-    title=node_api.location_prefix(selected.get("node_location") or node_api.load_location(LOCATION_FILE))
     if isinstance(profile,dict) and profile.get("enabled",True):
         return routing_store.xray_config(link,profile,title)
     return routing_store.plain_xray_config(link,title)
@@ -2836,7 +2834,7 @@ def proxy_link(protocol,secret,port=443,name="Proxy",username=""):
     protocol_label={"vless":"VLESS","hysteria":"Hysteria2","awg20":"AWG 2.0","awg31":"AWG 3.1"}.get(protocol,protocol)
     user=proxy_user(protocol,secret)
     if not (name.startswith("🌐") or (name and 0x1F1E6 <= ord(name[0]) <= 0x1F1FF)):
-        name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))+" · "+proxy_connection_name(user,protocol_label)
+        name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
     label=quote(name or "Proxy",safe="")
     if protocol=="vless":
         route=cdn.vless_route(DOMAIN,user.get("cdn") if user else None)
@@ -3635,20 +3633,16 @@ class Handler(BaseHTTPRequestHandler):
             kind=form.get("kind","")
             if not name or len(name)>80 or any(ord(c)<32 for c in name):
                 create_error("Укажите имя длиной от 1 до 80 символов."); return
-            try:
-                node_location=node_api.country_location(form.get("node_country",""),node_api.load_location(LOCATION_FILE))
-            except node_api.NodeError as exc:
-                create_error(str(exc)); return
             if kind=="subscription":
-                try: connection_specs=selected_connection_specs(form,node_location)
+                try: connection_specs=selected_connection_specs(form)
                 except connection_store.ConnectionError as exc: create_error(str(exc)); return
                 result=ctl_subscription({"operation":"create","name":name,"max_devices":form.get("max_devices","0"),
-                                         "connections":connection_specs,"node_location":node_location})
+                                         "connections":connection_specs})
                 if not result.get("ok"):
                     create_error(result.get("message","Ошибка создания подписки"),int(result.get("status",400))); return
             elif kind in ("web","mtproto","vless","hysteria","awg20","awg31","naive","mieru"):
                 try:
-                    common={"protocol":kind,"name":name,"node_location":node_location,
+                    common={"protocol":kind,"name":name,
                         "devices":form.get("direct_devices","1"),
                         "traffic_limit_gb":form.get("traffic_limit_gb","0")}
                     connection_id=form.get("connection_id","").strip()
@@ -3662,7 +3656,6 @@ class Handler(BaseHTTPRequestHandler):
                         elif selected.get("protocol") in ("naive","mieru"):
                             selected=connection_store.claim_external_port(CONNECTIONS_FILE,connection_id)
                         common={**connection_store.request_for_connection(selected),"name":name,
-                            "node_location":node_location,
                             "devices":form.get("direct_devices","1"),"traffic_limit_gb":form.get("traffic_limit_gb","0")}
                         kind=common["protocol"]
                     if kind=="mtproto":
@@ -3958,7 +3951,7 @@ class Handler(BaseHTTPRequestHandler):
                 config_items=[]
                 if not int(subscription.get("max_devices",0) or 0):
                     labels={"vless":"VLESS","hysteria":"Hysteria2"}
-                    local_name=node_api.location_prefix(subscription.get("node_location") or node_api.load_location(LOCATION_FILE))
+                    local_name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
                     seen_connections=set()
                     for profile in dashboard_profiles:
                         connection_id=str(profile.get("connection_id",""))
@@ -3990,7 +3983,7 @@ class Handler(BaseHTTPRequestHandler):
                 if result.get("code")=="device_limit": headers.update({"X-Hwid-Limit":"true","X-Hwid-Max-Devices-Reached":"true"})
                 self.send_data(result.get("message","Подписка недоступна"),int(result.get("status",503)),headers=headers); return
             labels={"vless":"VLESS","hysteria":"Hysteria2"}
-            local_name=node_api.location_prefix(subscription.get("node_location") or node_api.load_location(LOCATION_FILE))
+            local_name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
             lines=[proxy_link(u["protocol"],u["secret"],u["backend_port"],local_name,u.get("username","")) for u in result["users"]]
             if result["users"]:
                 first=result["users"][0]
@@ -4026,10 +4019,10 @@ class Handler(BaseHTTPRequestHandler):
             routing_entries=list(zip(lines[:local_count],local_routing))
             routing_entries.extend((line,merged_remote) for line in lines[local_count:])
             xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,"")
-            failover=bool(subscription.get("failover_enabled",True)) and len(lines)>1
+            failover=bool(subscription.get("failover_enabled",True)) and bool(lines)
             if failover:
                 try:
-                    auto_config=routing_store.failover_xray_config(lines,merged_remote,local_name+" · Автовыбор")
+                    auto_config=routing_store.failover_xray_config(lines,merged_remote,"🧭 Автовыбор")
                     xray_configs.insert(0,auto_config)
                 except routing_store.RoutingError: pass
             if requested_format in ("xray","xray-json","json") or (happ and (selected_routing or failover)):
