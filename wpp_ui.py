@@ -266,6 +266,14 @@ body:not(.login-page){font-size:15px;line-height:1.58}body:not(.login-page) :whe
 @media(prefers-reduced-motion:reduce){.workspace>main,.login-page,.login-card,.login-theme,.login-ambient i{animation:none!important}dialog,dialog::backdrop{transition:none!important}:where(button,.btn):hover:not(:disabled){transform:none}.login-submit.is-busy span{animation:none}}
 '''
 
+
+/* Keep the WPO mark comfortably inset inside the panel and sign-in frames. */
+CSS += """
+.mini-brand{display:grid;place-items:center}
+.mini-brand img{width:80%;height:80%;object-fit:contain;border-radius:7px}
+.login-card .signin-logo{transform:scale(.84);transform-origin:center}
+"""
+
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
 
 
