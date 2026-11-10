@@ -1158,6 +1158,33 @@ CSS += '''
 #dashboardContent .detail-line:last-child{border-bottom:0}
 @media(max-width:900px){#dashboardContent .dashboard-grid>.card,#dashboardContent .two-col.equal>.card{height:auto}}
 @media(max-width:560px){#dashboardContent{--dashboard-gap:10px;--dashboard-radius:13px}#dashboardContent .resource-deck .resource,#dashboardContent .overview-stat{min-height:82px}#dashboardContent .resource-deck .resource{padding:14px 16px!important}#dashboardContent .overview-stat{padding:14px 16px}#dashboardContent .card-title{min-height:0}}
+
+/* Unified lift-on-hover interaction for every dashboard tile and content card */
+#dashboardContent .resource-deck .resource,
+#dashboardContent .overview-stat,
+#dashboardContent .dashboard-grid>.card,
+#dashboardContent .two-col.equal>.card,
+#dashboardContent>.card:not(.resource-deck){
+ transition:transform .2s cubic-bezier(.2,.75,.25,1),border-color .2s ease,box-shadow .2s ease;
+}
+@media(hover:hover) and (pointer:fine){
+ #dashboardContent .resource-deck .resource:hover,
+ #dashboardContent .overview-stat:hover,
+ #dashboardContent .dashboard-grid>.card:hover,
+ #dashboardContent .two-col.equal>.card:hover,
+ #dashboardContent>.card:not(.resource-deck):hover{
+  transform:translateY(-2px)!important;
+  border-color:color-mix(in srgb,var(--accent) 38%,var(--line))!important;
+  box-shadow:0 15px 32px #0002,0 0 28px color-mix(in srgb,var(--accent) 7%,transparent)!important;
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ #dashboardContent .resource-deck .resource,
+ #dashboardContent .overview-stat,
+ #dashboardContent .dashboard-grid>.card,
+ #dashboardContent .two-col.equal>.card,
+ #dashboardContent>.card:not(.resource-deck){transition:none!important}
+}
 '''
 
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
