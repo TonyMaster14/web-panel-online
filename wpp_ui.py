@@ -693,8 +693,9 @@ def client_glances(records,path):
         else:
             source=r['source']; proto=r['protocols'][0]
             port=int(source.get('backend_port',443))
-            qr=path+'/__qr?'+urlencode({'secret':source.get('secret',''),'protocol':proto,
-                'port':port if proto in ('hysteria','mtproto','naive','mieru') else 443})
+            qr=(path+'/__qr?'+urlencode({'id':r['id']}) if proto in ('awg20','awg31') else
+                path+'/__qr?'+urlencode({'secret':source.get('secret',''),'protocol':proto,
+                    'port':port if proto in ('hysteria','mtproto','naive','mieru') else 443}))
             qr_kind='direct'
             user_port=port
         access=qr_attributes(qr,r['name'],r['link'],r['protocols'],qr_kind,user_port=user_port)
