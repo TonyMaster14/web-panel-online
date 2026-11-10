@@ -10,7 +10,7 @@ export GIT_CONFIG_NOSYSTEM=1
 export GIT_CONFIG_GLOBAL=/dev/null
 
 REPOSITORY="https://github.com/TonyMaster14/web-panel-online.git"
-RELEASE_REF="${WEB_PANEL_PROXY_REF:-v3.0.0}"
+RELEASE_REF="${WEB_PANEL_PROXY_REF:-main}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 [[ ${EUID:-1} -eq 0 ]] || die "Run this command with sudo or as root."

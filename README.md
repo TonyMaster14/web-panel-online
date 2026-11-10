@@ -42,7 +42,7 @@ sudo -i
 ### Установка
 
 ```bash
-sudo -i bash -c 'curl -4fsSL "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/v3.0.0/install.sh" -o /tmp/wpo-install.sh && bash /tmp/wpo-install.sh; code=$?; rm -f /tmp/wpo-install.sh; exit $code'
+sudo -i bash -c 'curl -4fsSL "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/main/install.sh" -o /tmp/wpo-install.sh && bash /tmp/wpo-install.sh; code=$?; rm -f /tmp/wpo-install.sh; exit $code'
 ```
 
 Установщик запросит домен, email для HTTPS-сертификата, логин и пароль панели. После установки он покажет адрес панели и данные для входа.
