@@ -280,7 +280,36 @@ CSS += """
 .login-secure{position:static;align-self:center;margin:0}
 @media(max-width:560px){.login-card-head{flex-direction:column;align-items:center;gap:14px}.login-secure{display:inline-flex;position:static;margin:0}}
 """
-
+ 
+# Keep browser-saved credentials visually consistent with the login form.
+CSS += """
+#loginForm .login-field input:-webkit-autofill,
+#loginForm .login-field input:-webkit-autofill:hover,
+#loginForm .login-field input:-webkit-autofill:active {
+  -webkit-text-fill-color:var(--text)!important;
+  caret-color:var(--text);
+  -webkit-box-shadow:0 0 0 1000px var(--input) inset!important;
+  box-shadow:0 0 0 1000px var(--input) inset!important;
+  border-color:color-mix(in srgb,var(--accent) 42%,var(--line))!important;
+  transition:background-color 9999s ease-out 0s,color 9999s ease-out 0s;
+}
+#loginForm .login-field input:-webkit-autofill:focus {
+  -webkit-box-shadow:0 0 0 1000px var(--input) inset,0 0 0 4px var(--tint)!important;
+  box-shadow:0 0 0 1000px var(--input) inset,0 0 0 4px var(--tint)!important;
+  border-color:var(--accent)!important;
+}
+#loginForm .login-field input:autofill {
+  color:var(--text)!important;
+  caret-color:var(--text);
+  box-shadow:0 0 0 1000px var(--input) inset!important;
+  border-color:color-mix(in srgb,var(--accent) 42%,var(--line))!important;
+}
+#loginForm .login-field input:autofill:focus {
+  box-shadow:0 0 0 1000px var(--input) inset,0 0 0 4px var(--tint)!important;
+  border-color:var(--accent)!important;
+}
+"""
+ 
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
 
 
