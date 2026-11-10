@@ -760,6 +760,14 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
     for code,title in country_names:
         country_map[title.casefold()]=code.lower()
         country_map[code.lower()]=code.lower()
+    country_map.update({'голландия':'nl','англия':'gb','соединенное королевство':'gb',
+                        'соединённое королевство':'gb','united kingdom':'gb','uk':'gb',
+                        'netherlands':'nl','holland':'nl','germany':'de','finland':'fi',
+                        'france':'fr','united states':'us','usa':'us','canada':'ca',
+                        'sweden':'se','norway':'no','denmark':'dk','poland':'pl',
+                        'czechia':'cz','czech republic':'cz','austria':'at',
+                        'switzerland':'ch','spain':'es','italy':'it','japan':'jp',
+                        'singapore':'sg','united arab emirates':'ae'})
     node_country_field=f'''<section class="create-step node-country-field"><label for="nodeCountry">Страна ноды</label><div class="node-country-control"><img id="nodeCountryFlag" src="{esc(path)}/__flag/{default_code.lower()}.svg" alt="🌐" width="30" height="22"><input id="nodeCountry" name="node_country" list="nodeCountryOptions" value="{esc(default_country)}" maxlength="80" required autocomplete="off" placeholder="Например, Нидерланды"></div><datalist id="nodeCountryOptions">{country_options}</datalist><small>Страна и флаг будут отображаться в Happ отдельно от имени клиента.</small></section>'''
     client_name_field='''<section class="create-step"><label for="accountName">Имя клиента или устройства</label><input id="accountName" name="name" placeholder="Например, Анна или Apple TV" maxlength="80" required autocomplete="off"></section>'''
     if client_name_field not in creation:
@@ -797,12 +805,12 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
 NODE_COUNTRIES = [
     ('UN','Не указано'), ('DE','Германия'), ('FI','Финляндия'),
     ('NL','Нидерланды'), ('FR','Франция'), ('GB','Великобритания'), ('US','США'),
-    ('CA','Канада'), ('SE','Швеция'), ('NO','Норвегия'), ('PL','Польша'),
+    ('CA','Канада'), ('SE','Швеция'), ('NO','Норвегия'), ('DK','Дания'), ('PL','Польша'),
     ('CZ','Чехия'), ('AT','Австрия'), ('CH','Швейцария'), ('ES','Испания'),
     ('IT','Италия'), ('LT','Литва'), ('LV','Латвия'), ('EE','Эстония'),
     ('RO','Румыния'), ('BG','Болгария'), ('TR','Турция'), ('KZ','Казахстан'),
     ('RU','Россия'), ('UA','Украина'), ('JP','Япония'), ('SG','Сингапур'),
-    ('HK','Гонконг'), ('AE','ОАЭ')
+    ('HK','Гонконг'), ('AE','ОАЭ'), ('IS','Исландия'), ('IE','Ирландия'), ('BE','Бельгия')
 ]
 
 
