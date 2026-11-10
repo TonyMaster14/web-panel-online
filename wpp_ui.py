@@ -1097,7 +1097,7 @@ html.wpp-navigating{cursor:progress}html.wpp-navigating .workspace>main{pointer-
 # Page actions belong to the blocks they affect. This removes the empty strip
 # above dashboards and tables while keeping every action visible on mobile.
 CSS += '''
-.resource-deck{position:relative}.resource-deck .resource:last-child{padding-right:166px!important}.dashboard-inline-tools{position:absolute;z-index:2;right:28px;top:50%;display:flex;align-items:center;gap:7px;margin:0;transform:translateY(-50%)}.dashboard-inline-tools .live-indicator{margin:0;padding:7px 9px;background:color-mix(in srgb,var(--surface) 88%,transparent)}.dashboard-inline-tools button{display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:7px}.dashboard-inline-tools button .ico{margin:0}
+.resource-deck{position:relative}.resource-deck .resource:last-child{padding-right:166px!important}.dashboard-inline-tools{position:absolute;z-index:2;right:28px;top:50%;display:flex;align-items:center;gap:7px;margin:0;transform:translateY(-50%)}.dashboard-inline-tools .live-indicator{margin:0;padding:7px 9px;background:color-mix(in srgb,var(--surface) 88%,transparent)}.dashboard-inline-tools button{display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:7px}.dashboard-inline-tools button .ico{margin:0}.subscription-connection-flag{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:13px;line-height:1}.subscription-connection-protocol{display:inline-flex;align-items:center;justify-content:center;gap:5px}
 .clients-summary{grid-template-columns:repeat(4,minmax(0,1fr)) auto;align-items:center}.clients-summary-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 14px}.clients-summary-actions button{min-height:38px;white-space:nowrap}.clients-summary-actions>button:first-child{width:38px;padding:8px}
 .connection-list-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}.connection-list-actions i{font-style:normal}.connection-list-actions button{padding:9px 13px;font-size:11px;text-transform:none;letter-spacing:0;white-space:nowrap}
 .local-node-head>.nodes-count{margin-left:0;padding:7px 10px;background:var(--input)}.local-node-head>.nodes-count strong{font-size:19px}.local-node-head>.nodes-count span{font-size:8px}.updates-hero .actions{align-items:center;flex-wrap:nowrap}.updates-hero #refreshAll{white-space:nowrap}
@@ -1314,8 +1314,6 @@ def dashboard_body(data, subs, profiles, traffic, path, domain, csrf, proxy_link
     tools = f'''<div class="dashboard-inline-tools"><span id="liveIndicator" class="live-indicator"><i></i><b>Онлайн</b><small id="liveAge">сейчас</small></span><button id="refreshDashboard" type="button" title="Обновить данные" aria-label="Обновить данные">{icon('refresh')}</button></div>'''
     return body.replace('<section class="card resource-deck live-block" data-live-block="resources"><div class="resource-grid">',
                         '<section class="card resource-deck">'+tools+'<div class="resource-grid live-block" data-live-block="resources">', 1)
-
-    return body
 
 
 def dashboard_page(body, path, csrf):
