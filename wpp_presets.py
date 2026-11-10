@@ -26,7 +26,7 @@ const target=Date.now()+12*864e5+7*36e5;function tick(){const left=Math.max(0,ta
         {
             "id": "cats-repair",
             "name": "Технические работы",
-            "description": "Правдоподобная статус-страница с этапами работ и контактами поддержки.",
+            "description": "Современная тёмная страница обслуживания с прогрессом, этапами и статусами систем.",
             "html": r'''<!doctype html>
 <html lang="ru">
 <head>
@@ -154,7 +154,7 @@ a{color:inherit}
   </aside>
 </section>
 <section class="mw-section">
-  <div class="mw-section-head"><h2 class="mw-section-title">Этапы обслуживания</h2><p>План работ · 10 ноября 2026</p></div>
+  <div class="mw-section-head"><h2 class="mw-section-title">Этапы обслуживания</h2><p>План работ · актуальный статус</p></div>
   <div class="mw-timeline">
     <article class="mw-phase"><div class="mw-phase-top"><span class="mw-phase-number">ЭТАП 01</span><span class="mw-phase-mark">✓</span></div><h3>Подготовка системы</h3><p>Резервное копирование и проверка оборудования завершены.</p></article>
     <article class="mw-phase"><div class="mw-phase-top"><span class="mw-phase-number">ЭТАП 02</span><span class="mw-phase-mark">✓</span></div><h3>Обновление платформы</h3><p>Установка обновлений и настройка сетевой инфраструктуры завершены.</p></article>
@@ -394,6 +394,7 @@ def _decorate_preset(item):
 
     def emoji_for(content):
         plain = re.sub(r"<[^>]*>", " ", content).lower()
+        if preset_id == "cats-repair": return "⚙️"
         if any(word in plain for word in ("цена", "стоимость", "прайс", "₽")): return "💳"
         if any(word in plain for word in ("адрес", "контакт", "связ", "телефон")): return "📍"
         if any(word in plain for word in ("запис", "заяв", "время", "обратн")): return "🗓️"
