@@ -1464,6 +1464,12 @@ def add(protocol,name,requested_port=None,device_count=1,options=None):
         traffic_limit_gb=0
     u={"id":secrets.token_hex(8),"name":name.strip(),"protocol":protocol,"enabled":True,"created_at":int(time.time()),
        "max_devices":device_count,"traffic_limit_bytes":int(traffic_limit_gb*1024**3)}
+    node_location=options.get("node_location")
+    if isinstance(node_location,dict):
+        code=str(node_location.get("country_code","")).upper()
+        country=str(node_location.get("country_name") or node_location.get("name") or "").strip()
+        if re.fullmatch(r"[A-Z]{2}",code) and code!="UN" and country and len(country)<=80 and not any(ord(char)<32 for char in country):
+            u["node_location"]={"country_code":code,"country_name":country,"name":country}
     connection_id=str(options.get("connection_id","")).strip()
     if connection_id:
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{2,63}",connection_id): raise ValueError("Некорректное подключение.")
@@ -2331,9 +2337,9 @@ def users():
     try:
         with open(USERS,encoding="utf-8") as f: return json.load(f).get("users",[])
     except Exception: return []
-def selected_connection_specs(form):
+def selected_connection_specs(form,node_location=None):
     registry=connection_store.ensure(CONNECTIONS_FILE,users())
-    country=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
+    country=node_api.location_prefix(node_location or node_api.load_location(LOCATION_FILE))
     selected=[]
     for item in registry.get("connections",[]):
         if not connection_store.selectable(item): continue
@@ -2343,8 +2349,7 @@ def selected_connection_specs(form):
             continue
         request=connection_store.request_for_connection(item)
         connection_name=str(item.get("name","Подключение"))
-        display_name=connection_name if connection_name.startswith(country+" · ") else country+" · "+connection_name
-        spec={"id":cid,"name":display_name,"protocol":item.get("protocol")}
+        spec={"id":cid,"name":connection_name,"protocol":item.get("protocol")}
         if item.get("protocol")=="vless":
             profile=cdn.profile_from_request(request)
             if profile is not None: spec["cdn"]=profile
@@ -2693,7 +2698,7 @@ def direct_profile_config(user,secret):
     # plain VLESS link: surface a retryable error instead.
     profiles=routing_store.load(ROUTING_FILE).get("profiles",{})
     profile=profiles.get(str(connection["id"]))
-    title=str(selected.get("name") or name)
+    title=node_api.location_prefix(selected.get("node_location") or node_api.load_location(LOCATION_FILE))
     if isinstance(profile,dict) and profile.get("enabled",True):
         return routing_store.xray_config(link,profile,title)
     return routing_store.plain_xray_config(link,title)
@@ -3630,16 +3635,20 @@ class Handler(BaseHTTPRequestHandler):
             kind=form.get("kind","")
             if not name or len(name)>80 or any(ord(c)<32 for c in name):
                 create_error("Укажите имя длиной от 1 до 80 символов."); return
+            try:
+                node_location=node_api.country_location(form.get("node_country",""),node_api.load_location(LOCATION_FILE))
+            except node_api.NodeError as exc:
+                create_error(str(exc)); return
             if kind=="subscription":
-                try: connection_specs=selected_connection_specs(form)
+                try: connection_specs=selected_connection_specs(form,node_location)
                 except connection_store.ConnectionError as exc: create_error(str(exc)); return
                 result=ctl_subscription({"operation":"create","name":name,"max_devices":form.get("max_devices","0"),
-                                         "connections":connection_specs})
+                                         "connections":connection_specs,"node_location":node_location})
                 if not result.get("ok"):
                     create_error(result.get("message","Ошибка создания подписки"),int(result.get("status",400))); return
             elif kind in ("web","mtproto","vless","hysteria","awg20","awg31","naive","mieru"):
                 try:
-                    common={"protocol":kind,"name":name,
+                    common={"protocol":kind,"name":name,"node_location":node_location,
                         "devices":form.get("direct_devices","1"),
                         "traffic_limit_gb":form.get("traffic_limit_gb","0")}
                     connection_id=form.get("connection_id","").strip()
@@ -3653,6 +3662,7 @@ class Handler(BaseHTTPRequestHandler):
                         elif selected.get("protocol") in ("naive","mieru"):
                             selected=connection_store.claim_external_port(CONNECTIONS_FILE,connection_id)
                         common={**connection_store.request_for_connection(selected),"name":name,
+                            "node_location":node_location,
                             "devices":form.get("direct_devices","1"),"traffic_limit_gb":form.get("traffic_limit_gb","0")}
                         kind=common["protocol"]
                     if kind=="mtproto":
@@ -3948,7 +3958,7 @@ class Handler(BaseHTTPRequestHandler):
                 config_items=[]
                 if not int(subscription.get("max_devices",0) or 0):
                     labels={"vless":"VLESS","hysteria":"Hysteria2"}
-                    local_name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
+                    local_name=node_api.location_prefix(subscription.get("node_location") or node_api.load_location(LOCATION_FILE))
                     seen_connections=set()
                     for profile in dashboard_profiles:
                         connection_id=str(profile.get("connection_id",""))
@@ -3980,8 +3990,8 @@ class Handler(BaseHTTPRequestHandler):
                 if result.get("code")=="device_limit": headers.update({"X-Hwid-Limit":"true","X-Hwid-Max-Devices-Reached":"true"})
                 self.send_data(result.get("message","Подписка недоступна"),int(result.get("status",503)),headers=headers); return
             labels={"vless":"VLESS","hysteria":"Hysteria2"}
-            local_name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
-            lines=[proxy_link(u["protocol"],u["secret"],u["backend_port"],local_name+" · "+proxy_connection_name(u,labels[u["protocol"]]),u.get("username","")) for u in result["users"]]
+            local_name=node_api.location_prefix(subscription.get("node_location") or node_api.load_location(LOCATION_FILE))
+            lines=[proxy_link(u["protocol"],u["secret"],u["backend_port"],local_name,u.get("username","")) for u in result["users"]]
             if result["users"]:
                 first=result["users"][0]
                 remote_id=federation_id(first.get("subscription_id",""),first.get("device_id",""))
@@ -4015,11 +4025,11 @@ class Handler(BaseHTTPRequestHandler):
             merged_remote=routing_store.merge_profiles(selected_routing)
             routing_entries=list(zip(lines[:local_count],local_routing))
             routing_entries.extend((line,merged_remote) for line in lines[local_count:])
-            xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,result["name"])
+            xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,"")
             failover=bool(subscription.get("failover_enabled",True)) and len(lines)>1
             if failover:
                 try:
-                    auto_config=routing_store.failover_xray_config(lines,merged_remote,result["name"]+" · Автовыбор")
+                    auto_config=routing_store.failover_xray_config(lines,merged_remote,local_name+" · Автовыбор")
                     xray_configs.insert(0,auto_config)
                 except routing_store.RoutingError: pass
             if requested_format in ("xray","xray-json","json") or (happ and (selected_routing or failover)):
