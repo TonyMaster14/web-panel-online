@@ -556,6 +556,15 @@ def failover_xray_config(links, profile=None, name="WPP · Автоперекл�
 
 
 def xray_config(link, profile, name="WPP · Маршрутизация"):
+    outbound = _proxy_outbound(link)
+    node_name = unquote(urlparse(link).fragment).strip()
+    if node_name:
+        outbound["tag"] = node_name
+    routing = routing_config(profile)
+    if node_name:
+        for rule in routing.get("rules", []):
+            if rule.get("outboundTag") == "proxy":
+                rule["outboundTag"] = node_name
     return {
         "remarks": str(name),
         "log": {"loglevel": "warning"},
@@ -565,16 +574,20 @@ def xray_config(link, profile, name="WPP · Маршрутизация"):
             {"tag": "http-in", "listen": "127.0.0.1", "port": 10809, "protocol": "http", "settings": {}},
         ],
         "outbounds": [
-            _proxy_outbound(link),
+            outbound,
             {"tag": "direct", "protocol": "freedom", "settings": {}},
             {"tag": "block", "protocol": "blackhole", "settings": {}},
         ],
-        "routing": routing_config(profile),
+        "routing": routing,
     }
 
 
 def plain_xray_config(link, name="WPP"):
     """Build an Xray profile without split-routing rules for one server."""
+    outbound = _proxy_outbound(link)
+    node_name = unquote(urlparse(link).fragment).strip()
+    if node_name:
+        outbound["tag"] = node_name
     return {
         "remarks": str(name),
         "log": {"loglevel": "warning"},
@@ -582,7 +595,7 @@ def plain_xray_config(link, name="WPP"):
             {"tag": "socks-in", "listen": "127.0.0.1", "port": 10808, "protocol": "socks", "settings": {"udp": True}},
             {"tag": "http-in", "listen": "127.0.0.1", "port": 10809, "protocol": "http", "settings": {}},
         ],
-        "outbounds": [_proxy_outbound(link)],
+        "outbounds": [outbound],
     }
 
 
