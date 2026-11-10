@@ -96,9 +96,32 @@ ef.addEventListener('submit',e=>{{if(e.submitter&&e.submitter.id==='publishHtml'
 </script>'''
 
 
-def preview_document(source, externalize):
+def preview_document(source, externalize, public_domain=""):
     # Preview the exact document without rewriting tags or JSON-LD.
-    # Only the selected photo hosts are allowed for image rendering; scripts,
-    # connections, frames, forms and all other network destinations stay blocked.
-    csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob: https://p2.zoon.ru https://ceramum.ru https://beloostrov.groupmmc.ru https://spautopro.ru https://medsi.ru; font-src data:; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+    # Local preset photos are served by the same public host as the panel.
+    # srcdoc has a sandboxed origin, so explicitly allow its HTTPS host as
+    # well as 'self'; otherwise root-relative /preset-*.webp assets are blocked.
+    # Scripts, connections, frames, forms and all other network destinations
+    # stay blocked.
+    image_sources = [
+        "'self'", "data:", "blob:",
+        "https://p2.zoon.ru", "https://ceramum.ru",
+        "https://beloostrov.groupmmc.ru", "https://spautopro.ru",
+        "https://medsi.ru",
+    ]
+    host = str(public_domain or "").strip().lower()
+    host_parts = host.split(".")
+    valid_host = len(host_parts) >= 2 and all(
+        part and all(ch.isascii() and (ch.isalnum() or ch == "-") for ch in part)
+        and part[0] != "-" and part[-1] != "-"
+        for part in host_parts
+    )
+    if valid_host:
+        image_sources.append("https://" + host)
+    csp = (
+        "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+        + "img-src " + " ".join(image_sources) + "; "
+        + "font-src data:; connect-src 'none'; frame-src 'none'; "
+        + "base-uri 'none'; form-action 'none'"
+    )
     return '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '">' + source
