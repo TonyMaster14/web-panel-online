@@ -1371,18 +1371,26 @@ def _dashboard_body_legacy(data, subs, profiles, traffic, path, domain, csrf, pr
             stats.append(f'<div class="overview-stat"><span>{label}</span><b>{value}</b></div>')
     stats=''.join(stats)
     services=latest.get('services',{}); names={'xray':'Xray · VLESS / Hysteria2','naive':'NaiveProxy','mieru':'Mieru','relay':'Telegram WEB Proxy / MTProto','openflux':'OpenFlux','caddy':'Caddy · HTTPS','panel':'Панель управления'}
-    def service_badge(label):
-        return '<div class="service-line"><span>'+label+'</span><span class="badge on">Запущен</span></div>'
+    def service_badge(label, status):
+        if status.get('state') == 'active':
+            badge = '<span class="badge on">Запущен</span>'
+        elif status.get('state') == 'inactive':
+            state = status.get('unit_file_state')
+            label_state = 'Отключён' if state in ('disabled', 'masked') else 'Остановлен'
+            badge = '<span class="badge">'+label_state+'</span>'
+        else:
+            badge = '<span class="badge">Статус неизвестен</span>'
+        return '<div class="service-line"><span>'+label+'</span>'+badge+'</div>'
     service_rows=[]
     for key,label in names.items():
         status=services.get(key,{})
-        if status.get('state')!='active' or status.get('load_state')=='not-found':
+        if status.get('load_state')=='not-found':
             continue
         if key=='openflux':
             transports=status.get('transports',[])
             if isinstance(transports,list) and transports:
                 label+=' · '+' / '.join(str(value) for value in transports)
-        service_rows.append(service_badge(label))
+        service_rows.append(service_badge(label, status))
     services_html=''.join(service_rows)
     xray=services.get('xray',{}); start=xray.get('start_us'); xu=max(0,latest.get('uptime',0)-start/1e6) if start and latest.get('uptime') else None
     detail=[('Время работы VPS',duration(latest.get('uptime'))),('Время работы Xray',duration(xu)),('Память Xray',size(xray.get('memory'))),('Задачи Xray',str(xray.get('tasks') if xray.get('tasks') is not None else '—')),('Нагрузка · 1 / 5 / 15 мин.',' / '.join(f'{v:.2f}' for v in latest.get('load',[])) or '—')]
@@ -1437,7 +1445,7 @@ function patchLive(html){{const template=document.createElement('template');temp
 function updateClock(){{const live=document.getElementById('liveIndicator'),liveAge=document.getElementById('liveAge');if(!live||!liveAge)return;const seconds=Math.floor((Date.now()-lastSuccess)/1000);liveAge.textContent=seconds<2?'сейчас':seconds+' с назад';live.classList.toggle('stale',seconds>20);live.classList.toggle('offline',seconds>45)}}
 async function refresh(){{if(busy||document.hidden)return;busy=true;try{{const r=await fetch('{esc(path)}/dashboard-data?hours='+range,{{cache:'no-store'}});if(r.redirected){{location.href='{esc(path)}/login';return}}if(!r.ok)throw new Error('Нет ответа от панели');const d=await r.json();patchLive(d.html);updateView(d.update);lastSuccess=Date.now();updateClock();if(!updating)notice.hidden=true}}catch(e){{document.getElementById('liveIndicator')?.classList.add('offline');notice.hidden=false;notice.textContent=updating?'Панель перезапускается во время обновления. Ожидаем восстановления связи…':'Нет связи с панелью. Данные на экране могут быть устаревшими.'}}finally{{busy=false}}}}
 async function automaticUpdateCheck(status){{if(status?.checked&&Date.now()/1000-Number(status.checked)<21600)return;try{{const r=await fetch('{esc(path)}/update-check',{{method:'POST',body:new URLSearchParams({{csrf:'{esc(csrf)}'}})}});if(!r.ok||r.redirected)return;updateView(await r.json())}}catch(e){{}}}}
-document.getElementById('updateNoticeLater').addEventListener('click',()=>wppCloseDialog(updateDialog));updateDialog.addEventListener('close',()=>{{if(updateDialog.dataset.version)dismissUpdate(updateDialog.dataset.version)}});root.addEventListener('click',e=>{{if(e.target.closest('#refreshDashboard')){{refresh();return}}const r=e.target.closest('[data-range]');if(r){{range=Number(r.dataset.range);refresh()}}}});setInterval(refresh,15000);setInterval(updateClock,5000);document.addEventListener('visibilitychange',()=>{{if(!document.hidden)refresh()}});fetch('{esc(path)}/update-status',{{cache:'no-store'}}).then(r=>r.ok&&!r.redirected?r.json():null).then(d=>{{if(d){{updateView(d);automaticUpdateCheck(d)}}}}).catch(()=>automaticUpdateCheck(null));
+document.getElementById('updateNoticeLater').addEventListener('click',()=>wppCloseDialog(updateDialog));updateDialog.addEventListener('close',()=>{{if(updateDialog.dataset.version)dismissUpdate(updateDialog.dataset.version)}});root.addEventListener('click',e=>{{if(e.target.closest('#refreshDashboard')){{refresh();return}}const r=e.target.closest('[data-range]');if(r){{range=Number(r.dataset.range);refresh()}}}});setInterval(refresh,5000);setInterval(updateClock,5000);document.addEventListener('visibilitychange',()=>{{if(!document.hidden)refresh()}});fetch('{esc(path)}/update-status',{{cache:'no-store'}}).then(r=>r.ok&&!r.redirected?r.json():null).then(d=>{{if(d){{updateView(d);automaticUpdateCheck(d)}}}}).catch(()=>automaticUpdateCheck(null));
 </script>'''
 
 
