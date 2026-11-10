@@ -2233,6 +2233,7 @@ SITE_JS_BACKUP="/var/lib/tproxy-panel/panel-site.js.bak"
 MAX_HTML_BYTES=1024*1024
 SITE_DRAFT="/var/lib/tproxy-panel/site-draft.html"
 CUSTOM_PRESETS_FILE="/var/lib/tproxy-panel/custom-presets.json"
+DELETED_PRESETS_FILE="/var/lib/tproxy-panel/deleted-presets.json"
 API_KEY_FILE="/var/lib/tproxy-panel/api.key"
 NODES_FILE="/var/lib/tproxy-panel/nodes.json"
 LOCATION_FILE="/var/lib/tproxy-panel/location.json"
@@ -2624,8 +2625,19 @@ def custom_presets():
         return []
 def save_custom_presets(items):
     install_private_file(CUSTOM_PRESETS_FILE,json.dumps(items,ensure_ascii=False,indent=2).encode("utf-8"))
+def deleted_presets():
+    try:
+        with open(DELETED_PRESETS_FILE,encoding="utf-8") as stream: value=json.load(stream)
+        if not isinstance(value,list): return []
+        known={str(item.get("id")) for item in PRESETS if isinstance(item,dict)}
+        return [item for item in value if isinstance(item,str) and item in known]
+    except (OSError,ValueError,TypeError,json.JSONDecodeError):
+        return []
+def save_deleted_presets(items):
+    install_private_file(DELETED_PRESETS_FILE,json.dumps(sorted(set(items)),ensure_ascii=False,indent=2).encode("utf-8"))
 def all_presets():
-    return PRESETS+custom_presets()
+    removed=set(deleted_presets())
+    return [item for item in PRESETS if item.get("id") not in removed]+custom_presets()
 def get_preset(preset_id):
     for preset in all_presets():
         if preset.get("id")==preset_id: return preset
@@ -3845,10 +3857,17 @@ class Handler(BaseHTTPRequestHandler):
                     save_custom_presets(items)
                 elif operation=="delete":
                     preset_id=form.get("preset","")
-                    if not preset_id.startswith("custom-"): raise ValueError("Встроенный пресет удалить нельзя.")
-                    retained=[item for item in items if item.get("id")!=preset_id]
-                    if len(retained)==len(items): raise ValueError("Заглушка не найдена.")
-                    save_custom_presets(retained)
+                    if preset_id.startswith("custom-"):
+                        retained=[item for item in items if item.get("id")!=preset_id]
+                        if len(retained)==len(items): raise ValueError("Заглушка не найдена.")
+                        save_custom_presets(retained)
+                    else:
+                        known={str(item.get("id")) for item in PRESETS if isinstance(item,dict)}
+                        if preset_id not in known: raise ValueError("Шаблон не найден.")
+                        removed=deleted_presets()
+                        if preset_id in removed: raise ValueError("Шаблон уже удалён.")
+                        removed.append(preset_id)
+                        save_deleted_presets(removed)
                 else:
                     raise ValueError("Неизвестная операция.")
                 self.redirect("/settings")
