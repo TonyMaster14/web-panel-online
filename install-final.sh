@@ -94,7 +94,22 @@ finish_install() {
     local code=$?
     cleanup_credentials
     wpp_progress_finish "$code"
-    if (( code == 0 )); then wpp_print_final_panel_url; fi
+    # The last visible output is the full user access card, AFTER Nodes Lab
+    # and progress finishing. The sensitive temporary card lives in /run.
+    if (( code == 0 )); then
+        if [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" && -s "$WPO_FINAL_SUMMARY_FILE" ]]; then
+            cat -- "$WPO_FINAL_SUMMARY_FILE" || true
+        else
+            wpp_print_final_panel_url
+        fi
+    fi
+    if [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" && -f "$WPO_FINAL_SUMMARY_FILE" ]]; then
+        if command -v shred >/dev/null 2>&1; then
+            shred -u -- "$WPO_FINAL_SUMMARY_FILE" 2>/dev/null || rm -f -- "$WPO_FINAL_SUMMARY_FILE"
+        else
+            rm -f -- "$WPO_FINAL_SUMMARY_FILE"
+        fi
+    fi
 }
 trap finish_install EXIT
 
@@ -131,10 +146,14 @@ wpp_progress 55 "Прокси-службы установлены"
 
 echo "Installing control panel..."
 wpp_progress 60 "Установка панели"
+# Keep the access card in root-only RAM until the whole installation succeeds.
+# /run is normally tmpfs; remove it on both success and failure in EXIT trap.
+WPO_FINAL_SUMMARY_FILE="$(mktemp /run/wpo-install-summary.XXXXXXXX)"
+chmod 0600 "$WPO_FINAL_SUMMARY_FILE"
 if [[ "$PANEL_UPDATE" == 1 ]]; then
-    WEB_PANEL_PROXY_UPDATE=1 bash "$BASE/install-panel.sh"
+    WEB_PANEL_PROXY_UPDATE=1 WPO_FINAL_SUMMARY_FILE="$WPO_FINAL_SUMMARY_FILE" bash "$BASE/install-panel.sh"
 else
-    bash "$BASE/install-panel.sh"
+    WPO_FINAL_SUMMARY_FILE="$WPO_FINAL_SUMMARY_FILE" bash "$BASE/install-panel.sh"
 fi
 WPO_PANEL_SECONDS=$((SECONDS-WPO_INSTALL_CLOCK-WPO_CORE_SECONDS))
 echo "      ⏱ Панель: ${WPO_PANEL_SECONDS} сек."
