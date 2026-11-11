@@ -104,7 +104,7 @@ ef.addEventListener('submit',e=>{{if(e.submitter&&e.submitter.id==='publishHtml'
 # Browsers can block images fetched from the public hostname inside this
 # sandbox when the public server sends cross-origin resource policies.
 # Use only our already-installed, locally verified WebP photos as data: URLs.
-# This does not modify the HTML saved to /srv/tproxy-site.
+# This also works in the public CSS; original author HTML is never rewritten.
 _PRESET_PREVIEW_PHOTOS = frozenset({
     "preset-coffee.webp", "preset-cars.webp",
     "preset-car-graphite.webp", "preset-car-silver.webp",
@@ -125,7 +125,7 @@ def _preset_photo_data(filename, mtime_ns, size):
     return "data:image/webp;base64," + base64.b64encode(raw).decode("ascii")
 
 
-def _preview_with_local_photos(source):
+def inline_bundled_preset_photos(source):
     # Match only exact packaged filenames, never arbitrary local paths.
     pattern = r"""(?P<quote>["'])(?P<url>/preset-[a-z0-9-]+\.webp)(?P=quote)"""
     def inline(match):
@@ -173,7 +173,7 @@ def preview_document(source, externalize, public_domain=""):
     )
     # Keep <!doctype html> first, otherwise the iframe can enter quirks mode
     # and the preview's layout differs from the real published landing page.
-    document = _preview_with_local_photos(source)
+    document = inline_bundled_preset_photos(source)
     policy = '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '">'
     head = re.search(r'<head\b[^>]*>', document, flags=re.I)
     if head:
