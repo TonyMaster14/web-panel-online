@@ -136,16 +136,16 @@ fi
 echo "      Preparing AmneziaWG 2.0 / 3.1..."
 AWG_INSTALLED_NOW=0
 if ! command -v ip >/dev/null 2>&1; then
-    apt-get -o DPkg::Lock::Timeout=600 update
-    apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends iproute2
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends iproute2
 fi
 if [[ ! -x /usr/local/bin/amneziawg-go ]] || ! /usr/local/bin/amneziawg-go --version 2>&1 | grep -Fq "$AWG_GO_VERSION"; then
     if [[ -s "$AWG_GO_BUNDLED" ]] && echo "${AWG_GO_SHA256}  ${AWG_GO_BUNDLED}" | sha256sum -c - >/dev/null; then
         install -o root -g root -m 0755 "$AWG_GO_BUNDLED" /usr/local/bin/amneziawg-go
     else
         if ! command -v git >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1 || ! command -v gcc >/dev/null 2>&1; then
-            apt-get -o DPkg::Lock::Timeout=600 update
-            apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends git build-essential
+            apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+            apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends git build-essential
         fi
         GO_BIN="$(find /opt -maxdepth 3 -type f -path '/opt/go*/bin/go' -print -quit 2>/dev/null || true)"
         [[ -x "$GO_BIN" ]] || GO_BIN="$(command -v go || true)"
@@ -170,8 +170,8 @@ if [[ ! -x /usr/local/bin/awg ]] || ! /usr/local/bin/awg --version 2>&1 | grep -
         install -o root -g root -m 0755 "$AWG_QUICK_BUNDLED" /usr/local/bin/awg-quick
     else
         if ! command -v unzip >/dev/null 2>&1; then
-            apt-get -o DPkg::Lock::Timeout=600 update
-            apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends unzip
+            apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+            apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends unzip
         fi
         AWG_TOOLS_ARCHIVE="$(mktemp /tmp/wpp-awg-tools.XXXXXX.zip)"
         AWG_TOOLS_DIR="$(mktemp -d /tmp/wpp-awg-tools.XXXXXX)"
@@ -274,8 +274,8 @@ systemctl daemon-reload
 
 echo "      Preparing NaiveProxy and Mieru..."
 if ! command -v tar >/dev/null 2>&1 || ! command -v xz >/dev/null 2>&1; then
-    apt-get -o DPkg::Lock::Timeout=600 update
-    apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends tar xz-utils
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends tar xz-utils
 fi
 echo "${NAIVE_SHA256}  ${NAIVE_BUNDLED}" | sha256sum -c - >/dev/null || die "Bundled NaiveProxy component is missing or damaged."
 echo "${MIERU_SHA256}  ${MIERU_BUNDLED}" | sha256sum -c - >/dev/null || die "Bundled Mieru component is missing or damaged."
@@ -379,8 +379,8 @@ chmod 0644 /etc/systemd/system/caddy.service.d/tproxy.conf
 
 export DEBIAN_FRONTEND=noninteractive
 if ! command -v qrencode >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v xz >/dev/null 2>&1; then
-    apt-get -o DPkg::Lock::Timeout=600 update
-    apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends qrencode unzip xz-utils
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends qrencode unzip xz-utils
 fi
 
 install -d -m 0755 "$APP_DIR" /etc/web-proxy-panel
@@ -5037,7 +5037,7 @@ if [[ -e /etc/web-proxy-panel/mieru-ufw-owned ]]; then
 fi
 if [[ -e /etc/web-proxy-panel/mita-package-owned ]]; then
     command -v mita >/dev/null 2>&1 && mita stop >/dev/null 2>&1 || true
-    apt-get -o DPkg::Lock::Timeout=600 remove -y mita >/dev/null || die "Could not remove the WPP-owned Mieru package."
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 remove -y mita >/dev/null || die "Could not remove the WPP-owned Mieru package."
     rm -f /etc/web-proxy-panel/mita-package-owned
     if ! getent group mita >/dev/null 2>&1; then
         groupadd --system mita
