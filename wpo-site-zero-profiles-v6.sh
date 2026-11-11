@@ -15,7 +15,7 @@ PROFILES=/etc/tproxy-server/profiles.json
 CONFIG=/etc/tproxy-server/config.json
 OVERRIDE=/etc/systemd/system/tproxy-server.service.d/30-wpp-public-site.conf
 UPSTREAM=52a5feb7fac38f68da5afef9cedd9b3bfc8473ca
-PATCH_REF=9229237d31444cd22b08479acfba4a090910f325
+PATCH_REF=7a488834e028a3956e99d940eeced41fdf8ca8a2
 MANAGER_REF=4ac8929cb690e7038e8871f5698e0a98b414cc92
 SOURCE=/root/tproxy-server
 
