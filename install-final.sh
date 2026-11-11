@@ -143,7 +143,7 @@ flock -u 9
 if ! systemctl start web-panel-proxy-component-auto-update.service; then
     echo "WARNING: Latest Xray/OpenFlux check failed; the automatic timer will retry." >&2
 fi
-# Nodes Lab v26 is bundled into the nodes-lab branch installation.
+# Nodes Lab v26 is part of the official main installation.
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
 # with the current Node Agent installer, auto-geolocation, status checks,
 # random site templates and the final compact node cards, including pending installs.
