@@ -193,6 +193,24 @@ else
     done
 fi
 
+# Fast fail before APT, source builds and asking for the admin password.
+# A first installation cannot issue its certificate when the A record points
+# to another VPS. Preserve the existing later DNS check as a second guard.
+if [[ ! -s /var/lib/tproxy-panel/data.json ]]; then
+    echo
+    echo "Checking DNS before downloading installation dependencies..."
+    EARLY_DNS_IP="$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk 'NR==1{print $1}' || true)"
+    [[ -n "$EARLY_DNS_IP" ]] ||
+        die "No IPv4 A record for $DOMAIN. Create the record before installing."
+    EARLY_VPS_IP="$(curl -4fsS --connect-timeout 5 --max-time 10 https://api.ipify.org 2>/dev/null || true)"
+    if [[ -n "$EARLY_VPS_IP" && "$EARLY_DNS_IP" != "$EARLY_VPS_IP" ]]; then
+        echo "      DNS: $DOMAIN -> $EARLY_DNS_IP"
+        echo "      VPS: $EARLY_VPS_IP"
+        die "DNS does not point to this VPS. Correct the A record and retry."
+    fi
+    echo "      DNS precheck passed: $DOMAIN -> $EARLY_DNS_IP"
+fi
+
 install -d -m 0700 /etc/web-proxy-panel
 if [[ -s /var/lib/tproxy-panel/data.json ]] &&
    [[ -f /etc/systemd/system/tproxy-panel.service ]]; then
