@@ -59,6 +59,8 @@ curl -4fsSL --retry 3 --connect-timeout 10 --max-time 90 "$SOURCE_URL" -o "$STAG
 bash -n "$STAGE/install-panel.sh"
 
 echo "[2/5] Исправление причины отключения сайта при удалении WEB пользователей..."
+# Rollback must also cover a Python patch that stops halfway through writing.
+TOUCHED=1
 python3 - "$MANAGER" "$PANEL" "$STAGE/install-panel.sh" <<'PY_PATCH'
 from pathlib import Path
 import os,re,sys,tempfile
@@ -136,7 +138,6 @@ atomic(manager_path,manager)
 atomic(panel_path,panel)
 print("✓ WEB Proxy можно удалять без остановки сайта.")
 PY_PATCH
-TOUCHED=1
 
 echo "[3/5] Независимая работа сайта от экономии MTProxy..."
 install -d -m 0755 "$(dirname "$OVERRIDE")"
