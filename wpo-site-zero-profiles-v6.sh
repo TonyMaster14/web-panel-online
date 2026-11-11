@@ -105,6 +105,13 @@ bash -n "$STAGE/install-panel.sh"
 echo "[2/5] Go-тесты: сайт без WEB Proxy и закрытый доступ к прокси-сессиям..."
 (
     cd "$STAGE/source"
+    # The upstream credential-permissions test deliberately writes a 0444
+    # file to assert that group/other reads are rejected outside systemd's
+    # credentials directory. Installer umask 077 silently turns 0444 into
+    # 0400, invalidating that test and causing a false failure.
+    # Relax umask ONLY for the isolated Go test/build subprocess, not for
+    # files, credentials, backups or the live service.
+    umask 022
     "$GO_BIN" test ./internal/config ./internal/server ./internal/session -count=1
     "$GO_BIN" build -trimpath -ldflags='-s -w' -o "$STAGE/tproxy-server.new" ./cmd/tproxy-server
 )
