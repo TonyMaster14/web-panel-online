@@ -330,9 +330,15 @@ echo '=== WEB PANEL ONLINE — Node Agent ==='
 read -r -p 'Домен ноды (например, de.example.com): ' DOMAIN
 DOMAIN="${DOMAIN#https://}"; DOMAIN="${DOMAIN#http://}"; DOMAIN="${DOMAIN%%/*}"; DOMAIN="${DOMAIN,,}"
 [[ "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || { report error 'Некорректный домен.'; echo 'Некорректный домен.'; exit 2; }
-read -r -p "Email для Let's Encrypt: " EMAIL
-# Validate ACME contact before installing services: no Cyrillic, spaces or malformed domains.
-if ! python3 - "$EMAIL" <<'PY_VALIDATE_EMAIL'
+# Allow correction without reinstalling; trim accidental paste artifacts at the edges.
+for EMAIL_ATTEMPT in 1 2 3; do
+  IFS= read -r -p "Email для Let's Encrypt: " EMAIL
+  EMAIL="$(python3 - "$EMAIL" <<'PY_EMAIL_TRIM'
+import sys
+print(sys.argv[1].strip(' \t\r\n\ufeff\u200b\u2060'))
+PY_EMAIL_TRIM
+)"
+  if python3 - "$EMAIL" <<'PY_VALIDATE_EMAIL'
 import re
 import sys
 
@@ -348,13 +354,23 @@ host_ok = re.fullmatch(
     r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}",
     host,
 ) is not None
-sys.exit(0 if value.isascii() and len(value) <= 254 and sep and local_ok and host_ok else 1)
+valid = value.isascii() and len(value) <= 254 and bool(sep) and local_ok and host_ok
+if not valid:
+    invalid = sorted({f"U+{ord(ch):04X}" for ch in value if ord(ch) > 127 or ord(ch) < 32})
+    if invalid:
+        print("Найдены посторонние символы: " + ", ".join(invalid), file=sys.stderr)
+sys.exit(0 if valid else 1)
 PY_VALIDATE_EMAIL
-then
-  report error 'Некорректный email: используйте латиницу, например name@example.com.'
-  echo 'Некорректный email: только латиница, без пробелов и лишних символов (например name@example.com).'
-  exit 2
-fi
+  then
+    break
+  fi
+  echo 'Некорректный email. Наберите адрес вручную английскими буквами, например name@example.com.'
+  if [[ "$EMAIL_ATTEMPT" == "3" ]]; then
+    report error 'Некорректный email после трёх попыток.'
+    echo 'Установка остановлена: неверный email.'
+    exit 2
+  fi
+done
 . /etc/os-release
 case "${ID:-}" in ubuntu) dpkg --compare-versions "${VERSION_ID:-0}" ge 22.04 || { echo 'Требуется Ubuntu 22.04+.'; exit 2; };; debian) dpkg --compare-versions "${VERSION_ID:-0}" ge 12 || { echo 'Требуется Debian 12+.'; exit 2; };; *) echo 'Поддерживаются Ubuntu 22.04+ и Debian 12+.'; exit 2;; esac
 report installing 'Установка Caddy и выпуск HTTPS.'
