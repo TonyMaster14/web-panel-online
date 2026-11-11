@@ -42,7 +42,7 @@ wpp_progress_finish() {
 }
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-for file in install-panel.sh install-webproxy-core.sh uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpo-nodes-lab-release-v21-install.sh; do
+for file in install-panel.sh install-webproxy-core.sh uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpo-nodes-lab-release-v22-install.sh; do
     [[ -s "$BASE/$file" ]] || die "Package is incomplete: missing $file. Extract the complete archive."
 done
 for file in mtproxy-download.sh assets/mtproxy-bootstrap/proxy-secret assets/mtproxy-bootstrap/proxy-multi.conf; do
@@ -149,7 +149,7 @@ fi
 # random site templates and the final compact node cards, including pending installs.
 wpp_progress 98 "Установка Nodes Lab v22"
 echo "Installing Nodes Lab v22 into the panel..."
-bash "$BASE/wpo-nodes-lab-release-v21-install.sh" || die "Не удалось подключить Nodes Lab v22; базовая панель установлена, изучите ошибку выше."
+bash "$BASE/wpo-nodes-lab-release-v22-install.sh" || die "Не удалось подключить Nodes Lab v22; базовая панель установлена, изучите ошибку выше."
 
 echo "Installation complete (WPO 3.0 + Nodes Lab v22)."
 wpp_progress 100 "Установка завершена"
