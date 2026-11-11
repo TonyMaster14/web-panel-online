@@ -1600,7 +1600,8 @@ def federation_purge():
     print(json.dumps({"ok":True,"deleted":removed}))
 
 def delete_primary_proxy():
-    if os.path.exists(PRIMARY_DISABLED): return False
+    # The disabled marker prevents automatic recreation; it must not prevent
+    # an operator from deleting a primary profile that was recreated later.
     with open(PROFILES,encoding="utf-8") as stream:
         old_profiles=stream.read()
     profiles=json.loads(old_profiles)
