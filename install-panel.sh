@@ -2519,15 +2519,17 @@ def verify_public_asset(path, marker):
     body=fetch_published(path)
     if marker not in body:
         raise RuntimeError("Relay did not publish "+path+" after restart")
-def verify_public_page(css_name,js_name):
-    # A query forces the relay's no-store path, avoiding a false success from
-    # the five-minute public index cache while a new design is being published.
-    stamp=hashlib.sha256(((css_name or "")+(js_name or "")).encode()).hexdigest()[:12]
+def verify_public_page(css_name,js_name,expected_hash=None):
+    # wpo-presets-live-v3: compare the actual published HTML to this save.
+    # Merely getting HTTP 200 or an old cached stylesheet was a false success.
+    stamp=(expected_hash or hashlib.sha256(((css_name or "")+(js_name or "")).encode()).hexdigest())[:16]
     body=fetch_published("/?wpp-site-check="+stamp)
     if css_name and ('/'+css_name) not in body:
-        raise RuntimeError("Published landing page does not reference its stylesheet")
+        raise RuntimeError("На домене не найден новый CSS шаблона")
     if js_name and ('/'+js_name) not in body:
-        raise RuntimeError("Published landing page does not reference its script")
+        raise RuntimeError("На домене не найден новый JavaScript шаблона")
+    if expected_hash and hashlib.sha256(body.encode("utf-8")).hexdigest()!=expected_hash:
+        raise RuntimeError("Домен возвращает старую страницу: обновление ещё не применилось")
 def insert_into_head(document,tag):
     """Insert an asset without placing anything before <!doctype html>."""
     closing=re.search(r"</head\s*>",document,flags=re.I)
@@ -2579,12 +2581,19 @@ def externalize_inline_assets(source):
     if inline_styles:
         styles.append("\n".join(inline_styles))
     css="/* WEB PANEL ONLINE public CSS */\n"+"\n\n".join(styles) if styles else ""
-    # Preload only bundled, verified WebP photos directly into the published
-    # stylesheet. This avoids image paths failing due to public relay caches,
-    # restrictive proxies or the browser's sandboxed preview origin.
-    # The stored source HTML stays unchanged for backup and future editing.
-    if css:
-        css=inline_bundled_preset_photos(css)
+    # wpo-presets-live-v3 — IMPORTANT: do not inline images into published CSS.
+    # The public relay's strict CSP permits same-origin images, but not data:
+    # images. Inlining WebP here made some car-page CSS oversized and broke
+    # photographs on the real hostname. Preview is separate and can inline.
+    # Keep /preset-*.webp references, served as local static relay assets.
+    for asset in set(re.findall(r'/preset-[a-z0-9-]+\.webp',css,flags=re.I)):
+        photo=os.path.join(os.path.dirname(SITE_INDEX),asset[1:])
+        try:
+            with open(photo,'rb') as stream: header=stream.read(12)
+        except OSError as exc:
+            raise ValueError("Отсутствует фотография сайта: "+asset) from exc
+        if len(header)!=12 or header[:4]!=b"RIFF" or header[8:12]!=b"WEBP":
+            raise ValueError("Повреждена фотография сайта: "+asset)
     javascript="/* WEB PANEL ONLINE public JS */\n"+"\n\n".join(scripts) if scripts else ""
     css_name="panel-site-"+hashlib.sha256(css.encode()).hexdigest()[:12]+".css" if css else ""
     js_name="panel-site-"+hashlib.sha256(javascript.encode()).hexdigest()[:12]+".js" if javascript else ""
@@ -2660,7 +2669,7 @@ def write_site_html(source):
             restart_public_site()
             if css: verify_public_asset("/"+css_name,"WEB PANEL ONLINE public CSS")
             if javascript: verify_public_asset("/"+js_name,"WEB PANEL ONLINE public JS")
-            verify_public_page(css_name,js_name)
+            verify_public_page(css_name,js_name,hashlib.sha256(raw).hexdigest())
             install_private_file(SITE_SOURCE,source.encode("utf-8"))
             # Keep a few prior immutable assets for rollback/open browser tabs.
             generated=[]
@@ -4051,7 +4060,10 @@ class Handler(BaseHTTPRequestHandler):
                 else: self.send_html("Ошибка применения пресета: "+esc(exc),400)
             except (RuntimeError,OSError,subprocess.TimeoutExpired) as exc:
                 print("landing preset failed:",type(exc).__name__,str(exc)[:300],file=sys.stderr,flush=True)
-                message="Не удалось опубликовать сайт. Предыдущая страница сохранена. Проверьте службы tproxy-server и caddy."
+                # Show the actual failure to the administrator; logging alone
+                # made every error look like a generic Caddy outage.
+                detail=re.sub(r'[\r\n\x00-\x1f]+',' ',str(exc)).strip()[:220]
+                message="Не удалось применить шаблон: "+(detail or "неизвестная ошибка")+"; публикация отменена."
                 if async_apply: self.send_json({"ok":False,"message":message},503)
                 else: self.send_html(message,503)
             return
