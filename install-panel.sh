@@ -887,6 +887,7 @@ def sync_profiles(d):
         old=json.load(f)
     disabled=os.path.exists(PRIMARY_DISABLED)
     keep=[p for p in old.get("profiles",[]) if not str(p.get("name","")).startswith("panel:")
+          and str(p.get("name",""))!="wpp-site-standby"
           and not (disabled and isinstance(p,dict)
                    and (p.get("name")=="default" or str(p.get("backend",""))=="127.0.0.1:2398"))]
     for u in d["users"]:
@@ -898,19 +899,25 @@ def sync_profiles(d):
                     "backend":"127.0.0.1:%d"%int(u["backend_port"]),
                     "carrier_mode":"https"
                 })
+    # wpo-site-always-on-v5 — the relay serves the public website even when
+    # every WEB Proxy client and the original primary profile are removed.
+    # The upstream relay rejects an empty profiles list. Use one unguessable
+    # internal standby capability with a nonlistening loopback backend.
+    # This is NEVER returned to a client, user, QR, link or node.
+    if not keep:
+        keep.append({"name":"wpp-site-standby",
+                     "secret":secrets.token_hex(16),
+                     "backend":"127.0.0.1:2398",
+                     "carrier_mode":"https"})
     tmp=PROFILES+".tmp"
     with open(tmp,"w",encoding="utf-8") as f:
         json.dump({"profiles":keep},f,ensure_ascii=True,indent=2)
     os.chmod(tmp,0o400)
-    # tproxy-server requires at least one profile. An empty list is valid
-    # panel state after the primary WEB Proxy and the last client are deleted,
-    # so skip relay validation in that case and stop the service in apply().
-    if keep:
-        c=run("/usr/local/bin/tproxy-server","-config","/etc/tproxy-server/config.json","-profiles-file",tmp,"-check")
-        if c.returncode:
-            try: os.unlink(tmp)
-            except FileNotFoundError: pass
-            raise RuntimeError("tproxy-server config check failed: "+(c.stderr or c.stdout)[-2000:])
+    c=run("/usr/local/bin/tproxy-server","-config","/etc/tproxy-server/config.json","-profiles-file",tmp,"-check")
+    if c.returncode:
+        try: os.unlink(tmp)
+        except FileNotFoundError: pass
+        raise RuntimeError("tproxy-server config check failed: "+(c.stderr or c.stdout)[-2000:])
     os.replace(tmp,PROFILES)
 
 def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
@@ -1344,8 +1351,11 @@ def set_mtproxy_economy(request):
         raise ValueError("Сначала выключите WEB Proxy и MTProto у клиентов. Активных подключений: "+str(len(users))+".")
     if enabled:
         atomic_text(MTPROXY_ECONOMY,"enabled\n",0o600)
-        run("systemctl","disable","--now","tproxy-server.service",check=False)
+        # Economy disables MTProxy traffic, never the public website. The
+        # relay has a separate standby profile when no WEB users exist.
         run("systemctl","disable","--now","mtproxy.service",check=False)
+        sync_profiles(d)
+        run("systemctl","enable","--now","tproxy-server.service",check=True)
     else:
         try: os.unlink(MTPROXY_ECONOMY)
         except FileNotFoundError: pass
@@ -1412,16 +1422,11 @@ def apply(d,restart=True,previous=None):
                     if chk.returncode:
                         st=run("systemctl","status",unit,"--no-pager","--full")
                         raise RuntimeError("User MTProxy is active but backend port is not listening: "+(st.stdout or st.stderr)[-2000:])
-            if web_changed and not os.path.exists(MTPROXY_ECONOMY):
-                with open(PROFILES,encoding="utf-8") as stream:
-                    relay_profiles=json.load(stream).get("profiles",[])
-                if relay_profiles:
-                    run("systemctl","enable","tproxy-server.service",check=True)
-                    run("systemctl","restart","tproxy-server.service",check=True)
-                else:
-                    # No public WEB Proxy profiles remain. Disable the relay
-                    # instead of restarting it with an invalid empty profile set.
-                    run("systemctl","disable","--now","tproxy-server.service",check=True)
+            if web_changed:
+                # Keep the public hostname alive after deleting WEB users;
+                # tproxy-server still serves the site with a standby profile.
+                run("systemctl","enable","tproxy-server.service",check=True)
+                run("systemctl","restart","tproxy-server.service",check=True)
     except Exception:
         with open(PROFILES,"w",encoding="utf-8") as f: f.write(old_profiles)
         os.chmod(PROFILES,0o400)
