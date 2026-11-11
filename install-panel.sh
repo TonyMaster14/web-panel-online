@@ -5077,27 +5077,12 @@ wpo_print_install_summary() {
     else
         printf '  Пароль: %s\n' "$PASS"
     fi
-    if [[ "$UPDATING" != "1" && "$NODE_API_TOKEN" == wppnode1_* ]]; then
-        printf '\n  🔐 NODE API TOKEN\n'
-        printf '  %s\n' "$NODE_API_TOKEN"
-    fi
     printf '\n%s\n' '────────────────────────────────────────────────────────────────'
     printf '%s\n' 'Сохраните адрес и данные доступа в надёжном месте.'
     printf '%s\n' 'Не публикуйте пароль и Node API token.'
     printf '%s\n' '────────────────────────────────────────────────────────────────'
 }
 
-NODE_API_TOKEN="$(python3 - "$DOMAIN" <<'PY'
-import sys
-sys.path.insert(0,"/opt/tproxy-panel")
-import wpp_nodes
-try:
-    key=open("/var/lib/tproxy-panel/api.key",encoding="ascii").read().strip()
-    print(wpp_nodes.make_connection_token(sys.argv[1],key))
-except (OSError,ValueError):
-    pass
-PY
-)"
 if [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" ]]; then
     [[ -f "$WPO_FINAL_SUMMARY_FILE" && ! -L "$WPO_FINAL_SUMMARY_FILE" ]] ||
         die "Missing secure installation summary file."
