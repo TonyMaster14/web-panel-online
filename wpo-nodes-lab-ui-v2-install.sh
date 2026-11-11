@@ -277,6 +277,7 @@ def loc():
         name=str(d.get('country_name') or 'Сервер')[:80]
         return {'country_code':code,'country_name':name,'name':name}
     except Exception: return {'country_code':'UN','country_name':'Сервер','name':'Сервер'}
+LOCATION=loc()
 def atomic(path,data):
     fd,tmp=tempfile.mkstemp(prefix='.wpo-',dir=os.path.dirname(path))
     try:
@@ -297,7 +298,7 @@ class H(BaseHTTPRequestHandler):
         if self.path=='/healthz': self.out({'ok':True}); return
         if not self.auth(): self.out({'ok':False,'message':'Unauthorized'},401); return
         if self.path=='/wpp-api/v1/status':
-            self.out({'ok':True,'api_version':1,'version':C['version'],'domain':DOMAIN,'location':loc(),'name':DOMAIN.split('.')[0],'capabilities':['node-agent','site-template']}); return
+            self.out({'ok':True,'api_version':1,'version':C['version'],'domain':DOMAIN,'location':LOCATION,'name':DOMAIN.split('.')[0],'capabilities':['node-agent','site-template']}); return
         if self.path=='/wpp-api/v1/profiles': self.out({'ok':True,'profiles':[]}); return
         self.out({'ok':False,'message':'Not found'},404)
     def do_POST(self):
