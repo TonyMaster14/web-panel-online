@@ -2947,7 +2947,10 @@ def connections_with_runtime(connections):
         protocol=item.get("protocol")
         cfg=item.get("config") if isinstance(item.get("config"),dict) else {}
         tag=connection_store.inbound_tag(item) if protocol in ("vless","hysteria") else ""
-        if tag and tag in by_tag: item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
+        if tag and tag in by_tag:
+            item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
+            if bucket=="reality":
+                item["runtime_inbound"].get("streamSettings",{}).get("realitySettings",{}).pop("privateKey",None)
         elif tag:
             bucket=connection_store._xray_bucket(item)
             if protocol=="vless" and bucket=="reality":
@@ -3703,6 +3706,8 @@ class Handler(BaseHTTPRequestHandler):
                     existing_config=dict(existing.get("config",{})) if isinstance(existing,dict) and isinstance(existing.get("config"),dict) else {}
                     existing_advanced=dict(existing.get("advanced",{})) if isinstance(existing,dict) and isinstance(existing.get("advanced"),dict) else {}
                     advanced_value=form.get("advanced",json.dumps(existing_advanced,ensure_ascii=False))
+                    if protocol=="vless" and form.get("route")=="reality" and form.get("xray_json","").strip():
+                        raise connection_store.ConnectionError("Редактор низкоуровневого Xray JSON для Reality отключён: приватный ключ хранится только на сервере.")
                     if protocol in ("vless","hysteria") and form.get("xray_json","").strip():
                         if not existing: raise connection_store.ConnectionError("Сначала создайте подключение, затем откройте его настройки карандашом.")
                         current=connections_with_runtime([existing])[0].get("runtime_inbound",{})
