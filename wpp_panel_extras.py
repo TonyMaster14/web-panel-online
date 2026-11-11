@@ -1,5 +1,9 @@
 """Panel-only HTML helpers. No public subscription request may render admin data."""
+import base64
+import functools
 import html
+import os
+import re
 import time
 
 
@@ -96,6 +100,49 @@ ef.addEventListener('submit',e=>{{if(e.submitter&&e.submitter.id==='publishHtml'
 </script>'''
 
 
+# Preview iframes deliberately have opaque origins (no allow-same-origin).
+# Browsers can block images fetched from the public hostname inside this
+# sandbox when the public server sends cross-origin resource policies.
+# Use only our already-installed, locally verified WebP photos as data: URLs.
+# This does not modify the HTML saved to /srv/tproxy-site.
+_PRESET_PREVIEW_PHOTOS = frozenset({
+    "preset-coffee.webp", "preset-cars.webp",
+    "preset-car-graphite.webp", "preset-car-silver.webp",
+    "preset-car-white.webp", "preset-car-blue.webp",
+    "preset-car-red.webp", "preset-car-black.webp",
+})
+
+
+@functools.lru_cache(maxsize=24)
+def _preset_photo_data(filename, mtime_ns, size):
+    path = os.path.join("/srv/tproxy-site", filename)
+    with open(path, "rb") as stream:
+        raw = stream.read(4 * 1024 * 1024 + 1)
+    if len(raw) != size or not 12 <= size <= 4 * 1024 * 1024:
+        raise ValueError("Фотография пресета слишком большая или повреждена: " + filename)
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WEBP":
+        raise ValueError("Неверный формат фотографии пресета: " + filename)
+    return "data:image/webp;base64," + base64.b64encode(raw).decode("ascii")
+
+
+def _preview_with_local_photos(source):
+    # Match only exact packaged filenames, never arbitrary local paths.
+    pattern = r"""(?P<quote>["'])(?P<url>/preset-[a-z0-9-]+\.webp)(?P=quote)"""
+    def inline(match):
+        url = match.group("url")
+        filename = url[1:]
+        if filename not in _PRESET_PREVIEW_PHOTOS:
+            return match.group(0)
+        path = os.path.join("/srv/tproxy-site", filename)
+        try:
+            stat = os.stat(path)
+            data_url = _preset_photo_data(filename, stat.st_mtime_ns, stat.st_size)
+        except OSError as exc:
+            raise ValueError("Не найдена фотография " + filename + ". Проверьте установку assets пресетов.") from exc
+        return match.group("quote") + data_url + match.group("quote")
+    return re.sub(pattern, inline, source, flags=re.I)
+
+
 def preview_document(source, externalize, public_domain=""):
     # Preview the exact document without rewriting tags or JSON-LD.
     # Local preset photos are served by the same public host as the panel.
@@ -124,4 +171,4 @@ def preview_document(source, externalize, public_domain=""):
         + "font-src data:; connect-src 'none'; frame-src 'none'; "
         + "base-uri 'none'; form-action 'none'"
     )
-    return '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '">' + source
+    return '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '">' + _preview_with_local_photos(source)
