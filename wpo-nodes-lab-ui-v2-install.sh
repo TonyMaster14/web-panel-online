@@ -338,6 +338,7 @@ if not os.path.exists(os.path.join(SITE,'index.html')): atomic(os.path.join(SITE
 ThreadingHTTPServer(('127.0.0.1',9088),H).serve_forever()
 PY_AGENT
 chmod 0755 /opt/wpp-node-agent/agent.py
+python3 -m py_compile /opt/wpp-node-agent/agent.py
 cat > /etc/systemd/system/wpp-node-agent.service <<'UNIT'
 [Unit]
 Description=WPO lightweight Node Agent
