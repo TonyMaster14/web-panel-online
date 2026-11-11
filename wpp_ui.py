@@ -1332,6 +1332,58 @@ setInterval(pollClients,60000);
 </script>'''
 
 
+
+# Compact outlined preset gallery, scoped to Settings only. Keep full text and
+# existing trash actions while removing the oversized empty card padding.
+CSS += '''
+.preset-section .card-title{margin-bottom:12px}
+.preset-section .card-title p{margin:3px 0 0;font-size:11px}
+.preset-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.preset-grid .preset{box-sizing:border-box;min-width:0;min-height:154px;padding:11px 11px 10px;
+  border:1px solid color-mix(in srgb,var(--line) 90%,var(--muted) 10%);
+  border-radius:13px;background:var(--raised);
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--surface) 75%,transparent);
+  transition:border-color .16s,background .16s,box-shadow .16s}
+.preset-grid .preset:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line));
+  box-shadow:0 6px 22px #00000013,inset 0 1px 0 color-mix(in srgb,var(--surface) 75%,transparent)}
+.preset-grid .preset .preset-art{display:grid;place-items:center;height:29px;width:100%;
+  margin:0 0 8px;padding:0 0 8px;font-size:21px;line-height:1;
+  border-bottom:1px dashed var(--line);flex:0 0 auto}
+.preset-grid .preset b{display:block;width:100%;padding-right:5px;font-size:11px;
+  line-height:1.25;letter-spacing:0}
+.preset-grid .preset p{width:100%;font-size:10px;line-height:1.43;
+  margin:5px 0 10px;overflow-wrap:anywhere;color:var(--muted)}
+.preset-grid .preset>.actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  width:100%;gap:6px;margin:auto 0 0}
+.preset-grid .preset>.actions form{min-width:0;display:block;margin:0}
+.preset-grid .preset>.actions button{display:block;width:100%;min-height:28px;
+  padding:7px 3px;margin:0;font-size:10px;line-height:1.15;white-space:nowrap}
+.preset-grid .preset>.actions button:disabled{opacity:.58;cursor:progress}
+.preset-grid .preset .preset-delete{position:absolute;top:6px;right:6px;margin:0;z-index:2}
+.preset-grid .preset .preset-delete .icon-btn{width:25px;height:25px;padding:5px;
+  border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted)}
+.preset-grid .preset .preset-delete .icon-btn .ico{width:13px;height:13px}
+.preset-grid .preset .preset-delete .icon-btn:hover{color:var(--red);
+  border-color:var(--red);background:color-mix(in srgb,var(--red) 9%,transparent)}
+.preset-grid .preset-create{border-style:dashed;text-align:left;cursor:pointer}
+.preset-grid .preset-create:hover{border-color:var(--accent);background:var(--tint)}
+.preset-grid .preset-create-mark{display:grid;place-items:center;width:31px;height:31px;
+  margin:0 0 10px;padding:0;border-radius:10px;background:var(--tint);
+  color:var(--accent);font-size:19px}
+.preset-grid .preset-create .btn{width:100%;padding:7px 8px;margin:auto 0 0;
+  min-height:28px;text-align:center;font-size:10px}
+.preset-gallery-status{margin:12px 0 0;min-height:17px;color:var(--muted);font-size:10px;line-height:1.45}
+.preset-gallery-status.preset-success{color:var(--green)}
+.preset-gallery-status.preset-error{color:var(--red)}
+.preset-preview-empty{align-self:center;margin:auto;padding:18px;color:var(--muted);
+  font-size:12px;text-align:center;line-height:1.6}
+@media(max-width:1100px){.preset-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:780px){.preset-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.preset-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.preset-grid .preset{transition:none}}
+'''
+
+
 def editor_ui(source, path, csrf, presets, has_draft):
     # Preset gallery is a first-class editor: preview is read-only and isolated,
     # publication is explicit. The large HTML editor remains available to the
