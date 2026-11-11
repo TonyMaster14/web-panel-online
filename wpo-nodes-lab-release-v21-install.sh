@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 umask 077
 
-REF="23a929cffb6d02bae13fe5840e7d5380a8dd67a6"
+REF="50b303a0368d369cc07fd27234090af48d2a0acb"
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF"
 APP="/opt/tproxy-panel"
 SERVICE="tproxy-panel.service"
