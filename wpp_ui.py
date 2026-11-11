@@ -1497,14 +1497,40 @@ gallery.addEventListener('submit',async event=>{
     if(response.redirected)throw new Error('Сессия завершена. Войдите в панель заново.');
     const data=await response.json().catch(()=>{throw new Error('Сервер не ответил на публикацию. Проверьте статус сайта.');});
     if(!response.ok||data.ok!==true)throw new Error(data.message||'Не удалось применить шаблон.');
+    // wpo-publish-v4: the panel has confirmed the local relay, now validate
+    // what this browser actually receives through the public HTTPS hostname.
+    // A successful panel response alone must not claim the domain is updated.
+    if(!/^[a-f0-9]{64}$/.test(data.published_hash||''))throw new Error('Сервер не подтвердил контрольную сумму страницы.');
+    galleryStatus.textContent='Сайт загружен на сервер. Проверяем домен через HTTPS…';
+    let verified=false;
+    let latestError='';
+    for(let attempt=0;attempt<5;attempt++){
+      try{
+        const check=await fetch('/?wpp-published='+Date.now()+'-'+attempt,{
+          method:'GET',cache:'no-store',credentials:'same-origin',signal:controller.signal,
+          headers:{'Cache-Control':'no-cache'}
+        });
+        if(!check.ok)throw new Error('Сайт ответил HTTP '+check.status);
+        const bytes=await check.arrayBuffer();
+        const digest=await crypto.subtle.digest('SHA-256',bytes);
+        const hex=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+        if(hex===data.published_hash){verified=true;break;}
+        latestError='Домен пока показывает другую страницу';
+      }catch(checkError){
+        if(controller.signal.aborted)throw checkError;
+        latestError=checkError.message;
+      }
+      await new Promise(resolve=>setTimeout(resolve,800));
+    }
+    if(!verified)throw new Error('Шаблон загружен на сервер, но публичный домен не подтвердил обновление: '+latestError+'. Проверьте маршрут Caddy и DNS.');
     galleryStatus.classList.add('preset-success');
-    galleryStatus.textContent='✓ «'+name+'» применён. ';
+    galleryStatus.textContent='✓ «'+name+'» применён и проверен на домене. ';
     const link=document.createElement('a');
     link.href=new URL('/?wpp-view='+Date.now(),window.location.origin).href;
     link.target='_blank';link.rel='noopener noreferrer';
     link.textContent='Открыть сайт';
     galleryStatus.appendChild(link);
-    window.showPanelToast?.('Шаблон «'+name+'» применён.','success');
+    window.showPanelToast?.('Шаблон «'+name+'» опубликован на домене.','success');
   }catch(error){
     galleryStatus.classList.add('preset-error');
     const message=controller.signal.aborted
