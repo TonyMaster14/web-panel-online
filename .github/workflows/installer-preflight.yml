@@ -93,6 +93,9 @@ jobs:
               "Go pinned source": 'TPROXY_REF="52a5feb7fac38f68da5afef9cedd9b3bfc8473ca"' in core,
               "domain/email preflight": 'valid_domain' in core and 'valid_email' in core,
               "node scripts independently validated": 'bash -n "$STAGE/$file"' in node,
+              "Reality private key redacted in UI": '.pop("privateKey",None)' in Path("install-panel.sh").read_text(),
+              "Reality raw config editor disabled": "const isReality=protocol.value==='vless'" in Path("wpp_ui.py").read_text(),
+              "Reality raw config blocked in backend": 'existing_config.get("route")=="reality"' in Path("install-panel.sh").read_text(),
           }
           for key,ok in checks.items():
               print(("OK" if ok else "FAIL"), key)
