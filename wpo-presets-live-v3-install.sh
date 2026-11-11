@@ -10,7 +10,7 @@ PANEL="$APP/panel.py"
 UI="$APP/wpp_ui.py"
 EXTRAS="$APP/wpp_panel_extras.py"
 SERVICE="tproxy-panel.service"
-REF="a656cdd246f9778b7a1097973ff50169823a9c7e"
+REF="34419f229438ad0fbdb3c03b4fd457312d6cd4d3"
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF"
 for file in "$PANEL" "$UI" "$EXTRAS"; do
     [[ -s "$file" ]] || { echo "Missing panel file: $file" >&2; exit 1; }
