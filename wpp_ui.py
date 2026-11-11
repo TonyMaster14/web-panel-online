@@ -1333,23 +1333,132 @@ setInterval(pollClients,60000);
 
 
 def editor_ui(source, path, csrf, presets, has_draft):
-    art={
-        'countdown':'☕','cars':'🚘','cats-repair':'⚙️','loading':'🏥',
-        'auto-service':'🔧','beauty-salon':'💗','phone-repair':'📱',
+    # Preset gallery is a first-class editor: preview is read-only and isolated,
+    # publication is explicit. The large HTML editor remains available to the
+    # backend for existing clients, but is not shown in the settings screen.
+    art = {
+        'countdown':'☕', 'cars':'🚘', 'cats-repair':'⚙️', 'loading':'🏥',
+        'auto-service':'🔧', 'beauty-salon':'💗', 'phone-repair':'📱',
         'medical-diagnostics':'🩺'
     }
-    card_items=[]
+    card_items = []
     for preset in presets:
-        delete=f'''<form class="preset-delete" method="post" action="{esc(path)}/custom-preset" data-confirm="Удалить шаблон «{esc(preset['name'])}» из списка?"><input type="hidden" name="csrf" value="{esc(csrf)}"><input type="hidden" name="operation" value="delete"><input type="hidden" name="preset" value="{esc(preset['id'])}"><button class="icon-btn danger" type="submit" aria-label="Удалить шаблон" title="Удалить шаблон">{icon('trash')}</button></form>'''
-        card_items.append(f'''<div class="preset">{delete}<div class="preset-art">{art.get(preset["id"],"✦")}</div><b>{esc(preset["name"])}</b><p>{esc(preset["description"])}</p><div class="actions"><form method="post" action="{esc(path)}/draft-preset">{hidden(csrf,preset=preset["id"])}<button>Предпросмотр</button></form><form method="post" action="{esc(path)}/apply-preset" data-confirm="Заменить рабочую заглушку пресетом «{esc(preset['name'])}»?">{hidden(csrf,preset=preset["id"])}<button class="primary">Применить</button></form></div></div>''')
-    cards=''.join(card_items)
-    create_card='''<button type="button" class="preset preset-create" id="openCustomPreset"><span class="preset-create-mark">＋</span><b>Создать свою заглушку</b><p>Добавьте название, описание и собственный HTML. Заглушка сохранится в этом списке.</p><span class="btn primary">Создать</span></button>'''
-    return f'''<div class="card"><div class="card-title"><h2>Пресеты заглушек</h2><span class="muted" style="font-size:11px">Готовые и собственные страницы</span></div><div class="preset-grid">{create_card}{cards}</div><p class="muted" style="font-size:12px;margin-bottom:0">«Предпросмотр» открывает пресет в редакторе, а «Применить» сразу публикует его и очищает старый черновик.</p></div><div class="card"><div class="card-title"><h2>Редактор главной страницы</h2><span class="pill">{'Черновик' if has_draft else 'Опубликованный исходник'}</span></div><form id="editorForm" method="post" action="{esc(path)}/site-html">{hidden(csrf)}<div class="editor-bar"><span>index.html</span><i>HTML · CSS · JavaScript</i></div><textarea class="code-editor" id="htmlSource" name="html" spellcheck="false" aria-label="HTML главной страницы" required>{esc(source)}</textarea><div class="editor-actions"><div class="actions"><button type="button" id="previewHtml">{icon('chart')}Предпросмотр</button><button formaction="{esc(path)}/save-draft">Сохранить черновик</button></div><button class="primary" id="publishHtml">Опубликовать на сайте</button></div></form><div class="actions" style="margin-top:14px"><form method="post" action="{esc(path)}/discard-draft" data-confirm="Удалить черновик и вернуться к опубликованному исходнику?">{hidden(csrf)}<button class="quiet">Удалить черновик</button></form><small id="previewStatus" role="status">Предпросмотр не изменяет рабочий сайт</small></div><details class="note"><summary>Требования к HTML и изоляция предпросмотра</summary><p>Вставляйте стили и скрипты внутрь HTML. Внешние библиотеки, запросы, формы и сетевые переходы в предпросмотре заблокированы. События подключайте через addEventListener. После публикации проверьте живой сайт.</p></details></div>
+        preset_id = esc(preset["id"])
+        preset_name = esc(preset["name"])
+        delete = f'''<form class="preset-delete" method="post" action="{esc(path)}/custom-preset" data-confirm="Удалить шаблон «{preset_name}» из списка?"><input type="hidden" name="csrf" value="{esc(csrf)}"><input type="hidden" name="operation" value="delete"><input type="hidden" name="preset" value="{preset_id}"><button class="icon-btn danger" type="submit" aria-label="Удалить шаблон" title="Удалить шаблон">{icon('trash')}</button></form>'''
+        card_items.append(f'''<article class="preset preset-card">{delete}<div class="preset-art" aria-hidden="true">{art.get(preset["id"],"✦")}</div><b>{preset_name}</b><p>{esc(preset["description"])}</p><div class="actions"><button type="button" class="preset-preview" data-preset-preview="{preset_id}" data-preset-title="{preset_name}">Предпросмотр</button><form class="preset-apply" method="post" action="{esc(path)}/apply-preset" data-preset-name="{preset_name}">{hidden(csrf,preset=preset["id"])}<button type="submit" class="primary">Применить</button></form></div></article>''')
+    cards = ''.join(card_items)
+    create_card = '''<button type="button" class="preset preset-create" id="openCustomPreset"><span class="preset-create-mark">＋</span><b>Создать свою заглушку</b><p>Название, описание и свой HTML. Шаблон появится в этой коллекции.</p><span class="btn primary">Создать</span></button>'''
+    js = r'''<script>
+(()=>{
+const gallery=document.getElementById('presetGallery');
+const previewDialog=document.getElementById('previewDialog');
+const customDialog=document.getElementById('customPresetDialog');
+const iframe=document.getElementById('landingPreview');
+const stage=document.getElementById('previewStage');
+const previewNote=document.getElementById('previewStatus');
+const previewEmpty=document.getElementById('previewEmpty');
+const galleryStatus=document.getElementById('presetGalleryStatus');
+let previewRequest=null,publishing=false;
+
+document.getElementById('openCustomPreset').addEventListener('click',()=>customDialog.showModal());
+for(const dialog of [previewDialog,customDialog]){
+  dialog.querySelectorAll('[data-close-dialog]').forEach(button=>button.addEventListener('click',()=>{if(dialog.open)dialog.close()}));
+}
+previewDialog.addEventListener('close',()=>{
+  if(previewRequest){previewRequest.abort();previewRequest=null;}
+  iframe.removeAttribute('srcdoc');
+  iframe.hidden=true;
+  previewEmpty.hidden=false;
+});
+for(const mode of ['Desktop','Phone']){
+  document.getElementById('preview'+mode).addEventListener('click',()=>{
+    stage.classList.toggle('phone',mode==='Phone');
+    for(const other of ['Desktop','Phone']){
+      document.getElementById('preview'+other).classList.toggle('selected',mode===other);
+    }
+  });
+}
+gallery.addEventListener('click',async event=>{
+  const button=event.target.closest('button[data-preset-preview]');
+  if(!button)return;
+  if(previewRequest)previewRequest.abort();
+  const controller=new AbortController();
+  previewRequest=controller;
+  const title=button.dataset.presetTitle||'Шаблон';
+  document.getElementById('previewHeading').textContent='Предпросмотр · '+title;
+  previewNote.textContent='Загружаем предпросмотр…';
+  previewEmpty.textContent='Загружаем страницу…';
+  previewEmpty.hidden=false;iframe.hidden=true;iframe.removeAttribute('srcdoc');
+  if(!previewDialog.open)previewDialog.showModal();
+  const timeout=setTimeout(()=>controller.abort(),25000);
+  button.disabled=true;
+  try{
+    const body=new URLSearchParams({csrf:gallery.dataset.csrf,preset:button.dataset.presetPreview});
+    const response=await fetch(gallery.dataset.previewUrl,{method:'POST',body,credentials:'same-origin',signal:controller.signal,cache:'no-store'});
+    if(response.redirected)throw new Error('Сессия завершена. Войдите в панель заново.');
+    const payload=await response.json().catch(()=>{throw new Error('Сервер вернул неверный ответ предпросмотра.');});
+    if(!response.ok||typeof payload.document!=='string')throw new Error(payload.message||'Ошибка загрузки шаблона.');
+    if(controller.signal.aborted)return;
+    iframe.srcdoc=payload.document;
+    iframe.hidden=false;previewEmpty.hidden=true;
+    previewNote.textContent='Предпросмотр без публикации · рабочий сайт не изменён';
+  }catch(error){
+    if(!previewDialog.open)return;
+    const message=controller.signal.aborted?'Истекло время загрузки предпросмотра. Попробуйте снова.':error.message;
+    previewEmpty.textContent=message;previewEmpty.hidden=false;
+    previewNote.textContent='Шаблон не был опубликован.';
+  }finally{
+    clearTimeout(timeout);
+    button.disabled=false;
+    if(previewRequest===controller)previewRequest=null;
+  }
+});
+gallery.addEventListener('submit',async event=>{
+  const form=event.target.closest('form.preset-apply');
+  if(!form)return;
+  event.preventDefault();
+  if(publishing)return;
+  const name=form.dataset.presetName||'этот шаблон';
+  if(!confirm('Опубликовать «'+name+'» на основном домене?'))return;
+  publishing=true;
+  const submit=form.querySelector('button[type="submit"]');
+  const buttons=gallery.querySelectorAll('.preset-apply button');
+  buttons.forEach(button=>button.disabled=true);
+  const original=submit.textContent;
+  submit.textContent='Публикуем…';
+  galleryStatus.textContent='Публикуем «'+name+'». Проверяем работу сайта…';
+  galleryStatus.classList.remove('preset-error','preset-success');
+  try{
+    const response=await fetch(form.action,{
+      method:'POST',
+      headers:{'X-WPP-Async':'1'},
+      body:new URLSearchParams(new FormData(form)),
+      credentials:'same-origin',
+      cache:'no-store'
+    });
+    if(response.redirected)throw new Error('Сессия завершена. Войдите в панель заново.');
+    const data=await response.json().catch(()=>{throw new Error('Сервер не ответил на публикацию. Проверьте статус сайта.');});
+    if(!response.ok||data.ok!==true)throw new Error(data.message||'Не удалось применить шаблон.');
+    galleryStatus.classList.add('preset-success');
+    galleryStatus.textContent='✓ «'+name+'» опубликован. Сайт обновлён.';
+    window.showPanelToast?.('Шаблон «'+name+'» опубликован.','success');
+  }catch(error){
+    galleryStatus.classList.add('preset-error');
+    galleryStatus.textContent=error.message;
+    window.showPanelToast?.(error.message,'error');
+  }finally{
+    submit.textContent=original;
+    buttons.forEach(button=>button.disabled=false);
+    publishing=false;
+  }
+});
+})();
+</script>'''
+    return f'''<section class="card preset-section"><div class="card-title"><div><h2>Пресеты заглушек</h2><p class="muted">Готовые и собственные страницы</p></div></div><div id="presetGallery" class="preset-grid" data-preview-url="{esc(path)}/preview-html" data-csrf="{esc(csrf)}">{create_card}{cards}</div><p id="presetGalleryStatus" class="preset-gallery-status" role="status">Нажмите «Предпросмотр», чтобы сразу увидеть сайт. «Применить» публикует шаблон на домене.</p></section>
 <dialog id="customPresetDialog" class="create-dialog preset-create-dialog"><div class="dialog-head"><div><h2>Своя заглушка</h2><small>После сохранения она появится среди остальных пресетов</small></div><button type="button" data-close-dialog aria-label="Закрыть">×</button></div><form method="post" action="{esc(path)}/custom-preset"><input type="hidden" name="csrf" value="{esc(csrf)}"><input type="hidden" name="operation" value="create"><div class="form-grid"><div><label for="customPresetName">Название</label><input id="customPresetName" name="name" maxlength="80" required placeholder="Например, Скоро открытие"></div><div><label for="customPresetDescription">Краткое описание</label><input id="customPresetDescription" name="description" maxlength="180" placeholder="Что увидит посетитель"></div></div><label for="customPresetHtml">HTML заглушки</label><div class="editor-bar"><span>index.html</span><i>до 1 МБ</i></div><textarea class="code-editor" id="customPresetHtml" name="html" spellcheck="false" required placeholder="<!doctype html>…"></textarea><div class="actions create-actions"><button type="button" data-close-dialog>Отмена</button><button class="primary">Сохранить в пресеты</button></div></form></dialog>
-<dialog id="previewDialog" class="preview-dialog"><div class="preview-top"><strong>Предпросмотр заглушки</strong><div class="actions"><div class="range"><button type="button" class="selected" id="previewDesktop">Компьютер</button><button type="button" id="previewPhone">Телефон</button></div><button type="button" data-close-dialog aria-label="Закрыть предпросмотр">×</button></div></div><div id="previewStage" class="preview-stage"><iframe id="landingPreview" title="Изолированный предпросмотр заглушки" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe></div><p class="preview-caption">Изолированный черновик · рабочий сайт не изменён</p></dialog>
-<script>const ef=document.getElementById('editorForm'),pf=document.getElementById('landingPreview'),ps=document.getElementById('previewStatus'),pd=document.getElementById('previewDialog'),cp=document.getElementById('customPresetDialog');document.getElementById('openCustomPreset').addEventListener('click',()=>cp.showModal());document.getElementById('previewHtml').addEventListener('click',async e=>{{const b=e.currentTarget;b.disabled=true;ps.textContent='Подготовка предпросмотра…';try{{const r=await fetch('{esc(path)}/preview-html',{{method:'POST',body:new URLSearchParams(new FormData(ef))}});if(r.redirected)throw new Error('Сессия завершена. Войдите заново.');const d=await r.json();if(!r.ok)throw new Error(d.message||'Ошибка предпросмотра');pf.srcdoc=d.document;pd.showModal();ps.textContent='Предпросмотр обновлён. Рабочий сайт не изменён.'}}catch(err){{ps.textContent=err.message}}finally{{b.disabled=false}}}});['Desktop','Phone'].forEach(mode=>document.getElementById('preview'+mode).addEventListener('click',()=>{{document.getElementById('previewStage').classList.toggle('phone',mode==='Phone');['Desktop','Phone'].forEach(m=>document.getElementById('preview'+m).classList.toggle('selected',m===mode))}}));pd.addEventListener('close',()=>pf.removeAttribute('srcdoc'));ef.addEventListener('submit',e=>{{if(e.submitter&&e.submitter.id==='publishHtml'&&!confirm('Опубликовать текущий HTML на основном сайте?'))e.preventDefault()}});</script>'''
-
-
+<dialog id="previewDialog" class="preview-dialog"><div class="preview-top"><strong id="previewHeading">Предпросмотр заглушки</strong><div class="actions"><div class="range"><button type="button" class="selected" id="previewDesktop">Компьютер</button><button type="button" id="previewPhone">Телефон</button></div><button type="button" data-close-dialog aria-label="Закрыть предпросмотр">×</button></div></div><div id="previewStage" class="preview-stage"><p id="previewEmpty" class="preset-preview-empty" role="status">Загружаем страницу…</p><iframe id="landingPreview" hidden title="Изолированный предпросмотр заглушки" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe></div><p id="previewStatus" class="preview-caption" role="status">Предпросмотр не изменяет рабочий сайт</p></dialog>
+{js}'''
 def openflux_ui(state, path, csrf):
     configured=bool(state.get('configured'))
     active=bool(state.get('active'))
