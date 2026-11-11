@@ -49,7 +49,8 @@ src=src[:start]+section+src[end:]
 print('Подпись раздела:', 'удалена' if removed else 'уже отсутствовала')
 
 css="""
-/* wpo-node-heading-v21: start on left edge of first stats tile */
+/* wpo-node-heading-v21 */
+/* Align heading to the first statistics card left edge. */
 .wpo-nodes-page .wpo-nodes-toolbar > div:first-child{
     margin-left:0;
     padding-left:0;
