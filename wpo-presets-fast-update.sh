@@ -148,7 +148,7 @@ if not all(mark in content for mark in expected):
     raise SystemExit("The preset gallery backend is incomplete.")
 # Ensure none of the existing Nodes Lab additions have been removed.
 node_marks=set(re.findall(r"# wpo-node-[^\n]+", original))
-if not node_marks.issubset(content.splitlines()):
+if not all(mark in content for mark in node_marks):
     raise SystemExit("Nodes Lab feature marker changed. Refusing patch.")
 compile(content,str(target),"exec")
 if content!=original:
