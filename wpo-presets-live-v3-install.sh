@@ -10,7 +10,7 @@ PANEL="$APP/panel.py"
 UI="$APP/wpp_ui.py"
 EXTRAS="$APP/wpp_panel_extras.py"
 SERVICE="tproxy-panel.service"
-REF="8d967685ca351a4208d78b2891ced1d9a957efe9"
+REF="a656cdd246f9778b7a1097973ff50169823a9c7e"
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF"
 for file in "$PANEL" "$UI" "$EXTRAS"; do
     [[ -s "$file" ]] || { echo "Missing panel file: $file" >&2; exit 1; }
@@ -85,7 +85,7 @@ done
 # Apply narrow, guarded edits to the running panel.py. All Nodes Lab code and
 # other customizations elsewhere in panel.py remain byte-for-byte unchanged.
 # Never replace wpp_ui.py wholesale: Nodes Lab v26 customizes it on the VPS.
-# Patch only editor_ui and gallery-specific CSS, leaving every node change intact.
+# Patch only preset routes, editor_ui and gallery CSS. Nodes Lab is not modified.
 MODIFIED=1
 python3 - "$PANEL" "$UI" "$STAGE/install-panel.sh" "$STAGE/wpp_ui.py" <<'PY_PATCH'
 from pathlib import Path
@@ -221,7 +221,16 @@ assert "data:image/webp;base64," not in css, "Published CSS contains forbidden d
 assert "/preset-car-" in css, "Local car photos missing in stylesheet"
 ui=Path(sys.argv[2]).read_text(encoding="utf-8")
 assert '# wpo-presets-compact-v3' in ui and 'data-presets-ui="v3"' in ui
-print("✓ Published car CSS references real local photos, gallery v3 is present.")
+import importlib.util
+spec=importlib.util.spec_from_file_location("wpo_preset_ui_smoke",sys.argv[2])
+ui_module=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(ui_module)
+assert "#presetGallery.preset-grid" in ui_module.CSS, "Compact gallery CSS not active"
+rendered=ui_module.editor_ui("","/panel-test","test-csrf",presets(),False)
+assert 'data-presets-ui="v3"' in rendered and 'preset-apply' in rendered, "Gallery HTML not active"
+assert "wpo-presets-ui-v3" in rendered and "new URL('/?wpp-view='" in rendered
+print("✓ Gallery renders new compact cards and one-click live publishing.")
+print("✓ Published car CSS references real local photos, not blocked data images.")
 PY_CSS
 systemctl restart "$SERVICE"
 systemctl is-active --quiet "$SERVICE" ||
