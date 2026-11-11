@@ -2245,7 +2245,7 @@ from urllib.parse import parse_qs, quote, urlencode, urlparse
 from collections import defaultdict, deque
 from wpp_subscriptions import PREFIX as SUB_PREFIX
 from wpp_subscription_dashboard import render as subscription_dashboard
-from wpp_panel_extras import preview_document
+from wpp_panel_extras import preview_document, inline_bundled_preset_photos
 from wpp_ui import CSS as PANEL_CSS, COMMON_JS as PANEL_COMMON_JS, page_layout, login_ui, dashboard_body, dashboard_page, users_ui, editor_ui, openflux_ui, client_glances, client_records, nodes_ui, updates_ui, openflux_import_uri, cdn_doctor_ui, connections_ui, routing_ui
 from wpp_ui import happ_import_link
 from wpp_presets import presets as preset_library
@@ -2579,6 +2579,12 @@ def externalize_inline_assets(source):
     if inline_styles:
         styles.append("\n".join(inline_styles))
     css="/* WEB PANEL ONLINE public CSS */\n"+"\n\n".join(styles) if styles else ""
+    # Preload only bundled, verified WebP photos directly into the published
+    # stylesheet. This avoids image paths failing due to public relay caches,
+    # restrictive proxies or the browser's sandboxed preview origin.
+    # The stored source HTML stays unchanged for backup and future editing.
+    if css:
+        css=inline_bundled_preset_photos(css)
     javascript="/* WEB PANEL ONLINE public JS */\n"+"\n\n".join(scripts) if scripts else ""
     css_name="panel-site-"+hashlib.sha256(css.encode()).hexdigest()[:12]+".css" if css else ""
     js_name="panel-site-"+hashlib.sha256(javascript.encode()).hexdigest()[:12]+".js" if javascript else ""
