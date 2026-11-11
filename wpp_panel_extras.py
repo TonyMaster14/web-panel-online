@@ -5,6 +5,7 @@ import html
 import os
 import re
 import time
+from urllib.parse import quote as url_quote
 
 
 def esc(value):
@@ -143,42 +144,95 @@ def inline_bundled_preset_photos(source):
     return re.sub(pattern, inline, source, flags=re.I)
 
 
-def preview_document(source, externalize, public_domain=""):
-    # Preview the exact document without rewriting tags or JSON-LD.
-    # Local preset photos are served by the same public host as the panel.
-    # srcdoc has a sandboxed origin, so explicitly allow its HTTPS host as
-    # well as 'self'; otherwise root-relative /preset-*.webp assets are blocked.
-    # Scripts, connections, frames, forms and all other network destinations
-    # stay blocked.
-    image_sources = [
-        "'self'", "data:", "blob:",
-        "https://p2.zoon.ru", "https://ceramum.ru",
-        "https://beloostrov.groupmmc.ru", "https://spautopro.ru",
-        "https://medsi.ru",
-    ]
-    host = str(public_domain or "").strip().lower()
-    host_parts = host.split(".")
-    valid_host = len(host_parts) >= 2 and all(
-        part and all(ch.isascii() and (ch.isalnum() or ch == "-") for ch in part)
-        and part[0] != "-" and part[-1] != "-"
-        for part in host_parts
-    )
-    if valid_host:
-        image_sources.append("https://" + host)
-    csp = (
+# Preview works for EVERY present and future HTML preset, not a fixed list
+# of images. Only existing public-site image/font assets get rewritten to an
+# independent, cacheable stream. Never embed huge WebP base64 in the HTML.
+_PREVIEW_EXTENSIONS = r"(?:webp|png|jpe?g|gif|avif|svg|woff2?|ttf|otf)"
+_PREVIEW_QUOTED_ASSET = re.compile(
+    r"""(?P<quote>["'])(?P<path>/?(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\."""
+    + _PREVIEW_EXTENSIONS + r""")(?P<tail>\?[^"']*)?(?P=quote)""", re.I
+)
+_PREVIEW_UNQUOTED_URL = re.compile(
+    r"url\(\s*(?P<path>/?(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+\."
+    + _PREVIEW_EXTENSIONS + r")\s*\)", re.I
+)
+
+
+def _preview_local_asset_url(path, domain, panel_path):
+    filename=path.lstrip("/")
+    parts=filename.split("/")
+    if (not filename or len(filename)>200
+        or any(not segment or segment in (".","..") or segment.startswith(".")
+               for segment in parts)):
+        return None
+    root=os.path.realpath("/srv/tproxy-site")
+    candidate=os.path.realpath(os.path.join(root,filename))
+    if not candidate.startswith(root+os.sep):
+        return None
+    try:
+        stat=os.stat(candidate)
+        if not os.path.isfile(candidate) or stat.st_size<1 or stat.st_size>8*1024*1024:
+            return None
+    except OSError:
+        return None
+    encoded="/".join(url_quote(part,safe="") for part in parts)
+    stamp=f"{stat.st_mtime_ns:x}-{stat.st_size:x}"
+    return "https://"+domain+panel_path+"/__preview_asset/"+encoded+"?v="+stamp
+
+
+def _preview_streamed_assets(source, domain, panel_path):
+    # Quotes cover HTML src/srcset, CSS url('...'), and images created by JS.
+    # Unquoted CSS url(...) is also supported. External HTTPS images stay as
+    # authored. No predetermined preset IDs or filenames are required.
+    def replace_quoted(match):
+        replacement=_preview_local_asset_url(match.group("path"),domain,panel_path)
+        if not replacement:
+            return match.group(0)
+        quote=match.group("quote")
+        return quote+replacement+quote
+
+    source=_PREVIEW_QUOTED_ASSET.sub(replace_quoted,source)
+
+    def replace_css_url(match):
+        replacement=_preview_local_asset_url(match.group("path"),domain,panel_path)
+        return 'url("'+replacement+'")' if replacement else match.group(0)
+
+    return _PREVIEW_UNQUOTED_URL.sub(replace_css_url,source)
+
+
+def preview_document(source, externalize, public_domain="", panel_path=""):
+    # Render immediately; image/font requests load concurrently over HTTP,
+    # cached by file version. The isolated iframe never gets admin origin,
+    # cookies, forms, frames or unrestricted JavaScript network access.
+    host=str(public_domain or "").strip().lower()
+    valid_host=(len(host.split("."))>=2 and all(
+        part and len(part)<=63
+        and all(ch.isascii() and (ch.isalnum() or ch=="-") for ch in part)
+        and part[0]!="-" and part[-1]!="-"
+        for part in host.split(".")
+    ))
+    valid_path=bool(re.fullmatch(r"/panel-[a-z0-9-]{3,64}",str(panel_path or "")))
+    if valid_host and valid_path:
+        document=_preview_streamed_assets(source,host,panel_path)
+    else:
+        document=source
+
+    # Arbitrary newly created presets may use different remote photo hosts.
+    # Only image and font downloads can use HTTPS; forms, fetch/connect,
+    # external scripts, frames and navigation remain restricted by CSP/sandbox.
+    image_sources="'self' data: blob: https:"
+    font_sources="data: https:"
+    csp=(
         "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-        + "img-src " + " ".join(image_sources) + "; "
-        + "font-src data:; connect-src 'none'; frame-src 'none'; "
-        + "base-uri 'none'; form-action 'none'"
+        +"img-src "+image_sources+"; font-src "+font_sources+"; "
+        +"connect-src 'none'; frame-src 'none'; "
+        +"base-uri 'none'; form-action 'none'"
     )
-    # Keep <!doctype html> first, otherwise the iframe can enter quirks mode
-    # and the preview's layout differs from the real published landing page.
-    document = inline_bundled_preset_photos(source)
-    policy = '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '">'
-    head = re.search(r'<head\b[^>]*>', document, flags=re.I)
+    policy='<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="'+csp+'">'
+    head=re.search(r'<head\b[^>]*>',document,flags=re.I)
     if head:
-        return document[:head.end()] + policy + document[head.end():]
-    doctype = re.match(r'\s*<!doctype\b[^>]*>', document, flags=re.I)
+        return document[:head.end()]+policy+document[head.end():]
+    doctype=re.match(r'\s*<!doctype\b[^>]*>',document,flags=re.I)
     if doctype:
-        return document[:doctype.end()] + '<head>' + policy + '</head>' + document[doctype.end():]
-    return policy + document
+        return document[:doctype.end()]+'<head>'+policy+'</head>'+document[doctype.end():]
+    return policy+document
