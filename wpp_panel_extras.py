@@ -175,10 +175,10 @@ def preview_document(source, externalize, public_domain=""):
     # and the preview's layout differs from the real published landing page.
     document = _preview_with_local_photos(source)
     policy = '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '">'
-    head = re.search(r'<head\\b[^>]*>', document, flags=re.I)
+    head = re.search(r'<head\b[^>]*>', document, flags=re.I)
     if head:
         return document[:head.end()] + policy + document[head.end():]
-    doctype = re.match(r'\\s*<!doctype\\b[^>]*>', document, flags=re.I)
+    doctype = re.match(r'\s*<!doctype\b[^>]*>', document, flags=re.I)
     if doctype:
         return document[:doctype.end()] + '<head>' + policy + '</head>' + document[doctype.end():]
     return policy + document
