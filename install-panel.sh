@@ -2241,7 +2241,7 @@ import threading
 import time
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, quote, urlencode, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 from collections import defaultdict, deque
 from wpp_subscriptions import PREFIX as SUB_PREFIX
 from wpp_subscription_dashboard import render as subscription_dashboard
@@ -3139,6 +3139,51 @@ class Handler(BaseHTTPRequestHandler):
         if path==PANEL_PATH+"/__assets/awg-routing-guide.mp4":
             self.send_mp4(AWG_GUIDE)
             return
+        # Streaming preview assets — works for all future locally stored
+        # HTML preset images/fonts. This serves PUBLIC site files only,
+        # never admin files. No login cookie is required inside an opaque
+        # sandboxed iframe, so this route intentionally stays before auth().
+        if path.startswith(PANEL_PATH+"/__preview_asset/"):
+            relative=unquote(path[len(PANEL_PATH+"/__preview_asset/"):])
+            segments=relative.split("/")
+            mime_map={
+                ".webp":"image/webp",".png":"image/png",".jpg":"image/jpeg",
+                ".jpeg":"image/jpeg",".gif":"image/gif",".avif":"image/avif",
+                ".svg":"image/svg+xml",".woff":"font/woff",
+                ".woff2":"font/woff2",".ttf":"font/ttf",".otf":"font/otf"
+            }
+            extension=os.path.splitext(relative)[1].lower()
+            if (not 1<=len(relative)<=200 or not re.fullmatch(r"[A-Za-z0-9._/-]+",relative)
+                or any(not part or part in (".","..") or part.startswith(".")
+                       for part in segments)
+                or extension not in mime_map):
+                self.send_data("Not found",404); return
+            root=os.path.realpath(os.path.dirname(SITE_INDEX))
+            filename=os.path.realpath(os.path.join(root,*segments))
+            if not filename.startswith(root+os.sep):
+                self.send_data("Not found",404); return
+            try:
+                stat=os.stat(filename)
+                if not os.path.isfile(filename) or not 1<=stat.st_size<=8*1024*1024:
+                    raise OSError("asset size")
+                with open(filename,"rb") as stream:
+                    body=stream.read(8*1024*1024+1)
+                if len(body)!=stat.st_size:
+                    raise OSError("asset changed")
+            except OSError:
+                self.send_data("Not found",404); return
+            self.send_response(200)
+            self.send_header("Content-Type",mime_map[extension])
+            self.send_header("Content-Length",str(len(body)))
+            self.send_header("Cache-Control","public, max-age=86400")
+            self.send_header("Cross-Origin-Resource-Policy","cross-origin")
+            self.send_header("Access-Control-Allow-Origin","*")
+            self.send_header("X-Content-Type-Options","nosniff")
+            self.send_header("Referrer-Policy","no-referrer")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if path==PANEL_PATH+"/__health":
             self.send_response(200)
             self.send_header("Content-Type","text/plain; charset=utf-8")
@@ -3999,7 +4044,7 @@ class Handler(BaseHTTPRequestHandler):
                     source=validate_html(get_preset(preset_id)["html"] if use_preset else form.get("html",""))
                     if path.endswith("/preview-html"):
                         # A card preview does not create or replace any draft.
-                        self.send_json({"document":preview_document(source,externalize_inline_assets,DOMAIN)}); return
+                        self.send_json({"document":preview_document(source,externalize_inline_assets,DOMAIN,PANEL_PATH)}); return
                     with STATE_LOCK: install_private_file(SITE_DRAFT,source.encode("utf-8"))
                 self.redirect("/settings")
             except ValueError as exc:
