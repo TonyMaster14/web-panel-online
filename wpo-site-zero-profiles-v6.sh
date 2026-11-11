@@ -123,19 +123,19 @@ manager_path,panel_path,reference_path,stage=map(Path,sys.argv[1:])
 manager=manager_path.read_text(encoding="utf-8")
 panel=panel_path.read_text(encoding="utf-8")
 reference=reference_path.read_text(encoding="utf-8")
-# install-panel.sh is Bash containing two separate Python heredocs. Parse
-# those Python scripts individually, not the entire Bash installer.
+# The Bash installer embeds two Python programs under separate heredocs.
 def embedded_python(text,opening):
-    marker=opening+"\\n"
-    if text.count(marker)!=1: raise RuntimeError("Невозможно найти исходник "+opening)
+    marker=opening+"\n"
+    if text.count(marker)!=1:
+        raise RuntimeError("Не найден исходник "+opening)
     pos=text.index(marker)+len(marker)
-    end=text.find("\\nPY\\n",pos)
-    if end<0: raise RuntimeError("Не найден конец встроенного Python-кода")
-    result=text[pos:end]+"\\n"
-    ast.parse(result)
-    return result
-manager_reference=embedded_python(reference,'''cat > "$MANAGER" <<'PY\'''')
-panel_reference=embedded_python(reference,'''cat > "$APP_FILE" <<'PY\'''')
+    end=text.find("\nPY\n",pos)
+    if end<0: raise RuntimeError("Не найден конец Python кода")
+    source=text[pos:end]+"\n"
+    ast.parse(source)
+    return source
+manager_reference=embedded_python(reference, """cat > "$MANAGER" <<'PY'""")
+panel_reference=embedded_python(reference, """cat > "$APP_FILE" <<'PY'""")
 
 def func(text,name):
     tree=ast.parse(text)
