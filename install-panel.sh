@@ -2792,6 +2792,12 @@ def direct_profile_token(user_id,secret):
 def direct_profile_url(user,secret=None):
     selected=str(secret if secret is not None else user.get("secret", ""))
     return "https://"+DOMAIN+DIRECT_PROFILE_PREFIX+direct_profile_token(user.get("id", ""),selected)
+def happ_profile_title(value,fallback="WEB PANEL ONLINE"):
+    # Happ documents a maximum 25-character profile-title. Normalize only
+    # presentation text; never alter the client's saved account or link keys.
+    name=" ".join(re.sub(r"[\\x00-\\x1f\\x7f]+"," ",str(value or "")).split()).strip()
+    return (name or fallback)[:25]
+
 def direct_profile_config(user,secret):
     # Older standalone users may lack connection_id on disk. Resolve them the
     # same way as the users page before looking up per-connection routing.
@@ -2804,18 +2810,23 @@ def direct_profile_config(user,secret):
     # A standalone profile may belong to a remote node. Prefer its saved
     # node metadata; the local VPS country is only a fallback for legacy users.
     node_location=selected.get("node_location")
-    title=node_api.location_prefix(node_location if isinstance(node_location,dict)
-                                   else node_api.load_location(LOCATION_FILE))
-    link=proxy_link(selected["protocol"],secret,selected.get("backend_port",443),title,selected.get("username",""))
+    node_title=node_api.location_prefix(node_location if isinstance(node_location,dict)
+                                        else node_api.load_location(LOCATION_FILE))
+    # The Xray outbound keeps its flag/country node name. JSON remarks
+    # gets a visible client heading as a fallback if Happ imports the JSON
+    # as a standalone config and ignores the subscription's HTTP title.
+    profile_title=happ_profile_title(selected.get("name"),"WEB PANEL ONLINE")
+    display_title=profile_title+" · "+node_title
+    link=proxy_link(selected["protocol"],secret,selected.get("backend_port",443),node_title,selected.get("username",""))
     # A broken routing store must not silently downgrade a routed profile to a
     # plain VLESS link: surface a retryable error instead.
     profiles=routing_store.load(ROUTING_FILE).get("profiles",{})
     profile=profiles.get(str(connection["id"]))
-    # In a single Happ JSON, remarks names the server entry. The profile
-    # title is supplied separately through the profile-title response header.
+    # HTTP profile-title controls the subscription heading in Happ. The
+    # JSON remarks also includes a human-readable label for direct import.
     if isinstance(profile,dict) and profile.get("enabled",True):
-        return routing_store.xray_config(link,profile,title)
-    return routing_store.plain_xray_config(link,title)
+        return routing_store.xray_config(link,profile,display_title)
+    return routing_store.plain_xray_config(link,display_title)
 def subscription_device_name(user_agent):
     value=str(user_agent or "").lower()
     if "android" in value: return "Android"
@@ -4217,7 +4228,8 @@ class Handler(BaseHTTPRequestHandler):
             state=traffic()
             up=sum(int(state.get(u["id"],{}).get("up",0)) for u in result["users"])
             down=sum(int(state.get(u["id"],{}).get("down",0)) for u in result["users"])
-            headers={"profile-title":"base64:"+base64.b64encode(result["name"].encode()).decode(),"profile-update-interval":"6",
+            subscription_title=happ_profile_title(result.get("name"),"WEB PANEL ONLINE")
+            headers={"profile-title":"base64:"+base64.b64encode(subscription_title.encode("utf-8")).decode(),"profile-update-interval":"6",
                      "profile-web-page-url":"https://"+DOMAIN+SUB_PREFIX+token,
                      "subscription-userinfo":f"upload={up}; download={down}; total=0; expire=0"}
             if result["limited"]: headers.update({"X-Hwid-Active":"true","subscription-always-hwid-enable":"true"})
@@ -4236,11 +4248,13 @@ class Handler(BaseHTTPRequestHandler):
             merged_remote=routing_store.merge_profiles(selected_routing)
             routing_entries=list(zip(lines[:local_count],local_routing))
             routing_entries.extend((line,merged_remote) for line in lines[local_count:])
-            xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,"")
+            # Do not send anonymous node-only JSON remarks. Happ may display
+            # these remarks as the connection heading for JSON imports.
+            xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,subscription_title)
             failover=bool(lines)
             if failover:
                 try:
-                    auto_config=routing_store.failover_xray_config(lines,merged_remote,"🇪🇺 Автовыбор")
+                    auto_config=routing_store.failover_xray_config(lines,merged_remote,subscription_title+" · 🇪🇺 Автовыбор")
                     xray_configs.insert(0,auto_config)
                 except routing_store.RoutingError: pass
             if requested_format in ("xray","xray-json","json") or (happ and (selected_routing or failover)):
@@ -4283,7 +4297,7 @@ class Handler(BaseHTTPRequestHandler):
             config=direct_profile_config(matched,matched_secret)
             # Keep the Happ profile title (client/device name) separate from
             # config.remarks, which is the server/node name inside the profile.
-            title=str(matched.get("name") or "VLESS")
+            title=happ_profile_title(matched.get("name"),"WEB PANEL ONLINE")
             usage=traffic().get(str(matched.get("id","")), {})
             raw_up=max(0,int(usage.get("up",0) or 0))
             raw_down=max(0,int(usage.get("down",0) or 0))
