@@ -1451,12 +1451,12 @@ gallery.addEventListener('click',async event=>{
     if(response.redirected)throw new Error('Сессия завершена. Войдите в панель заново.');
     const payload=await response.json().catch(()=>{throw new Error('Сервер вернул неверный ответ предпросмотра.');});
     if(!response.ok||typeof payload.document!=='string')throw new Error(payload.message||'Ошибка загрузки шаблона.');
-    if(controller.signal.aborted)return;
+    if(controller.signal.aborted||previewRequest!==controller||!previewDialog.open)return;
     iframe.srcdoc=payload.document;
     iframe.hidden=false;previewEmpty.hidden=true;
     previewNote.textContent='Предпросмотр без публикации · рабочий сайт не изменён';
   }catch(error){
-    if(!previewDialog.open)return;
+    if(!previewDialog.open||previewRequest!==controller)return;
     const message=controller.signal.aborted?'Истекло время загрузки предпросмотра. Попробуйте снова.':error.message;
     previewEmpty.textContent=message;previewEmpty.hidden=false;
     previewNote.textContent='Шаблон не был опубликован.';
@@ -1481,13 +1481,16 @@ gallery.addEventListener('submit',async event=>{
   submit.textContent='Публикуем…';
   galleryStatus.textContent='Публикуем «'+name+'». Проверяем работу сайта…';
   galleryStatus.classList.remove('preset-error','preset-success');
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),150000);
   try{
     const response=await fetch(form.action,{
       method:'POST',
       headers:{'X-WPP-Async':'1'},
       body:new URLSearchParams(new FormData(form)),
       credentials:'same-origin',
-      cache:'no-store'
+      cache:'no-store',
+      signal:controller.signal
     });
     if(response.redirected)throw new Error('Сессия завершена. Войдите в панель заново.');
     const data=await response.json().catch(()=>{throw new Error('Сервер не ответил на публикацию. Проверьте статус сайта.');});
@@ -1497,9 +1500,13 @@ gallery.addEventListener('submit',async event=>{
     window.showPanelToast?.('Шаблон «'+name+'» опубликован.','success');
   }catch(error){
     galleryStatus.classList.add('preset-error');
-    galleryStatus.textContent=error.message;
-    window.showPanelToast?.(error.message,'error');
+    const message=controller.signal.aborted
+      ? 'Сервер долго не отвечает. Проверьте сайт на домене перед повторной публикацией.'
+      : error.message;
+    galleryStatus.textContent=message;
+    window.showPanelToast?.(message,'error');
   }finally{
+    clearTimeout(timeout);
     submit.textContent=original;
     buttons.forEach(button=>button.disabled=false);
     publishing=false;
