@@ -426,18 +426,36 @@ def _vless_outbound(link):
                 extra = candidate
         except json.JSONDecodeError:
             pass
-    stream = {
-        "network": "xhttp", "security": one("security", "tls"),
-        "tlsSettings": {"serverName": one("sni", parsed.hostname), "fingerprint": one("fp", "chrome"),
-                        "alpn": [x for x in one("alpn", "h2").split(",") if x]},
-        "xhttpSettings": {"host": one("host", parsed.hostname), "path": one("path", "/"),
-                          "mode": one("mode", "auto")},
-    }
-    if extra:
-        stream["xhttpSettings"]["extra"] = extra
+    if one("security") == "reality":
+        if one("type", "tcp") not in ("tcp", "raw"):
+            raise RoutingError("Reality поддерживается только через TCP.")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{43}", one("pbk")):
+            raise RoutingError("Некорректный открытый ключ Reality.")
+        if not re.fullmatch(r"(?:[0-9a-f]{2}){1,8}", one("sid")):
+            raise RoutingError("Некорректный shortId Reality.")
+        stream = {
+            "network": "tcp", "security": "reality",
+            "realitySettings": {
+                "serverName": one("sni"), "fingerprint": one("fp", "chrome"),
+                "password": one("pbk"), "shortId": one("sid"), "spiderX": one("spx", "/"),
+            },
+        }
+        client = {"id": unquote(parsed.username), "encryption": "none",
+                  "flow": "xtls-rprx-vision"}
+    else:
+        stream = {
+            "network": "xhttp", "security": one("security", "tls"),
+            "tlsSettings": {"serverName": one("sni", parsed.hostname), "fingerprint": one("fp", "chrome"),
+                            "alpn": [x for x in one("alpn", "h2").split(",") if x]},
+            "xhttpSettings": {"host": one("host", parsed.hostname), "path": one("path", "/"),
+                              "mode": one("mode", "auto")},
+        }
+        if extra:
+            stream["xhttpSettings"]["extra"] = extra
+        client = {"id": unquote(parsed.username), "encryption": one("encryption", "none")}
     return {"tag": "proxy", "protocol": "vless", "settings": {"vnext": [{
         "address": parsed.hostname, "port": parsed.port or 443,
-        "users": [{"id": unquote(parsed.username), "encryption": one("encryption", "none")}],
+        "users": [client],
     }]}, "streamSettings": stream}
 
 

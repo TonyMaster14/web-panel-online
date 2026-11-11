@@ -44,6 +44,7 @@ def defaults():
     return [
         _base("vless-direct", "VLESS XHTTP · напрямую", "vless", route="direct", fingerprint="chrome", mode="auto", uplink_method="POST"),
         _base("hysteria-primary", "Hysteria2 · основной", "hysteria", port=8443),
+        _base("vless-reality", "VLESS TCP Reality · Vision", "vless", route="reality"),
         _base("mtproto-primary", "MTProto · отдельный порт", "mtproto", port=0),
         _base("web-primary", "Web Proxy · HTTPS", "web", port=0),
         _base("awg20-primary", "AmneziaWG 2.0 · отдельный профиль", "awg20", port=0),
@@ -263,6 +264,7 @@ def inbound_tag(connection):
     override = connection.get("advanced", {}).get("inbound", {})
     if override.get("tag"): return override["tag"]
     bucket = _xray_bucket(connection)
+    if bucket == "reality": return "vless-reality"
     return "hysteria2" if bucket == "hysteria" else "vless-xhttp" + ("-" + bucket if bucket and bucket != "direct" else "")
 
 
@@ -317,7 +319,7 @@ def validate(raw, existing=None):
               "config": {}, "advanced": {}}
     if protocol == "vless":
         route = str(config.get("route", "direct"))
-        if route not in ("direct", "cdn"): raise ConnectionError("Неизвестный маршрут VLESS.")
+        if route not in ("direct", "cdn", "reality"): raise ConnectionError("Неизвестный маршрут VLESS.")
         provider = str(config.get("provider", "custom"))
         if provider not in PROVIDERS: raise ConnectionError("Неизвестный CDN-провайдер.")
         public_host = _host(config.get("public_host"), "публичный домен CDN", route == "cdn")
@@ -529,7 +531,7 @@ def apply_to_user(user, connection):
         user["transport"] = str(connection["config"].get("transport", "TCP")).upper()
     if user.get("protocol") == "vless":
         cfg = connection["config"]
-        if cfg.get("route") == "direct":
+        if cfg.get("route") != "cdn":
             user.pop("cdn", None)
         else:
             method = str(cfg.get("uplink_method", "GET")).lower()
@@ -589,6 +591,7 @@ def _xray_bucket(connection):
     if protocol == "hysteria": return "hysteria"
     if protocol != "vless": return None
     config = connection.get("config") if isinstance(connection.get("config"), dict) else {}
+    if config.get("route") == "reality": return "reality"
     if config.get("route") != "cdn": return "direct"
     provider = str(config.get("provider", "custom"))
     return provider if provider in ("beget", "selectel", "vk", "timeweb") else "cdn"

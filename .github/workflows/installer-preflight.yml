@@ -20,7 +20,25 @@ jobs:
             echo "Checking $script"
             bash -n "$script"
           done
-          python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py wpo-node-geo-v13.py wpo-node-autotemplate-v20.py wpo-relay-zero-profiles-patch.py
+          python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py wpp_reality.py tests/test_reality.py wpo-node-geo-v13.py wpo-node-autotemplate-v20.py wpo-relay-zero-profiles-patch.py
+      - name: Проверка встроенного Python менеджера и панели
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          script=Path("install-panel.sh").read_text(encoding="utf-8")
+          for label,target in (("менеджер",'cat > "$MANAGER" <<\'PY\''),
+                               ("панель",'cat > "$APP_FILE" <<\'PY\'')):
+              opener=target+"\n"
+              assert script.count(opener)==1, f"{label}: неверный маркер начала"
+              body=script.split(opener,1)[1].split("\nPY\n",1)[0]
+              compile(body,label+".py","exec")
+              print(f"OK {label}: {len(body)} символов")
+          PY
+      - name: Регрессии Reality и неизменность XHTTP
+        shell: bash
+        run: |
+          python3 -m unittest discover -s tests -p 'test_reality.py' -v
       - name: Сверка 26 встроенных Nodes Lab с исходниками
         shell: bash
         run: |
@@ -75,6 +93,9 @@ jobs:
               "Go pinned source": 'TPROXY_REF="52a5feb7fac38f68da5afef9cedd9b3bfc8473ca"' in core,
               "domain/email preflight": 'valid_domain' in core and 'valid_email' in core,
               "node scripts independently validated": 'bash -n "$STAGE/$file"' in node,
+              "Reality private key redacted in UI": '.pop("privateKey",None)' in Path("install-panel.sh").read_text(),
+              "Reality raw config editor disabled": "const isReality=protocol.value==='vless'" in Path("wpp_ui.py").read_text(),
+              "Reality raw config blocked in backend": 'existing_config.get("route")=="reality"' in Path("install-panel.sh").read_text(),
           }
           for key,ok in checks.items():
               print(("OK" if ok else "FAIL"), key)
