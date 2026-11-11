@@ -2947,7 +2947,9 @@ def connections_with_runtime(connections):
         if tag and tag in by_tag: item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
         elif tag:
             bucket=connection_store._xray_bucket(item)
-            if protocol=="vless":
+            if protocol=="vless" and bucket=="reality":
+                base=reality.inbound([],reality.load_or_create("/opt/web-panel-proxy/xray/xray"))
+            elif protocol=="vless":
                 ports={"direct":10000,"cdn":10001,"beget":10002,"selectel":10003,"vk":10004,"timeweb":10005}
                 base={"tag":tag,"listen":"127.0.0.1","port":ports[bucket],"protocol":"vless",
                       "settings":{"clients":[],"decryption":"none"},
@@ -2979,6 +2981,10 @@ def proxy_link(protocol,secret,port=443,name="Proxy",username=""):
         name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
     label=quote(name or "Proxy",safe="")
     if protocol=="vless":
+        connection=proxy_connection(user)
+        if connection and (connection.get("config") or {}).get("route")=="reality":
+            return reality.client_link(secret,DOMAIN,name,
+                reality.load_or_create("/opt/web-panel-proxy/xray/xray"))
         route=cdn.vless_route(DOMAIN,user.get("cdn") if user else None)
         connection=proxy_connection(user)
         if connection:
