@@ -133,7 +133,7 @@ ui=once(ui,
 # Pass the installed site's real preset library into the node editor.
 panel=once(panel,
 "node_api.load_location(LOCATION_FILE),\"\",PANEL_PATH,self.csrf(),pending_rows)",
-"node_api.load_location(LOCATION_FILE),\"\",PANEL_PATH,self.csrf(),pending_rows,PRESETS)",
+"node_api.load_location(LOCATION_FILE),\"\",PANEL_PATH,self.csrf(),pending_rows,all_presets())",
 "pass site presets into node UI")
 
 old="""                elif operation=="rename":
@@ -155,7 +155,7 @@ new="""                elif operation=="rename":
                         if "site-template" not in selected.get("capabilities",[]):
                             raise node_api.NodeError("Эта нода не поддерживает шаблоны сайтов. Удалите её и подключите заново через новый установщик Node Agent.")
                         if next_template:
-                            preset=next((x for x in PRESETS if isinstance(x,dict) and str(x.get("id",""))==next_template),None)
+                            preset=next((x for x in all_presets() if isinstance(x,dict) and str(x.get("id",""))==next_template),None)
                             if not preset: raise node_api.NodeError("Выбранный шаблон не найден в библиотеке.")
                             page=str(preset.get("html",""))
                             if not page: raise node_api.NodeError("У выбранного шаблона отсутствует HTML.")
