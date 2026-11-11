@@ -31,7 +31,7 @@ def once(s,a,b,label):
 ui=get('wpp_ui.py'); panel=get('panel.py'); nodes=get('wpp_nodes.py'); subs=get('wpp_subscriptions.py')
 
 # Node page with the five agreed statuses, add wizard, rename and delete controls.
-start=ui.index('def nodes_ui('); end=ui.index('\n\nNODE_COUNTRIES',start)
+start=ui.index('def nodes_ui('); end=ui.index('\n\nCSS +=',start)
 new_nodes=r"""def nodes_ui(nodes, local, connection_token, path, csrf, pending_nodes=None):
     nodes=nodes if isinstance(nodes,list) else []
     local=local if isinstance(local,dict) else {}
