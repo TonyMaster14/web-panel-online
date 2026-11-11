@@ -270,6 +270,39 @@ apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends \
     build-essential libssl-dev util-linux zlib1g-dev
 echo "      OK"
 
+# Download pinned Caddy and Go archives WHILE fetching/building MTProxy.
+# They retain their original checksum checks before installation.
+# This overlaps network-bound work rather than removing verification.
+WPP_PREFETCH_DIR="$(mktemp -d /tmp/wpo-build-prefetch.XXXXXXXX)"
+WPP_CADDY_PREFETCH_PID=""
+WPP_GO_PREFETCH_PID=""
+trap 'rm -rf -- "$WPP_PREFETCH_DIR"' EXIT
+if [[ "$REUSE_CADDY" != 1 ]]; then
+    (
+        trap - ERR
+        curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --retry 2 --connect-timeout 20 --max-time 300 \
+            --output "$WPP_PREFETCH_DIR/caddy.tar.gz" \
+            'https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_linux_amd64.tar.gz'
+    ) &
+    WPP_CADDY_PREFETCH_PID=$!
+fi
+if [[ ! -x /opt/go1.26.5/bin/go && ! -x /usr/local/bin/tproxy-server ]]; then
+    (
+        trap - ERR
+        curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --retry 2 --connect-timeout 20 --max-time 300 \
+            --output "$WPP_PREFETCH_DIR/go.tar.gz" \
+            'https://go.dev/dl/go1.26.5.linux-amd64.tar.gz'
+    ) &
+    WPP_GO_PREFETCH_PID=$!
+fi
+if [[ -n "$WPP_CADDY_PREFETCH_PID" || -n "$WPP_GO_PREFETCH_PID" ]]; then
+    echo '      Starting verified Caddy/Go downloads in parallel with MTProxy setup.'
+fi
+
 # Direct MTProto must bypass any HTTPS/CDN proxy in front of the site domain.
 # Store the public IPv4 for MTProto links; WEB Proxy continues to use DOMAIN.
 MTPROTO_HOST="$(curl -4fsS --max-time 10 https://api.ipify.org 2>/dev/null || true)"
@@ -445,10 +478,17 @@ else
     caddy_archive="$(mktemp /tmp/caddy-linux-amd64.XXXXXX.tar.gz)"
     caddy_directory="$(mktemp -d /tmp/caddy-linux-amd64.XXXXXX)"
 
-    curl --fail --silent --show-error --location \
-        --proto '=https' --proto-redir '=https' --tlsv1.2 \
-        --output "$caddy_archive" \
-        "https://github.com/caddyserver/caddy/releases/download/v${caddy_version}/caddy_${caddy_version}_linux_amd64.tar.gz"
+    if [[ -n "$WPP_CADDY_PREFETCH_PID" ]] &&
+       wait "$WPP_CADDY_PREFETCH_PID" &&
+       [[ -s "$WPP_PREFETCH_DIR/caddy.tar.gz" ]]; then
+        mv "$WPP_PREFETCH_DIR/caddy.tar.gz" "$caddy_archive"
+        echo '      Caddy archive downloaded while other steps ran.'
+    else
+        curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --output "$caddy_archive" \
+            "https://github.com/caddyserver/caddy/releases/download/v${caddy_version}/caddy_${caddy_version}_linux_amd64.tar.gz"
+    fi
 
     test "$(sha512sum "$caddy_archive" | awk '{print $1}')" = "$caddy_sha512" ||
         die "Caddy checksum verification failed."
@@ -554,10 +594,17 @@ else
     go_archive="$(mktemp /tmp/go-linux-amd64.XXXXXX.tar.gz)"
     go_directory="$(mktemp -d /tmp/go-linux-amd64.XXXXXX)"
 
-    curl --fail --silent --show-error --location \
-        --proto '=https' --proto-redir '=https' --tlsv1.2 \
-        --output "$go_archive" \
-        "https://go.dev/dl/go${go_version}.linux-amd64.tar.gz"
+    if [[ -n "$WPP_GO_PREFETCH_PID" ]] &&
+       wait "$WPP_GO_PREFETCH_PID" &&
+       [[ -s "$WPP_PREFETCH_DIR/go.tar.gz" ]]; then
+        mv "$WPP_PREFETCH_DIR/go.tar.gz" "$go_archive"
+        echo '      Go archive downloaded while other steps ran.'
+    else
+        curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --output "$go_archive" \
+            "https://go.dev/dl/go${go_version}.linux-amd64.tar.gz"
+    fi
 
     test "$(sha256sum "$go_archive" | awk '{print $1}')" = "$go_sha256" ||
         die "Go checksum verification failed."
