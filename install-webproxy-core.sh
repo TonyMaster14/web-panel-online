@@ -220,8 +220,8 @@ echo
 echo "      Preparing primary secret..."
 command -v openssl >/dev/null 2>&1 || {
     export DEBIAN_FRONTEND=noninteractive
-    apt-get -o DPkg::Lock::Timeout=600 update
-    apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends openssl
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends openssl
 }
 SECRET="$(cat /etc/web-proxy-panel/primary-secret 2>/dev/null || true)"
 if ! valid_secret "$SECRET" && [[ -s /etc/tproxy-server/profiles.json ]]; then
@@ -264,9 +264,9 @@ esac
 echo
 echo "[2/10] Installing dependencies..."
 export DEBIAN_FRONTEND=noninteractive
-apt-get -o DPkg::Lock::Timeout=600 update
+apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
 # Include panel tools now so later installers can skip their extra APT refreshes.
-apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends \
+apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends \
     ca-certificates curl git openssl dnsutils nftables \
     build-essential libssl-dev util-linux zlib1g-dev \
     python3 iproute2 unzip xz-utils tar qrencode
