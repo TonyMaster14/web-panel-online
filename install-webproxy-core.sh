@@ -262,21 +262,9 @@ case "${ID:-}" in
 esac
 
 echo
-echo "[2/10] Installing dependencies..."
-WPO_APT_CLOCK=$SECONDS
-export DEBIAN_FRONTEND=noninteractive
-apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
-# Include panel tools now so later installers can skip their extra APT refreshes.
-apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends \
-    ca-certificates curl git openssl dnsutils nftables \
-    build-essential libssl-dev util-linux zlib1g-dev \
-    python3 iproute2 unzip xz-utils tar qrencode
-echo "      APT: $((SECONDS-WPO_APT_CLOCK)) сек."
-echo "      OK"
-
-# Download pinned Caddy and Go archives WHILE fetching/building MTProxy.
+# Download pinned Caddy and Go archives while APT updates and MTProxy builds.
 # They retain their original checksum checks before installation.
-# This overlaps network-bound work rather than removing verification.
+# All fetched bytes still pass the original pinned SHA checks before use.
 WPP_PREFETCH_DIR="$(mktemp -d /tmp/wpo-build-prefetch.XXXXXXXX)"
 WPP_CADDY_PREFETCH_PID=""
 WPP_GO_PREFETCH_PID=""
@@ -314,8 +302,20 @@ if [[ ! -x /opt/go1.26.5/bin/go && ! -x /usr/local/bin/tproxy-server ]]; then
     WPP_GO_PREFETCH_PID=$!
 fi
 if [[ -n "$WPP_CADDY_PREFETCH_PID" || -n "$WPP_GO_PREFETCH_PID" ]]; then
-    echo '      Starting verified Caddy/Go downloads in parallel with MTProxy setup.'
+    echo '      Starting pinned Caddy/Go downloads alongside system packages.'
 fi
+
+echo "[2/10] Installing dependencies..."
+WPO_APT_CLOCK=$SECONDS
+export DEBIAN_FRONTEND=noninteractive
+apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+# Include panel tools now so later installers can skip their extra APT refreshes.
+apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends \
+    ca-certificates curl git openssl dnsutils nftables \
+    build-essential libssl-dev util-linux zlib1g-dev \
+    python3 iproute2 unzip xz-utils tar qrencode
+echo "      APT: $((SECONDS-WPO_APT_CLOCK)) сек."
+echo "      OK"
 
 # Direct MTProto must bypass any HTTPS/CDN proxy in front of the site domain.
 # Store the public IPv4 for MTProto links; WEB Proxy continues to use DOMAIN.
