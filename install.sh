@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nodes Lab branch bootstrapper: install WPO 3.0 with finalized Nodes Lab v21.
+# Official WPO 3.0 bootstrapper: install the current main release with Nodes Lab v26.
 set -Eeuo pipefail
 umask 077
 
@@ -10,7 +10,7 @@ export GIT_CONFIG_NOSYSTEM=1
 export GIT_CONFIG_GLOBAL=/dev/null
 
 REPOSITORY="https://github.com/TonyMaster14/web-panel-online.git"
-RELEASE_REF="${WEB_PANEL_PROXY_REF:-nodes-lab}"
+RELEASE_REF="${WEB_PANEL_PROXY_REF:-main}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 [[ ${EUID:-1} -eq 0 ]] || die "Run this command with sudo or as root."
