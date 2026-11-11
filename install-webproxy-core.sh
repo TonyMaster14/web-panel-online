@@ -476,25 +476,29 @@ install -d -o caddy -g caddy -m 0750 /var/lib/caddy
 
 echo "      Installing official MTProxy..."
 if [[ "$REUSE_MT" != "1" ]]; then
-    # The pinned upstream installer invokes apt-get without a lock timeout.
-    # Ubuntu may start unattended-upgrades between our dependency step and
-    # this call, so add the same bounded wait used by the main installer.
+    # The base installer already ran a successful apt update AND installed
+    # every package the pinned MTProxy bootstrap requests. On a clean VPS,
+    # repeating both APT operations can add minutes without adding features.
+    # Verify the exact pinned bootstrap lines before skipping duplicates.
     MT_INSTALLER="$REPO_DIR/deploy/install-mtproxy.sh"
+    MT_APT='apt-get install -y --no-install-recommends ca-certificates curl build-essential libssl-dev util-linux zlib1g-dev'
     grep -Fxq 'apt-get update' "$MT_INSTALLER" ||
         die "Unexpected pinned MTProxy installer: apt update command not found."
-    grep -Fxq 'apt-get install -y --no-install-recommends ca-certificates curl build-essential libssl-dev util-linux zlib1g-dev' "$MT_INSTALLER" ||
-        die "Unexpected pinned MTProxy installer: apt install command not found."
+    grep -Fxq "$MT_APT" "$MT_INSTALLER" ||
+        die "Unexpected pinned MTProxy installer: expected packages changed."
     sed -i \
-        -e 's/^apt-get update$/apt-get -o DPkg::Lock::Timeout=600 update/' \
-        -e 's/^apt-get install /apt-get -o DPkg::Lock::Timeout=600 install /' \
+        -e 's/^apt-get update$/: # APT metadata already refreshed by the controller/' \
+        -e 's/^apt-get install -y --no-install-recommends ca-certificates curl build-essential libssl-dev util-linux zlib1g-dev$/: # MTProxy build dependencies already installed/' \
         "$MT_INSTALLER"
-    # Public Telegram metadata can be unreachable from some VPS networks.
-    # Bound the request and retain upstream format checks and atomic writes.
+    # The signed SHA-256 verified Telegram bootstrap snapshots are bundled.
+    # Use them for first install, saving potentially long network timeouts.
+    # The normal refresh timer can fetch newer metadata after installation.
+    # WEB_PANEL_PROXY_MTPROXY_OFFLINE=0 opts back into live downloads.
     MT_DOWNLOAD_HELPER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/mtproxy-download.sh"
     [[ -s "$MT_DOWNLOAD_HELPER" ]] || die "Package is incomplete: mtproxy-download.sh is missing."
     if (
         source "$MT_DOWNLOAD_HELPER"
-        "$MT_INSTALLER"
+        WEB_PANEL_PROXY_MTPROXY_OFFLINE="${WEB_PANEL_PROXY_MTPROXY_OFFLINE:-1}" "$MT_INSTALLER"
     ); then
         :
     else
