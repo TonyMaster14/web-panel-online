@@ -2489,20 +2489,31 @@ def install_private_file(path,raw):
         except FileNotFoundError: pass
         raise
 def restart_public_site():
-    r=subprocess.run(["systemctl","restart","tproxy-server.service"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=30)
-    if r.returncode or subprocess.run(["systemctl","is-active","--quiet","tproxy-server.service"],timeout=10).returncode:
-        raise RuntimeError((r.stderr or r.stdout or "tproxy-server failed to restart").strip())
-    # systemd considers the process active before both HTTP listeners have
-    # completed their startup. Wait for the local health endpoint instead of
-    # racing the first landing-page request.
-    for _ in range(30):
-        health=subprocess.run(["curl","-fsS","--noproxy","*","--max-time","2",
-                               "http://127.0.0.1:8081/healthz"],
-                              stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=4)
-        if health.returncode==0: break
-        time.sleep(0.5)
-    else:
-        raise RuntimeError("Relay health endpoint did not become ready after restart")
+    # wpo-site-always-on-v5: the site-serving relay is a separate always-on
+    # dependency, even when the operator has no WEB Proxy profiles.
+    service="tproxy-server.service"
+    restart=subprocess.run(["systemctl","restart",service],
+                           stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=30)
+    if restart.returncode:
+        raise RuntimeError("Не удалось запустить сервер сайта: "+(restart.stderr or restart.stdout or "systemctl restart failed")[-260:].strip())
+    # Only a short readiness probe is necessary. On failure, report the real
+    # systemd cause instead of a vague half-minute health timeout.
+    last=""
+    for attempt in range(14):
+        health=subprocess.run(["curl","-4fsS","--noproxy","*","--connect-timeout","1",
+                               "--max-time","2","http://127.0.0.1:8081/healthz"],
+                              stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=4)
+        if health.returncode==0 and health.stdout.strip()=="ok":
+            return
+        last=(health.stderr or "порт 8081 не отвечает").strip()
+        time.sleep(0.45)
+    state=subprocess.run(["systemctl","is-active",service],stdout=subprocess.PIPE,
+                         stderr=subprocess.DEVNULL,text=True,timeout=4).stdout.strip()
+    journal=subprocess.run(["journalctl","-u",service,"-n","10","--no-pager","--output=cat"],
+                           stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,timeout=5).stdout.strip()
+    print("site relay restart error:",state,(journal or last)[-900:],file=sys.stderr,flush=True)
+    raise RuntimeError("Сервер сайта не запустился (состояние "+(state or "unknown")+
+                       "). Проверьте журнал tproxy-server.service. "+last[-130:])
 def fetch_published(path):
     # wpo-publish-v4: verify the running relay through its dedicated local
     # public listener after restart. The admin UI is reached through Caddy,
@@ -4930,6 +4941,15 @@ if ! caddy validate --config "$CADDYFILE" --adapter caddyfile; then
     exit 1
 fi
 
+# The relay is also the public website server. It must not pull MTProxy
+# back on in economy mode just because the site needs to stay online.
+install -d -m 0755 /etc/systemd/system/tproxy-server.service.d
+cat > /etc/systemd/system/tproxy-server.service.d/30-wpp-public-site.conf <<'UNIT'
+[Unit]
+Wants=
+Wants=network-online.target
+UNIT
+chmod 0644 /etc/systemd/system/tproxy-server.service.d/30-wpp-public-site.conf
 systemctl daemon-reload
 echo "      Activating Caddy..."
 if ! systemctl restart caddy.service; then
@@ -4979,11 +4999,14 @@ find /srv/tproxy-site -type f -exec chmod 0640 {} +
 echo "[5/6] Starting service..."
 systemctl restart caddy.service
 if [[ -f /etc/web-proxy-panel/mtproxy-economy ]]; then
-    systemctl disable --now tproxy-server.service mtproxy.service >/dev/null 2>&1 || true
+    systemctl disable --now mtproxy.service >/dev/null 2>&1 || true
 else
-    systemctl restart tproxy-server.service
     systemctl restart mtproxy.service
 fi
+# A dedicated static site must remain available in both economy and
+# zero-WEB-user modes. sync_profiles() gives it a private standby capability.
+systemctl enable tproxy-server.service >/dev/null
+systemctl restart tproxy-server.service
 
 # Re-publish the retained author source through the current CSP-safe renderer.
 # This automatically repairs pages saved by the affected release where the
@@ -5007,9 +5030,9 @@ fi
 systemctl start tproxy-panel.service
 sleep 1
 
-required_units=(caddy.service tproxy-panel.service)
+required_units=(caddy.service tproxy-panel.service tproxy-server.service)
 if [[ ! -f /etc/web-proxy-panel/mtproxy-economy ]]; then
-    required_units+=(tproxy-server.service mtproxy.service)
+    required_units+=(mtproxy.service)
 fi
 for unit in "${required_units[@]}"; do
     systemctl is-active --quiet "$unit" || {
