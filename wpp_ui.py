@@ -320,6 +320,41 @@ CSS += """
 }
 """
  
+
+/* Compact centered QR modal shared by users, subscriptions and every protocol. */
+CSS += """
+.connection-dialog{
+  width:min(420px,calc(100vw - 40px));
+  max-width:calc(100vw - 40px);
+  max-height:88dvh;
+  overflow-y:auto;
+}
+.connection-header{padding:17px 18px 14px}
+.connection-body{padding:12px 18px 14px;gap:12px}
+.connection-info{padding:12px}
+.connection-person .client-initial{width:40px;height:40px;font-size:19px}
+.connection-info h3{font-size:18px}
+.connection-protocol{margin:12px 0 8px}
+.connection-meta{gap:8px}
+.qr-visual{padding:10px}
+.qr-canvas{width:228px;height:228px}
+.qr-caption{max-width:260px;margin:8px auto 0;font-size:10px}
+.connection-footer{padding:0 18px 16px}
+.connection-footer .primary{padding:10px}
+.connection-link{margin-top:8px}
+.connection-privacy{margin-top:12px;padding-top:12px}
+@media(max-width:700px){
+  .connection-dialog{width:min(390px,calc(100vw - 40px));max-width:calc(100vw - 40px);max-height:88dvh}
+  .connection-header{padding:15px 16px 12px}
+  .connection-body{padding:10px 16px 12px;gap:10px}
+  .connection-info{padding:11px}
+  .qr-visual{padding:9px}
+  .qr-canvas{width:196px;height:196px}
+  .connection-footer{padding:0 16px 14px}
+  .connection-privacy{margin-top:10px;padding-top:10px}
+}
+"""
+ 
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
 
 
