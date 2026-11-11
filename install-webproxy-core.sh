@@ -1249,15 +1249,22 @@ fi
 HTTPS_READY=0
 WPO_TLS_CLOCK=$SECONDS
 
-if [[ "$REUSE_EXISTING_HTTPS" == "1" ]] &&
-   curl -fsSI --max-time 10 "https://${DOMAIN}/" >/dev/null 2>&1; then
+# Prefer local loopback for TLS readiness: some VPS networks cannot route
+# their own public IP back to themselves. --resolve preserves the real SNI
+# and TLS certificate verification; it does not bypass HTTPS security.
+wpo_https_ready() {
+    curl -4fsSI --connect-timeout 2 --max-time 4 \
+         --resolve "$DOMAIN:443:127.0.0.1" "https://${DOMAIN}/" >/dev/null 2>&1 ||
+    curl -4fsSI --connect-timeout 2 --max-time 4 "https://${DOMAIN}/" >/dev/null 2>&1
+}
+if [[ "$REUSE_EXISTING_HTTPS" == "1" ]] && wpo_https_ready; then
     HTTPS_READY=1
     echo "      Existing HTTPS certificate/config is already working."
 else
     # Cert issuance normally completes quickly. Detect irreversible ACME
     # failures instead of waiting for the full retry window at a frozen 10%.
     for _ in $(seq 1 36); do
-        if curl -fsSI --connect-timeout 3 --max-time 4 "https://${DOMAIN}/" >/dev/null 2>&1; then
+        if wpo_https_ready; then
             HTTPS_READY=1
             break
         fi
