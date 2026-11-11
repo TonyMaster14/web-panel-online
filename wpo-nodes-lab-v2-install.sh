@@ -53,7 +53,7 @@ new_nodes=r"""def nodes_ui(nodes, local, connection_token, path, csrf, pending_n
     counts['online']+=1
     cards.append(f'''<article class="card wpo-node-card">
       <div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(lc))}</span>{status("local","online")}</div>
-      <div class="wpo-node-card-body"><small class="wpo-node-eyebrow">ОСНОВНАЯ НОДА</small><h3>{esc(lname)}</h3><div class="wpo-node-domain">{icon("link")}<span>Панель управления</span></div></div>
+      <div class="wpo-node-card-body"><small class="wpo-node-eyebrow">ОСНОВНАЯ НОДА</small><h3>{esc(lname)}</h3><a class="wpo-node-domain" href="https://{esc(connection_token)}" target="_blank" rel="noopener noreferrer">{icon("link")}<span>{esc(connection_token)}</span></a></div>
       <div class="wpo-node-card-bottom"><span>Локальный сервер</span><span class="muted">Основная</span></div>
       </article>''')
     for n in nodes:
@@ -137,7 +137,7 @@ setInterval(refresh,1000)})();'''
 ui=ui[:start]+new_nodes+ui[end:]
 # Expose the real current preset list to the node editor.
 anchor='body=nodes_ui([node_api.public_node(n) for n in node_api.load_nodes(NODES_FILE)],node_api.load_location(LOCATION_FILE),"",PANEL_PATH,self.csrf(),pending_rows)'
-panel=replace_once(panel,anchor,anchor[:-1]+',all_presets())','load site presets')
+panel=replace_once(panel,anchor,anchor[:-1].replace('LOCATION_FILE),"",PANEL_PATH','LOCATION_FILE),DOMAIN,PANEL_PATH')+',all_presets())','load site presets')
 # Old generated tokens are not installation jobs: never render cards until the installer reports progress.
 needle='and now-int(v.get("updated_at",v.get("created_at",now)) or now)<=3600]'
 panel=replace_once(panel,needle,'and now-int(v.get("updated_at",v.get("created_at",now)) or now)<=3600 and not (v.get("detail")=="Ожидает запуска установщика" and not v.get("domain"))]','filter idle pending page')
@@ -168,7 +168,7 @@ insert='''                elif operation=="pending-delete":
                             raise node_api.NodeError("Эта нода не поддерживает шаблоны сайтов. Требуется Node Agent версии 0.2 или новее.")
                         preset=allowed.get(template_id)
                         html_text=str(preset.get("html","")) if preset else ""
-                        asset_names=sorted(set(re.findall(r"/(preset-[A-Za-z0-9_.-]+\\\\.webp)",html_text)))
+                        asset_names=sorted(set(re.findall(r"/(preset-[A-Za-z0-9_.-]+\.webp)",html_text)))
                         assets=[]; total=0
                         for filename in asset_names:
                             file_path=os.path.join("/srv/tproxy-site",filename)
