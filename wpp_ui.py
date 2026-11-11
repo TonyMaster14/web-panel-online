@@ -1472,17 +1472,19 @@ gallery.addEventListener('submit',async event=>{
   event.preventDefault();
   if(publishing)return;
   const name=form.dataset.presetName||'этот шаблон';
-  if(!confirm('Опубликовать «'+name+'» на основном домене?'))return;
+  // wpo-presets-ui-v3 — one click publishes immediately without a second
+  // confirmation. Only the clicked card enters busy state.
   publishing=true;
   const submit=form.querySelector('button[type="submit"]');
-  const buttons=gallery.querySelectorAll('.preset-apply button');
-  buttons.forEach(button=>button.disabled=true);
+  const card=form.closest('.preset-card');
+  submit.disabled=true;
+  card?.classList.add('preset-publishing');
   const original=submit.textContent;
-  submit.textContent='Публикуем…';
-  galleryStatus.textContent='Публикуем «'+name+'». Проверяем работу сайта…';
+  submit.textContent='Применяем…';
+  galleryStatus.textContent='Применяем «'+name+'» и проверяем опубликованный сайт…';
   galleryStatus.classList.remove('preset-error','preset-success');
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),150000);
+  const timeout=setTimeout(()=>controller.abort(),60000);
   try{
     const response=await fetch(form.action,{
       method:'POST',
@@ -1496,8 +1498,13 @@ gallery.addEventListener('submit',async event=>{
     const data=await response.json().catch(()=>{throw new Error('Сервер не ответил на публикацию. Проверьте статус сайта.');});
     if(!response.ok||data.ok!==true)throw new Error(data.message||'Не удалось применить шаблон.');
     galleryStatus.classList.add('preset-success');
-    galleryStatus.textContent='✓ «'+name+'» опубликован. Сайт обновлён.';
-    window.showPanelToast?.('Шаблон «'+name+'» опубликован.','success');
+    galleryStatus.textContent='✓ «'+name+'» применён. ';
+    const link=document.createElement('a');
+    link.href=new URL('/?wpp-view='+Date.now(),window.location.origin).href;
+    link.target='_blank';link.rel='noopener noreferrer';
+    link.textContent='Открыть сайт';
+    galleryStatus.appendChild(link);
+    window.showPanelToast?.('Шаблон «'+name+'» применён.','success');
   }catch(error){
     galleryStatus.classList.add('preset-error');
     const message=controller.signal.aborted
@@ -1508,13 +1515,14 @@ gallery.addEventListener('submit',async event=>{
   }finally{
     clearTimeout(timeout);
     submit.textContent=original;
-    buttons.forEach(button=>button.disabled=false);
+    submit.disabled=false;
+    card?.classList.remove('preset-publishing');
     publishing=false;
   }
 });
 })();
 </script>'''
-    return f'''<section class="card preset-section"><div class="card-title"><div><h2>Пресеты заглушек</h2><p class="muted">Готовые и собственные страницы</p></div></div><div id="presetGallery" class="preset-grid" data-preview-url="{esc(path)}/preview-html" data-csrf="{esc(csrf)}">{create_card}{cards}</div><p id="presetGalleryStatus" class="preset-gallery-status" role="status">Нажмите «Предпросмотр», чтобы сразу увидеть сайт. «Применить» публикует шаблон на домене.</p></section>
+    return f'''<section class="card preset-section"><div class="card-title"><div><h2>Пресеты заглушек</h2><p class="muted">Готовые и собственные страницы</p></div></div><div id="presetGallery" class="preset-grid" data-presets-ui="v3" data-preview-url="{esc(path)}/preview-html" data-csrf="{esc(csrf)}">{create_card}{cards}</div><p id="presetGalleryStatus" class="preset-gallery-status" role="status">Нажмите «Предпросмотр», чтобы сразу увидеть сайт. «Применить» публикует шаблон на домене.</p></section>
 <dialog id="customPresetDialog" class="create-dialog preset-create-dialog"><div class="dialog-head"><div><h2>Своя заглушка</h2><small>После сохранения она появится среди остальных пресетов</small></div><button type="button" data-close-dialog aria-label="Закрыть">×</button></div><form method="post" action="{esc(path)}/custom-preset"><input type="hidden" name="csrf" value="{esc(csrf)}"><input type="hidden" name="operation" value="create"><div class="form-grid"><div><label for="customPresetName">Название</label><input id="customPresetName" name="name" maxlength="80" required placeholder="Например, Скоро открытие"></div><div><label for="customPresetDescription">Краткое описание</label><input id="customPresetDescription" name="description" maxlength="180" placeholder="Что увидит посетитель"></div></div><label for="customPresetHtml">HTML заглушки</label><div class="editor-bar"><span>index.html</span><i>до 1 МБ</i></div><textarea class="code-editor" id="customPresetHtml" name="html" spellcheck="false" required placeholder="<!doctype html>…"></textarea><div class="actions create-actions"><button type="button" data-close-dialog>Отмена</button><button class="primary">Сохранить в пресеты</button></div></form></dialog>
 <dialog id="previewDialog" class="preview-dialog"><div class="preview-top"><strong id="previewHeading">Предпросмотр заглушки</strong><div class="actions"><div class="range"><button type="button" class="selected" id="previewDesktop">Компьютер</button><button type="button" id="previewPhone">Телефон</button></div><button type="button" data-close-dialog aria-label="Закрыть предпросмотр">×</button></div></div><div id="previewStage" class="preview-stage"><p id="previewEmpty" class="preset-preview-empty" role="status">Загружаем страницу…</p><iframe id="landingPreview" hidden title="Изолированный предпросмотр заглушки" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe></div><p id="previewStatus" class="preview-caption" role="status">Предпросмотр не изменяет рабочий сайт</p></dialog>
 {js}'''
@@ -1699,6 +1707,40 @@ document.querySelectorAll('[data-component-install]').forEach(button=>button.add
 loadPanel();loadComponents();setInterval(loadPanel,15000);
 </script>'''
 
+
+
+# wpo-presets-compact-v3 — visibly smaller cards. Append after all previous
+# styles; selectors are scoped to the gallery and preserve full descriptions.
+CSS += '''
+#presetGallery.preset-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:stretch}
+#presetGallery .preset{position:relative;display:flex;flex-direction:column;box-sizing:border-box;
+ min-height:128px;padding:10px 9px 9px;border:1px solid var(--line);border-radius:12px;
+ background:var(--raised);box-shadow:none;overflow:visible;gap:0}
+#presetGallery .preset .preset-art{display:grid;place-items:center;width:29px;height:27px;
+ min-height:27px;margin:0 0 6px;padding:0;border:0;font-size:21px;line-height:1}
+#presetGallery .preset b{font-size:11px;line-height:1.25;margin:0;width:100%;
+ letter-spacing:-.01em;overflow-wrap:anywhere}
+#presetGallery .preset p{font-size:10px;line-height:1.35;margin:4px 0 8px;
+ color:var(--muted);width:100%;overflow-wrap:anywhere}
+#presetGallery .preset>.actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+ align-items:end;gap:5px;margin:auto 0 0;padding:0;width:100%}
+#presetGallery .preset>.actions form{margin:0;min-width:0}
+#presetGallery .preset>.actions button{margin:0;padding:6px 2px;min-height:27px;
+ font-size:10px;line-height:1.15;width:100%;border-radius:7px;white-space:nowrap}
+#presetGallery .preset-delete{position:absolute;top:5px;right:5px}
+#presetGallery .preset-delete .icon-btn{width:24px;height:24px;padding:4px}
+#presetGallery .preset-create-mark{width:29px;height:29px;margin:0 0 6px;
+ font-size:19px;line-height:1}
+#presetGallery .preset-create .btn{width:100%;margin:auto 0 0;padding:7px 5px;
+ min-height:27px;font-size:10px}
+#presetGallery .preset-publishing{border-color:var(--accent)}
+#presetGallery .preset-publishing>.actions button:disabled{opacity:1;cursor:progress}
+.preset-gallery-status a{display:inline-block;margin-left:7px;color:var(--accent);text-decoration:underline}
+@media(max-width:1450px){#presetGallery.preset-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:1080px){#presetGallery.preset-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:740px){#presetGallery.preset-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:430px){#presetGallery.preset-grid{grid-template-columns:1fr}}
+'''
 
 CSS += '''
 .node-country-control{display:flex;align-items:center;gap:11px}.node-country-control img{display:block;width:30px;height:22px;flex:0 0 auto;object-fit:cover;border:1px solid var(--line);border-radius:5px;background:var(--raised)}.node-country-control input{flex:1;min-width:0}.node-country-field>small{display:block;margin-top:7px;color:var(--muted);font-size:10px;line-height:1.5}
