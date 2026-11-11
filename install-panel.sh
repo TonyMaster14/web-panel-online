@@ -2812,12 +2812,10 @@ def direct_profile_config(user,secret):
     node_location=selected.get("node_location")
     node_title=node_api.location_prefix(node_location if isinstance(node_location,dict)
                                         else node_api.load_location(LOCATION_FILE))
-    # The Xray outbound retains its flag/country node name, while the
-    # imported Happ profile heading must match the client's saved name.
-    # Do not append the server location to JSON remarks: the server name
-    # is already carried by the outbound tag.
-    profile_title=happ_profile_title(selected.get("name"),"WEB PANEL ONLINE")
-    display_title=profile_title
+    # Happ uses the HTTP profile-title for the client's group heading.
+    # Xray JSON remarks are the child node name: keep only flag/country,
+    # without repeating the client's name inside the node list.
+    display_title=node_title
     link=proxy_link(selected["protocol"],secret,selected.get("backend_port",443),node_title,selected.get("username",""))
     # A broken routing store must not silently downgrade a routed profile to a
     # plain VLESS link: surface a retryable error instead.
@@ -4249,13 +4247,13 @@ class Handler(BaseHTTPRequestHandler):
             merged_remote=routing_store.merge_profiles(selected_routing)
             routing_entries=list(zip(lines[:local_count],local_routing))
             routing_entries.extend((line,merged_remote) for line in lines[local_count:])
-            # Do not send anonymous node-only JSON remarks. Happ may display
-            # these remarks as the connection heading for JSON imports.
-            xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,subscription_title)
+            # Happ displays profile-title as the subscription heading; JSON
+            # remarks must remain only the child node label (flag/country).
+            xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,"")
             failover=bool(lines)
             if failover:
                 try:
-                    auto_config=routing_store.failover_xray_config(lines,merged_remote,subscription_title+" · 🇪🇺 Автовыбор")
+                    auto_config=routing_store.failover_xray_config(lines,merged_remote,"🇪🇺 Автовыбор")
                     xray_configs.insert(0,auto_config)
                 except routing_store.RoutingError: pass
             if requested_format in ("xray","xray-json","json") or (happ and (selected_routing or failover)):
