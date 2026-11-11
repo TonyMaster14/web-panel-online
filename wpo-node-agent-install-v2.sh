@@ -29,19 +29,24 @@ echo '=== WEB PANEL ONLINE — Node Agent 0.2 ==='
 read -r -p 'Домен ноды (например, de.example.com): ' DOMAIN
 DOMAIN=$(printf '%s' "$DOMAIN" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]')
 [[ "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || { report error 'Некорректный домен.'; echo 'Некорректный домен.'; exit 2; }
-# Allow correction without reinstalling; trim accidental paste artifacts at the edges.
+# Email is required for Let's Encrypt. Fix accidental non-ASCII paste
+# characters at the edges, but never silently modify the middle of an address.
 for EMAIL_ATTEMPT in 1 2 3; do
-  IFS= read -r -p "Email для Let's Encrypt: " EMAIL
-  EMAIL="$(python3 - "$EMAIL" <<'PY_EMAIL_TRIM'
-import sys
-print(sys.argv[1].strip(' \t\r\n\ufeff\u200b\u2060'))
-PY_EMAIL_TRIM
-)"
-  if python3 - "$EMAIL" <<'PY_VALIDATE_EMAIL'
+  if ! IFS= read -r -p "Email для Let's Encrypt (латиница, EN): " EMAIL; then
+    report error 'Email не введён.'
+    echo 'Email не введён. Установка остановлена.'
+    exit 2
+  fi
+  if VALIDATED_EMAIL="$(python3 - "$EMAIL" <<'PY_VALIDATE_EMAIL'
 import re
 import sys
 
-value = sys.argv[1]
+original = sys.argv[1]
+value = original.strip(" \t\r\n\ufeff\u200b\u2060")
+while value and not value[0].isascii():
+    value = value[1:]
+while value and not value[-1].isascii():
+    value = value[:-1]
 local, sep, host = value.partition("@")
 local_ok = (
     1 <= len(local) <= 64
@@ -53,22 +58,24 @@ host_ok = re.fullmatch(
     r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}",
     host,
 ) is not None
-valid = value.isascii() and len(value) <= 254 and bool(sep) and local_ok and host_ok
-if not valid:
-    invalid = sorted({f"U+{ord(ch):04X}" for ch in value if ord(ch) > 127 or ord(ch) < 32})
-    if invalid:
-        print("Найдены посторонние символы: " + ", ".join(invalid), file=sys.stderr)
-sys.exit(0 if valid else 1)
+if value.isascii() and len(value) <= 254 and sep and local_ok and host_ok:
+    if value != original:
+        print("Убраны случайные символы по краям email.", file=sys.stderr)
+    print(value)
+else:
+    print("Проверьте email: только латинские буквы, без лишних символов.", file=sys.stderr)
+    sys.exit(1)
 PY_VALIDATE_EMAIL
-  then
+)"; then
+    EMAIL="$VALIDATED_EMAIL"
     break
   fi
-  echo 'Некорректный email. Наберите адрес вручную английскими буквами, например name@example.com.'
   if [[ "$EMAIL_ATTEMPT" == "3" ]]; then
-    report error 'Некорректный email после трёх попыток.'
+    report error 'Email указан некорректно после трёх попыток.'
     echo 'Установка остановлена: неверный email.'
     exit 2
   fi
+  echo 'Повторите ввод email в английской раскладке.'
 done
 . /etc/os-release
 case "$ID" in
