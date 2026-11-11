@@ -45,7 +45,7 @@ once(
     'Наведение на домен')
 once(
     '<div class="wpo-node-card-bottom"><span>Локальный сервер</span><span class="muted">Основная</span></div>',
-    '<div class="wpo-node-card-bottom"><span class="muted">Основная нода панели</span></div>',
+    '<div class="wpo-node-card-bottom"><span class="muted">Основная</span></div>',
     'Убрать Локальный сервер')
 once(
     '<h2>Серверная сеть</h2>',
