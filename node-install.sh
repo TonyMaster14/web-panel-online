@@ -1665,7 +1665,1530 @@ echo "Резервная копия: $BACKUP"
 echo 'GitHub main не изменён. На VPS ноды изменения не требуются.'
 __WPO_EMBED_V13_END_736a4b__
 
-# __WPO_APPEND_REMAINING__
+cat > "$STAGE/wpo-nodes-lab-v14-install.sh" <<'__WPO_EMBED_V14_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS с панелью.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Файл не найден: $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-aligned-v9' "$UI" || { echo 'Требуется установленный Nodes Lab v9 или новее. Ничего не изменено.'; exit 1; }
+
+if grep -Fq '# wpo-node-visual-v14' "$UI"; then
+  echo 'Nodes Lab v14 уже установлен.'
+  exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v14-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+
+path=Path(sys.argv[1])
+src=path.read_text(encoding='utf-8')
+
+def once(old,new,label):
+    global src
+    hits=src.count(old)
+    if hits!=1:
+        raise RuntimeError(f'{label}: найдено {hits} совпадений вместо одного. Файл не изменён.')
+    src=src.replace(old,new,1)
+
+# Preserve both node columns and their existing widths; stretch each card in
+# one grid row to the height of the taller card.
+once(
+    '.wpo-node-grid{display:grid;grid-template-columns:repeat(2,minmax(0,calc((100% - 36px)/5)));gap:12px;align-items:start;justify-content:start;grid-auto-flow:row}',
+    '.wpo-node-grid{display:grid;grid-template-columns:repeat(2,minmax(0,calc((100% - 36px)/5)));gap:12px;align-items:stretch;justify-content:start;grid-auto-flow:row}',
+    'Одинаковая высота Нидерландов и Чехии')
+
+# On additional nodes, the status becomes the right-most control in the header.
+# The primary node markup is intentionally left untouched.
+once(
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(code))}</span><div class="wpo-node-label"><h3 title="{esc(name)}">{esc(name)}</h3><small>{esc(country)}</small></div><div class="wpo-node-head-tools">{status(uid,state)}<div class="wpo-node-actions">{edit}{delete}</div></div></div>',
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(code))}</span><div class="wpo-node-label"><h3 title="{esc(name)}">{esc(name)}</h3><small>{esc(country)}</small></div>{status(uid,state)}</div>',
+    'Статус дополнительной ноды справа')
+
+# Restore the clean site-template line, remove version and dot separator,
+# and put only edit/delete controls at the bottom-right of additional cards.
+once(
+    '<p class="wpo-node-template">{icon("settings")} {esc(site_name)} · Агент {esc(n.get("version","—"))}</p></div>',
+    '<p class="wpo-node-template">{icon("settings")} {esc(site_name)}</p></div><div class="wpo-node-card-bottom"><div class="wpo-node-actions">{edit}{delete}</div></div>',
+    'Шаблон сайта по центру, кнопки снизу справа')
+
+once(
+    '.wpo-node-actions{display:flex;align-items:center;gap:3px}.wpo-node-actions form{margin:0}',
+    '.wpo-node-actions{display:flex;align-items:center;gap:3px}.wpo-node-actions form{margin:0}\n'
+    '/* wpo-node-visual-v14: only additional-node footers and template labels */\n'
+    '.wpo-nodes-page .wpo-node-card-bottom{display:flex;align-items:center;justify-content:flex-end;min-height:29px;margin-top:auto;padding:5px 0 0;border:0;background:transparent}\n'
+    '.wpo-nodes-page .wpo-node-card-bottom .wpo-node-actions{margin-left:auto;justify-content:flex-end}\n'
+    '.wpo-nodes-page .wpo-node-template{text-align:center;margin:6px 0 0;line-height:1.35}\n'
+    '.wpo-nodes-page .wpo-node-template .ico{vertical-align:-2px;margin-right:2px}',
+    'Позиционирование действий и названия шаблона')
+
+once(
+    '    # wpo-node-aligned-v9\n    # wpo-node-compact-v6',
+    '    # wpo-node-aligned-v9\n    # wpo-node-visual-v14\n    # wpo-node-compact-v6',
+    'Маркер версии v14')
+
+compile(src,str(path),'exec')
+temp=path.with_suffix('.py.nodes14tmp')
+temp.write_text(src,encoding='utf-8')
+temp.chmod(path.stat().st_mode & 0o777)
+temp.replace(path)
+print('Готово: карточки одной высоты, статус справа, кнопки внизу, только название сайта.')
+PY_PATCH
+then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  echo 'Правка не применена: файл восстановлен из резервной копии.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$UI" || ! systemctl restart "$SERVICE" || ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  systemctl restart "$SERVICE" || true
+  echo 'Не пройдена проверка или запуск панели: выполнен откат.'
+  exit 1
+fi
+
+echo 'Nodes Lab v14: визуальные правки карточек нод применены.'
+echo "Резервная копия: $BACKUP"
+echo 'Node Agent и подключения не изменены. GitHub main не затронута.'
+__WPO_EMBED_V14_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v15-install.sh" <<'__WPO_EMBED_V15_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запустите на основном VPS от root.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Файл панели не найден: $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-visual-v14' "$UI" || { echo 'Сначала требуется Nodes Lab v14. Изменения не применены.'; exit 1; }
+
+if grep -Fq '# wpo-node-polish-v15' "$UI"; then
+  echo 'Nodes Lab v15 уже установлен.'
+  exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v15-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+
+path=Path(sys.argv[1])
+src=path.read_text(encoding='utf-8')
+
+def once(old,new,label):
+    global src
+    n=src.count(old)
+    if n!=1:
+        raise RuntimeError(f'{label}: найдено {n} совпадений вместо 1. Ничего не изменено.')
+    src=src.replace(old,new,1)
+
+# Main node: one centered country name and a discreet starred flag. Status unchanged.
+once(
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(lc))}</span><div class="wpo-node-label"><h3>{esc(lname)}</h3><small>Основная нода</small></div>{status("local","online")}</div>',
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag wpo-node-main-flag">{esc(node_flag(lc))}<span class="wpo-node-main-mark" title="Основная нода" aria-label="Основная нода">★</span></span><div class="wpo-node-label"><h3>{esc(lname)}</h3></div>{status("local","online")}</div>',
+    'Основная нода без подписи и со звёздочкой')
+
+# Additional nodes: no duplicated country subtitle. Keep status at the right.
+once(
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(code))}</span><div class="wpo-node-label"><h3 title="{esc(name)}">{esc(name)}</h3><small>{esc(country)}</small></div>{status(uid,state)}</div>',
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(code))}</span><div class="wpo-node-label"><h3 title="{esc(name)}">{esc(name)}</h3></div>{status(uid,state)}</div>',
+    'Убрать повтор названия страны у дополнительных нод')
+
+css=r"""
+/* wpo-node-polish-v15 — clean grid, equal domain baselines, blue globe */
+.wpo-nodes-page .wpo-node-card{
+    display:grid;
+    grid-template-rows:40px minmax(0,1fr) 27px;
+    row-gap:7px;
+    min-height:157px;
+    align-content:stretch;
+    justify-content:stretch;
+}
+.wpo-nodes-page .wpo-node-card-head{min-height:40px;align-items:center;gap:7px}
+.wpo-nodes-page .wpo-node-label{
+    display:flex;align-items:center;min-width:0;flex:1;min-height:40px;gap:0
+}
+.wpo-nodes-page .wpo-node-label h3{
+    margin:0;font-size:14px;line-height:1.2;font-weight:650;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.wpo-nodes-page .wpo-node-card-head>.wpo-node-status{margin-left:auto;flex-shrink:0}
+.wpo-nodes-page .wpo-node-card-body{
+    grid-row:2;display:grid;align-content:start;align-self:start;
+    gap:6px;min-width:0;padding:0;flex:none;
+}
+.wpo-nodes-page .wpo-node-domain{
+    display:flex;align-items:center;gap:7px;min-width:0;
+    margin:0;padding:3px 0;background:transparent;border:0;
+    color:var(--muted);text-decoration:none;cursor:pointer;
+    font:500 10.5px/1.3 ui-monospace,monospace;letter-spacing:-.16px
+}
+.wpo-nodes-page .wpo-node-domain .wpo-domain-mark{
+    filter:none;opacity:1;color:#38bdf8;
+    font:13px/1 system-ui,sans-serif;flex:0 0 13px
+}
+.wpo-nodes-page .wpo-node-domain span:last-child{
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0
+}
+.wpo-nodes-page .wpo-node-domain:hover{color:var(--accent)}
+.wpo-nodes-page .wpo-node-template{
+    display:flex;align-items:center;justify-content:center;gap:4px;
+    min-width:0;margin:3px 0 0;line-height:1.35;
+    text-align:center;transform:translateX(-6px);font-size:10.5px
+}
+.wpo-nodes-page .wpo-node-template .ico{
+    flex:0 0 13px;width:13px;height:13px;margin:0;vertical-align:middle
+}
+.wpo-nodes-page .wpo-node-card-bottom{
+    grid-row:3;align-self:end;min-height:27px;margin:0;padding:0;
+    display:flex;align-items:center;justify-content:flex-end
+}
+.wpo-nodes-page .wpo-node-card-bottom .wpo-node-actions{margin-left:auto}
+.wpo-nodes-page .wpo-node-main-flag{position:relative}
+.wpo-nodes-page .wpo-node-main-mark{
+    position:absolute;top:-5px;right:-5px;display:grid;place-items:center;
+    width:16px;height:16px;border:1px solid var(--line);border-radius:50%;
+    background:var(--surface);color:#eab308;
+    font:700 10px/1 system-ui,sans-serif
+}
+@media(max-width:700px){
+  .wpo-nodes-page .wpo-node-card{min-height:157px}
+}
+"""
+once(
+    "'''\n    js=r'''(()=>{const path=__PATH__",
+    css+"\n'''\n    js=r'''(()=>{const path=__PATH__",
+    'Единая сетка и оформление доменов')
+
+once(
+    '    # wpo-node-visual-v14\n    # wpo-node-compact-v6',
+    '    # wpo-node-visual-v14\n    # wpo-node-polish-v15\n    # wpo-node-compact-v6',
+    'Маркер v15')
+
+compile(src,str(path),'exec')
+temp=path.with_suffix('.py.nodes15tmp')
+temp.write_text(src,encoding='utf-8')
+temp.chmod(path.stat().st_mode & 0o777)
+temp.replace(path)
+print('Карточки выровнены, названия по центру флага, домены на одной линии.')
+PY_PATCH
+then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  echo 'Ошибка обновления: восстановлен предыдущий интерфейс.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$UI" || ! systemctl restart "$SERVICE" || ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  systemctl restart "$SERVICE" || true
+  echo 'Ошибка проверки или перезапуска: выполнен откат.'
+  exit 1
+fi
+
+echo 'Nodes Lab v15: визуал карточек нод обновлён.'
+echo "Резервная копия: $BACKUP"
+echo 'Подключения, настройки и Node Agent не изменены. GitHub main не затронут.'
+__WPO_EMBED_V15_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v16-install.sh" <<'__WPO_EMBED_V16_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS с WPO.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Файл не найден: $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-polish-v15' "$UI" || { echo 'Требуется установленный Nodes Lab v15. Ничего не изменено.'; exit 1; }
+if grep -Fq '# wpo-node-finetune-v16' "$UI"; then
+  echo 'Nodes Lab v16 уже установлен.'
+  exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v16-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+
+p=Path(sys.argv[1])
+src=p.read_text(encoding='utf-8')
+
+def once(old,new,label):
+    global src
+    n=src.count(old)
+    if n!=1:
+        raise RuntimeError(f'{label}: найдено {n} совпадений вместо 1. Изменений нет.')
+    src=src.replace(old,new,1)
+
+# Keep both node columns identical; reduce each card by only eight pixels.
+once(
+    '    grid-template-rows:40px minmax(0,1fr) 27px;\n    row-gap:7px;\n    min-height:157px;',
+    '    grid-template-rows:40px minmax(0,1fr) 25px;\n    row-gap:6px;\n    min-height:149px;',
+    'Высота двух карточек')
+
+# Move the domain down equally in the main and additional node.
+once(
+    '    gap:6px;min-width:0;padding:0;flex:none;',
+    '    gap:6px;min-width:0;padding:7px 0 0;flex:none;',
+    'Домены чуть ниже')
+
+# Align the gear icon and site-template name with the globe and domain text.
+once(
+    '    display:flex;align-items:center;justify-content:center;gap:4px;\n'
+    '    min-width:0;margin:3px 0 0;line-height:1.35;\n'
+    '    text-align:center;transform:translateX(-6px);font-size:10.5px',
+    '    display:flex;align-items:center;justify-content:flex-start;gap:7px;\n'
+    '    min-width:0;margin:3px 0 0;line-height:1.35;\n'
+    '    text-align:left;transform:none;font-size:10.5px',
+    'Подпись шаблона слева, по сетке домена')
+
+once(
+    '@media(max-width:700px){\n  .wpo-nodes-page .wpo-node-card{min-height:157px}\n}',
+    '@media(max-width:700px){\n  .wpo-nodes-page .wpo-node-card{min-height:149px}\n}',
+    'Адаптация мобильного вида')
+
+once(
+    '    # wpo-node-polish-v15\n    # wpo-node-compact-v6',
+    '    # wpo-node-polish-v15\n    # wpo-node-finetune-v16\n    # wpo-node-compact-v6',
+    'Маркер v16')
+
+compile(src,str(p),'exec')
+tmp=p.with_suffix('.py.nodes16tmp')
+tmp.write_text(src,encoding='utf-8')
+tmp.chmod(p.stat().st_mode & 0o777)
+tmp.replace(p)
+print('Высота карточек уменьшена на 8px, домены опущены, подпись шаблона выровнена по тексту.')
+PY_PATCH
+then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  echo 'Ошибка правки: интерфейс восстановлен.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$UI" || ! systemctl restart "$SERVICE" || ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  systemctl restart "$SERVICE" || true
+  echo 'Ошибка проверки/перезапуска: выполнен откат.'
+  exit 1
+fi
+
+echo 'Nodes Lab v16: карточки чуть ниже, домены опущены, строка шаблона слева.'
+echo "Резервная копия: $BACKUP"
+echo 'Функции нод не затронуты. Основная ветка main не изменена.'
+__WPO_EMBED_V16_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v17-install.sh" <<'__WPO_EMBED_V17_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS с панелью WPO.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Не найден $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-finetune-v16' "$UI" || { echo 'Требуется установленный Nodes Lab v16. Ничего не изменено.'; exit 1; }
+if grep -Fq '# wpo-node-globe-v17' "$UI"; then
+  echo 'Оформление Nodes Lab v17 уже установлено.'
+  exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v17-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+
+path=Path(sys.argv[1])
+src=path.read_text(encoding='utf-8')
+def once(old,new,label):
+    global src
+    count=src.count(old)
+    if count!=1:
+        raise RuntimeError(f'{label}: найдено {count} совпадений вместо одного; файл не изменён.')
+    src=src.replace(old,new,1)
+
+# Both cards use the same monochrome, precisely aligned blue vector globe.
+# Avoid platform-dependent emoji baseline and font sizing differences.
+globe_svg=(
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" '
+    'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" '
+    'stroke-linejoin="round" aria-hidden="true">'
+    '<circle cx="12" cy="12" r="9"/>'
+    '<path d="M3 12h18M12 3c2.8 2.4 4 5.4 4 9s-1.2 6.6-4 9'
+    'M12 3c-2.8 2.4-4 5.4-4 9s1.2 6.6 4 9"/>'
+    '</svg>'
+)
+old_globe='<span class="wpo-domain-mark">🌐</span>'
+count=src.count(old_globe)
+if count != 2:
+    raise RuntimeError(f'Глобусы основной и дополнительной ноды: найдено {count}, ожидается 2.')
+src=src.replace(old_globe,'<span class="wpo-domain-mark">'+globe_svg+'</span>')
+
+# Reduce both cards by another seven pixels, without moving top indicators.
+once(
+    '    grid-template-rows:40px minmax(0,1fr) 25px;\n    row-gap:6px;\n    min-height:149px;',
+    '    grid-template-rows:40px minmax(0,1fr) 25px;\n    row-gap:6px;\n    min-height:142px;',
+    'Высота двух карточек')
+once(
+    '@media(max-width:700px){\n  .wpo-nodes-page .wpo-node-card{min-height:149px}\n}',
+    '@media(max-width:700px){\n  .wpo-nodes-page .wpo-node-card{min-height:142px}\n}',
+    'Мобильная высота')
+
+# Fix the icon and text baselines identically in both domain rows.
+css="""
+/* wpo-node-globe-v17: fixed SVG baseline for both domain rows */
+.wpo-nodes-page .wpo-node-domain{
+  display:grid;grid-template-columns:14px minmax(0,1fr);
+  align-items:center;column-gap:7px;min-height:21px;line-height:1.35
+}
+.wpo-nodes-page .wpo-node-domain .wpo-domain-mark{
+  display:flex;align-items:center;justify-content:center;
+  width:14px;height:16px;min-width:14px;color:#38bdf8;
+  font-size:0;line-height:0;filter:none;opacity:1;
+}
+.wpo-nodes-page .wpo-node-domain .wpo-domain-mark svg{
+  display:block;width:14px;height:14px;flex:0 0 14px;
+}
+"""
+once(
+    "'''\n    js=r'''(()=>{const path=__PATH__",
+    css+"\n'''\n    js=r'''(()=>{const path=__PATH__",
+    'CSS выравнивания SVG')
+
+once(
+    '    # wpo-node-finetune-v16\n    # wpo-node-compact-v6',
+    '    # wpo-node-finetune-v16\n    # wpo-node-globe-v17\n    # wpo-node-compact-v6',
+    'Маркер v17')
+
+compile(src,str(path),'exec')
+tmp=path.with_suffix('.py.nodes17tmp')
+tmp.write_text(src,encoding='utf-8')
+tmp.chmod(path.stat().st_mode & 0o777)
+tmp.replace(path)
+print('Глобусы выровнены и заменены на голубые SVG, карточки уменьшены на 7px.')
+PY_PATCH
+then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  echo 'Изменения не применены. Восстановлена резервная копия.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$UI" || ! systemctl restart "$SERVICE" || ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  systemctl restart "$SERVICE" || true
+  echo 'Ошибка проверки или запуска: выполнен откат.'
+  exit 1
+fi
+echo 'Nodes Lab v17: одинаковые голубые глобусы, карточки ниже на 7px.'
+echo "Резервная копия: $BACKUP"
+echo 'Данные, функции нод и GitHub main не изменены.'
+__WPO_EMBED_V17_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v18-install.sh" <<'__WPO_EMBED_V18_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS с панелью WPO.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Не найден $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-globe-v17' "$UI" || { echo 'Требуется установленный Nodes Lab v17. Ничего не изменено.'; exit 1; }
+if grep -Fq '# wpo-node-divider-v18' "$UI"; then
+  echo 'Nodes Lab v18 уже установлен.'
+  exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v18-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+
+p=Path(sys.argv[1])
+src=p.read_text(encoding='utf-8')
+
+def once(old,new,label):
+    global src
+    matches=src.count(old)
+    if matches!=1:
+        raise RuntimeError(f'{label}: найдено {matches} совпадений вместо одного. Файл не изменён.')
+    src=src.replace(old,new,1)
+
+# Primary node: preserve the complete flag/title/status/domain, add matching
+# metadata under its domain. Restrict replacement to the local card only.
+start=src.index('    cards.append(f\'\'\'<article class="card wpo-node-card">')
+end=src.index('    for n in nodes:',start)
+main=src[start:end]
+if main.count('</a></div>')!=1 or 'href="https://{esc(connection_token)}"' not in main:
+    raise RuntimeError('Не найдена ожидаемая основная карточка; ничего не изменено.')
+main=main.replace('</a></div>',
+    '</a><div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p></div></div>',1)
+src=src[:start]+main+src[end:]
+
+# Additional nodes: template and action buttons share the same separated row.
+# Template name remains dynamic ("Технические работы", "Открытие кофейни"...).
+once(
+    '<p class="wpo-node-template">{icon("settings")} {esc(site_name)}</p></div><div class="wpo-node-card-bottom"><div class="wpo-node-actions">{edit}{delete}</div></div>',
+    '<div class="wpo-node-meta-row"><p class="wpo-node-template">{icon("settings")} {esc(site_name)}</p><div class="wpo-node-actions">{edit}{delete}</div></div></div>',
+    'Строка шаблона и кнопок')
+
+# Exactly the same layout for local/remote nodes. Installation cards are
+# excluded, so their spinner and progress presentation stay unchanged.
+css=r"""
+/* wpo-node-divider-v18: matched meta rows with subtle separators */
+.wpo-nodes-page .wpo-node-card:not(.wpo-pending-node){
+    display:grid;
+    grid-template-rows:40px minmax(0,1fr);
+    row-gap:5px;
+    min-height:140px;
+    padding:10px 12px;
+}
+.wpo-nodes-page .wpo-node-card:not(.wpo-pending-node) .wpo-node-card-body{
+    display:grid;
+    grid-template-rows:21px minmax(0,1fr);
+    row-gap:7px;
+    align-content:stretch;
+    align-self:stretch;
+    padding:11px 0 0;
+    min-width:0;
+}
+.wpo-nodes-page .wpo-node-meta-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:5px;
+    align-self:end;
+    min-height:35px;
+    min-width:0;
+    position:relative;
+    padding:6px 0 0;
+    border-top:1px solid var(--line);
+}
+.wpo-nodes-page .wpo-node-meta-row::before{
+    content:"";
+    position:absolute;
+    top:-1px;left:0;
+    height:1px;width:55%;
+    background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 44%,var(--line)),transparent);
+    pointer-events:none;
+}
+.wpo-nodes-page .wpo-node-meta-row .wpo-node-template{
+    margin:0;
+    padding:0;
+    display:flex;
+    justify-content:flex-start;
+    align-items:center;
+    gap:6px;
+    text-align:left;
+    transform:none;
+    min-width:0;
+    line-height:1.35;
+    font-size:10.5px;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
+}
+.wpo-nodes-page .wpo-node-meta-row:has(.wpo-node-actions) .wpo-node-template{
+    max-width:calc(100% - 61px);
+}
+.wpo-nodes-page .wpo-node-meta-row .wpo-node-actions{
+    margin-left:auto;
+    display:flex;
+    flex:0 0 auto;
+    align-items:center;
+    justify-content:flex-end;
+    gap:3px;
+}
+.wpo-nodes-page .wpo-node-meta-row .wpo-main-node-label{
+    font-size:12px;
+    line-height:1.35;
+    font-weight:650;
+    color:var(--text);
+    letter-spacing:.01em;
+}
+"""
+once(
+    "'''\n    js=r'''(()=>{const path=__PATH__",
+    css+"\n'''\n    js=r'''(()=>{const path=__PATH__",
+    'Стили разделителя и общей сетки')
+
+once(
+    '    # wpo-node-globe-v17\n    # wpo-node-compact-v6',
+    '    # wpo-node-globe-v17\n    # wpo-node-divider-v18\n    # wpo-node-compact-v6',
+    'Маркер v18')
+
+compile(src,str(p),'exec')
+temp=p.with_suffix('.py.nodes18tmp')
+temp.write_text(src,encoding='utf-8')
+temp.chmod(p.stat().st_mode & 0o777)
+temp.replace(p)
+print('Добавлены одинаковые разделители; "Основная нода" и шаблон сайта стоят на одной линии.')
+PY_PATCH
+then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  echo 'Правка не применена, интерфейс восстановлен.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$UI" || ! systemctl restart "$SERVICE" || ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  systemctl restart "$SERVICE" || true
+  echo 'Проверка или запуск панели не удались. Выполнен откат.'
+  exit 1
+fi
+
+echo 'Nodes Lab v18: обе карточки с разделителем, подписи на одном уровне, немного компактнее.'
+echo "Резервная копия: $BACKUP"
+echo 'Сервисы нод, шаблоны, статусы и GitHub main не затронуты.'
+__WPO_EMBED_V18_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v19-install.sh" <<'__WPO_EMBED_V19_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS с WPO.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Не найден $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-divider-v18' "$UI" || { echo 'Сначала установите Nodes Lab v18. Ничего не изменено.'; exit 1; }
+
+if grep -Fq '# wpo-node-server-icon-v19' "$UI"; then
+  echo 'Nodes Lab v19 уже установлен.'
+  exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v19-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+
+p=Path(sys.argv[1])
+src=p.read_text(encoding='utf-8')
+
+def once(old,new,label):
+    global src
+    count=src.count(old)
+    if count!=1:
+        raise RuntimeError(f'{label}: найдено {count} совпадений вместо одного. Исходник не изменён.')
+    src=src.replace(old,new,1)
+
+# Reuse the panel's server-rack icon, which is already drawn in the same
+# SVG style and size as the site-template/settings icon.
+once(
+    '<p class="wpo-node-template wpo-main-node-label">Основная нода</p>',
+    '<p class="wpo-node-template wpo-main-node-label">{icon("nodes")} Основная нода</p>',
+    'Значок сервера перед подписью основной ноды')
+
+# Keep all card measurements untouched. Tint only this new icon.
+once(
+    "'''\n    js=r'''(()=>{const path=__PATH__",
+    '\n/* wpo-node-server-icon-v19 */\n'
+    '.wpo-nodes-page .wpo-main-node-label .ico{color:#38bdf8}\n'
+    "'''\n    js=r'''(()=>{const path=__PATH__",
+    'Голубой значок сервера')
+
+once(
+    '    # wpo-node-divider-v18\n    # wpo-node-compact-v6',
+    '    # wpo-node-divider-v18\n    # wpo-node-server-icon-v19\n    # wpo-node-compact-v6',
+    'Маркер v19')
+
+compile(src,str(p),'exec')
+tmp=p.with_suffix('.py.nodes19tmp')
+tmp.write_text(src,encoding='utf-8')
+tmp.chmod(p.stat().st_mode & 0o777)
+tmp.replace(p)
+print('Значок сервера добавлен к надписи "Основная нода".')
+PY_PATCH
+then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  echo 'Обновление не применено: исходный интерфейс восстановлен.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$UI" || ! systemctl restart "$SERVICE" || ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  systemctl restart "$SERVICE" || true
+  echo 'Проверка или перезапуск не удались: выполнен откат.'
+  exit 1
+fi
+
+echo 'Nodes Lab v19: у основной ноды появился голубой значок сервера.'
+echo "Резервная копия: $BACKUP"
+echo 'Размеры и функции нод не изменены. GitHub main не затронут.'
+__WPO_EMBED_V19_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v20-install.sh" <<'__WPO_EMBED_V20_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+APP=/opt/tproxy-panel
+PANEL="$APP/panel.py"
+UI="$APP/wpp_ui.py"
+AUTO="$APP/wpo_node_autotemplate.py"
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS с панелью WPO.'; exit 1; }
+[[ -s "$PANEL" && -s "$UI" ]] || { echo 'Файлы панели не найдены.'; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq 'def wpo_pending_load' "$PANEL" || { echo 'Nodes Lab не обнаружен.'; exit 1; }
+grep -Fq 'all_presets()' "$PANEL" || { echo 'Требуется поддержка шаблонов из Nodes Lab v2.'; exit 1; }
+grep -Fq '# wpo-node-country-v13' "$PANEL" || { echo 'Требуется установленный Nodes Lab v13 или новее.'; exit 1; }
+grep -Fq '# wpo-node-server-icon-v19' "$UI" || { echo 'Требуется установленный Nodes Lab v19.'; exit 1; }
+
+if grep -Fq '# wpo-node-auto-v20' "$PANEL"; then
+  echo 'Nodes Lab v20 уже установлен.'
+  exit 0
+fi
+
+TMP="$(mktemp)"
+trap 'rm -f "$TMP"' EXIT
+curl -4fsSL --retry 3 --connect-timeout 15 \
+  'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/nodes-lab/wpo-node-autotemplate-v20.py' -o "$TMP"
+python3 - "$TMP" <<'PY_CHECK'
+from pathlib import Path
+import sys
+s=Path(sys.argv[1]).read_text(encoding='utf-8')
+assert all(x in s for x in ['def choose(', 'def start(', 'def _loop(', 'registry_lock'])
+compile(s,'wpo_node_autotemplate.py','exec')
+PY_CHECK
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v20-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$PANEL" "$BACKUP/panel.py"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+if [[ -f "$AUTO" ]]; then cp -a "$AUTO" "$BACKUP/wpo_node_autotemplate.py"; fi
+
+if ! python3 - "$PANEL" "$UI" "$TMP" "$AUTO" <<'PY_PATCH'
+from pathlib import Path
+import sys
+panel_path,ui_path,auto_source,auto_path=map(Path,sys.argv[1:])
+panel=panel_path.read_text(encoding='utf-8')
+ui=ui_path.read_text(encoding='utf-8')
+
+def once(source,old,new,label):
+    cnt=source.count(old)
+    if cnt!=1:
+        raise RuntimeError(f'{label}: найдено {cnt} совпадений вместо одного. Ничего не изменено.')
+    return source.replace(old,new,1)
+
+panel=once(panel,
+    'import shlex\n',
+    'import shlex\nimport wpo_node_autotemplate as wpo_node_auto  # wpo-node-auto-v20\n',
+    'Импорт автоподбора сайтов')
+
+panel=once(panel,
+    'class Handler(BaseHTTPRequestHandler):',
+    'wpo_node_auto.start(NODES_FILE,lambda: all_presets(),node_api)\n\nclass Handler(BaseHTTPRequestHandler):',
+    'Запуск автоотправки шаблонов в фоне')
+
+# Reserve a template ONLY when a new node is enrolled. Reservations are
+# persisted before responding, and never alter old/renamed nodes.
+old='''                added=node_api.add_node(NODES_FILE,{"connection_token":packed})
+                registered=node_api.load_nodes(NODES_FILE); display=str(payload.get("name","")).strip()[:80] or "Нода"
+                for n in registered:
+                    if n.get("id")==added.get("id"):
+                        n["name"]=str(n.get("country_name") or display) if n.get("country_code")!="UN" else display; n["name_auto"]=True; n["status"]="online"; n["status_detail"]="Агент зарегистрирован"
+                node_api.save_nodes(NODES_FILE,registered); pending.pop(digest,None); wpo_pending_save(pending)'''
+new='''                with wpo_node_auto.registry_lock:
+                    added=node_api.add_node(NODES_FILE,{"connection_token":packed})
+                    registered=node_api.load_nodes(NODES_FILE); display=str(payload.get("name","")).strip()[:80] or "Нода"
+                    for n in registered:
+                        if n.get("id")==added.get("id"):
+                            n["name"]=str(n.get("country_name") or display) if n.get("country_code")!="UN" else display; n["name_auto"]=True; n["status"]="online"; n["status_detail"]="Агент зарегистрирован"
+                            try:
+                                auto_id=wpo_node_auto.choose(registered,all_presets())
+                                if auto_id: n["auto_site_template_id"]=auto_id
+                            except Exception as auto_error:
+                                print("Node auto-template selection:",type(auto_error).__name__,file=sys.stderr,flush=True)
+                    node_api.save_nodes(NODES_FILE,registered)
+                pending.pop(digest,None); wpo_pending_save(pending)'''
+panel=once(panel,old,new,'Автоподбор только для новой ноды')
+
+# Show the chosen label automatically as soon as delivery is confirmed.
+panel=once(panel,
+    '"country_code":n.get("country_code","UN"),"name":n.get("name","")',
+    '"country_code":n.get("country_code","UN"),"name":n.get("name",""),"site_template_id":n.get("site_template_id","")',
+    'Актуальный шаблон в ответе статуса')
+
+ui=once(ui,
+    'const state=map[n.status]||map.offline;el.className=',
+    'const edit=el.closest(".wpo-node-card")?.querySelector("[data-node-edit]");if(edit&&typeof n.site_template_id==="string"&&edit.dataset.nodeTemplate!==n.site_template_id){location.reload();return}const state=map[n.status]||map.offline;el.className=',
+    'Автообновление имени шаблона в карточке')
+
+# Manual template edits always have priority over pending auto-assignments.
+panel=once(panel,
+    '                        selected["site_template_id"]=template_id',
+    '                        selected["site_template_id"]=template_id\n                        selected.pop("auto_site_template_id",None)',
+    'Ручной выбор отменяет ожидающий автоподбор')
+
+newmod=auto_source.read_text(encoding='utf-8')
+compile(newmod,str(auto_path),'exec')
+compile(panel,str(panel_path),'exec')
+compile(ui,str(ui_path),'exec')
+
+# Stage every file and only then replace originals.
+for path,data in [(auto_path,newmod),(panel_path,panel),(ui_path,ui)]:
+    tmp=path.with_suffix(path.suffix+'.v20tmp')
+    tmp.write_text(data,encoding='utf-8')
+    tmp.chmod(path.stat().st_mode & 0o777 if path.exists() else 0o644)
+for path in [auto_path,panel_path,ui_path]:
+    path.with_suffix(path.suffix+'.v20tmp').replace(path)
+print('Включён рандомный подбор шаблона на регистрации и автоматическая публикация.')
+PY_PATCH
+then
+  cp -a "$BACKUP/panel.py" "$PANEL"
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  if [[ -f "$BACKUP/wpo_node_autotemplate.py" ]]; then cp -a "$BACKUP/wpo_node_autotemplate.py" "$AUTO"; else rm -f "$AUTO"; fi
+  echo 'Обновление не применено, исходный код восстановлен.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$PANEL" "$UI" "$AUTO" ||
+   ! systemctl restart "$SERVICE" ||
+   ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/panel.py" "$PANEL"
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  if [[ -f "$BACKUP/wpo_node_autotemplate.py" ]]; then cp -a "$BACKUP/wpo_node_autotemplate.py" "$AUTO"; else rm -f "$AUTO"; fi
+  systemctl restart "$SERVICE" || true
+  echo 'Ошибка проверки или запуска панели. Выполнен откат.'
+  exit 1
+fi
+echo 'Nodes Lab v20 готов: шаблоны выбираются случайно без повторов, пока есть свободные.'
+echo 'Новые ноды получают сайт автоматически после регистрации. Старые ноды не изменяются.'
+echo "Резервная копия: $BACKUP"
+echo 'GitHub main не затронут.'
+__WPO_EMBED_V20_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v21-install.sh" <<'__WPO_EMBED_V21_END_736a4b__'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS с WPO.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Не найден $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-server-icon-v19' "$UI" || { echo 'Нужен Nodes Lab v19 или новее. Изменений нет.'; exit 1; }
+if grep -Fq '/* wpo-node-heading-v21 */' "$UI"; then
+    echo 'Nodes Lab v21 уже установлен.'
+    exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v21-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+
+path=Path(sys.argv[1])
+src=path.read_text(encoding='utf-8')
+def once(old,new,label):
+    global src
+    n=src.count(old)
+    if n!=1:
+        raise RuntimeError(f'{label}: ожидается 1 совпадение, найдено {n}; файл не изменён.')
+    src=src.replace(old,new,1)
+
+# Earlier live UI edits may already have removed the subtitle; in that case
+# v21 must still apply the final spacing and alignment.
+heading='<h2>⚙️ Управление нодами</h2>'
+if src.count(heading)!=1 or 'def nodes_ui(' not in src:
+    raise RuntimeError('Заголовок нод не найден однозначно. Файл не изменён.')
+import re
+subtitle_re=r'<p(?:\s[^>]*)?>\s*Подключённые серверы и состояние установок\s*</p>'
+# Keep any other page or help text untouched: this is restricted to nodes_ui.
+start=src.index('def nodes_ui(')
+end=src.index('\n\nCSS +=',start)
+section=src[start:end]
+section,removed=re.subn(subtitle_re,'',section)
+if removed>1:
+    raise RuntimeError('У подписи найдено более одного совпадения; файл не изменён.')
+src=src[:start]+section+src[end:]
+print('Подпись раздела:', 'удалена' if removed else 'уже отсутствовала')
+
+css="""
+/* wpo-node-heading-v21 */
+/* Align heading to the first statistics card left edge. */
+.wpo-nodes-page .wpo-nodes-toolbar > div:first-child{
+    margin-left:0;
+    padding-left:0;
+    min-width:0;
+}
+.wpo-nodes-page .wpo-nodes-toolbar .eyebrow{margin-bottom:0}
+.wpo-nodes-page .wpo-nodes-toolbar h2{
+    margin:10px 0 0;
+    line-height:1.3;
+}
+"""
+once(
+    "'''\n    js=r'''(()=>{const path=__PATH__",
+    css+"\n'''\n    js=r'''(()=>{const path=__PATH__",
+    'Отступ и левое выравнивание заголовка')
+
+compile(src,str(path),'exec')
+temp=path.with_suffix('.py.nodes21tmp')
+temp.write_text(src,encoding='utf-8')
+temp.chmod(path.stat().st_mode & 0o777)
+temp.replace(path)
+print('Подпись удалена; заголовок ниже и выровнен по левому краю блока «В сети».')
+PY_PATCH
+then
+    cp -a "$BACKUP/wpp_ui.py" "$UI"
+    echo 'Ошибка правки. Исходный файл восстановлен.'
+    exit 1
+fi
+
+if ! python3 -m py_compile "$UI" ||
+   ! systemctl restart "$SERVICE" ||
+   ! systemctl is-active --quiet "$SERVICE"; then
+    cp -a "$BACKUP/wpp_ui.py" "$UI"
+    systemctl restart "$SERVICE" || true
+    echo 'Ошибка проверки или запуска. Выполнен откат.'
+    exit 1
+fi
+echo 'Nodes Lab v21: подпись удалена, заголовок выровнен.'
+echo "Резервная копия: $BACKUP"
+echo 'Работа нод и ветка GitHub main не изменены.'
+__WPO_EMBED_V21_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v22-install.sh" <<'__WPO_EMBED_V22_END_736a4b__'
+#!/usr/bin/env bash
+# Nodes Lab v22: horizontal continuous node list and correctly sized install card.
+set -Eeuo pipefail
+umask 077
+
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+[[ $EUID -eq 0 ]] || { echo 'Запустите на основном VPS с WPO от root.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Отсутствует $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Служба WPO не найдена.'; exit 1; }
+grep -Fq '/* wpo-node-heading-v21 */' "$UI" || { echo 'Сначала нужен Nodes Lab v21.'; exit 1; }
+
+if grep -Fq '/* wpo-node-pending-row-v22 */' "$UI"; then
+  echo 'Nodes Lab v22 уже установлен.'
+  exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v22-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1])
+src=p.read_text(encoding='utf-8')
+
+def once(old,new,what):
+    global src
+    count=src.count(old)
+    if count!=1:
+        raise RuntimeError(f'{what}: найдено {count} совпадений, ожидалось одно; исходник не изменён.')
+    src=src.replace(old,new,1)
+
+# Install card uses the SAME three visual rows as an ordinary node.
+# The long live progress text moves out of the header to the compact lower row.
+old_head=(
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">◇</span>'
+    '<div class="wpo-node-label"><h3>Установка</h3>'
+    '<small data-node-progress="{esc(uid)}" title="{esc(detail)}">{esc(detail)}</small></div>'
+    '<div class="wpo-node-head-tools">{status(uid,state)}'
+    '<div class="wpo-node-actions">{delete}</div></div></div>'
+)
+new_head=(
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">◇</span>'
+    '<div class="wpo-node-label"><h3>Установка</h3></div>{status(uid,state)}</div>'
+)
+once(old_head,new_head,'Заголовок ожидающей ноды')
+
+globe_svg=(
+    '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" '
+    'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" '
+    'stroke-linejoin="round" aria-hidden="true">'
+    '<circle cx="12" cy="12" r="9"/>'
+    '<path d="M3 12h18M12 3c2.8 2.4 4 5.4 4 9s-1.2 6.6-4 9'
+    'M12 3c-2.8 2.4-4 5.4-4 9s1.2 6.6 4 9"/>'
+    '</svg>'
+)
+old_body=(
+    '<div class="wpo-node-card-body"><div class="wpo-node-domain">{icon("link")}'
+    '<span data-node-domain="{esc(uid)}">{esc(domain or "Домен определяется")}</span>'
+    '</div></div>'
+)
+new_body=(
+    '<div class="wpo-node-card-body"><div class="wpo-node-domain">'
+    '<span class="wpo-domain-mark">'+globe_svg+'</span>'
+    '<span data-node-domain="{esc(uid)}">{esc(domain or "Домен определяется")}</span></div>'
+    '<div class="wpo-node-meta-row">'
+    '<p class="wpo-node-template wpo-node-install-detail" data-node-progress="{esc(uid)}"'
+    ' title="{esc(detail)}">{esc(detail)}</p>'
+    '<div class="wpo-node-actions">{delete}</div></div></div>'
+)
+once(old_body,new_body,'Домен и нижняя полоса ожидающей ноды')
+
+css=r"""
+/* wpo-node-pending-row-v22 */
+/* Nodes always fill the first available slot from left to right. */
+.wpo-nodes-page .wpo-node-grid{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:9px;
+    grid-auto-flow:row;
+    align-items:stretch;
+    justify-content:stretch;
+    min-width:0;
+}
+@media(max-width:850px){
+    .wpo-nodes-page .wpo-node-grid{
+        grid-template-columns:repeat(3,minmax(0,1fr));
+    }
+}
+@media(max-width:700px){
+    .wpo-nodes-page .wpo-node-grid{
+        grid-template-columns:minmax(0,1fr);
+    }
+}
+/* Match installed-node card dimensions and keep everything inside the card. */
+.wpo-nodes-page .wpo-pending-node{
+    display:grid;
+    grid-template-rows:40px minmax(0,1fr);
+    row-gap:5px;
+    min-height:140px;
+    padding:10px 12px;
+    min-width:0;
+    overflow:hidden;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-card-head{
+    display:flex;
+    align-items:center;
+    min-height:40px;
+    min-width:0;
+    gap:7px;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-label{
+    display:flex;
+    min-width:0;
+    flex:1 1 auto;
+    overflow:hidden;
+    white-space:nowrap;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-label h3{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    max-width:100%;
+    font-size:12px;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-card-head>.wpo-node-status{
+    margin-left:auto;
+    flex:0 0 auto;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-card-body{
+    display:grid;
+    grid-template-rows:21px minmax(0,1fr);
+    gap:7px;
+    align-content:stretch;
+    align-self:stretch;
+    padding:11px 0 0;
+    min-width:0;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-domain{
+    display:grid;
+    grid-template-columns:14px minmax(0,1fr);
+    align-items:center;
+    column-gap:7px;
+    min-width:0;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-domain .wpo-domain-mark{
+    color:#38bdf8;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-meta-row{
+    min-width:0;
+    overflow:hidden;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-install-detail{
+    margin:0;
+    display:block;
+    flex:1 1 0;
+    min-width:0;
+    max-width:calc(100% - 36px);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    text-align:left;
+    font-size:10.5px;
+    color:var(--muted);
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-actions{
+    flex:0 0 auto;
+    margin-left:auto;
+}
+"""
+once(
+    "'''\n    js=r'''(()=>{const path=__PATH__",
+    css+"\n'''\n    js=r'''(()=>{const path=__PATH__",
+    'Сетка и компактный дизайн временной ноды')
+compile(src,str(p),'exec')
+tmp=p.with_suffix('.py.nodes22tmp')
+tmp.write_text(src,encoding='utf-8')
+tmp.chmod(p.stat().st_mode & 0o777)
+tmp.replace(p)
+print('Ноды идут слева направо; третья карточка в первом ряду, установка без вылезающего текста.')
+PY_PATCH
+then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  echo 'v22 не применился; восстановлен исходный интерфейс.'
+  exit 1
+fi
+
+if ! python3 -m py_compile "$UI" ||
+   ! systemctl restart "$SERVICE" ||
+   ! systemctl is-active --quiet "$SERVICE"; then
+  cp -a "$BACKUP/wpp_ui.py" "$UI"
+  systemctl restart "$SERVICE" || true
+  echo 'Ошибка проверки или перезапуска; выполнен откат.'
+  exit 1
+fi
+echo 'Nodes Lab v22 готов: слева направо, одинаковые карточки, компактная установка.'
+echo "Резервная копия: $BACKUP"
+echo 'GitHub main, Node Agent и работа протоколов не изменены.'
+__WPO_EMBED_V22_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v23-install.sh" <<'__WPO_EMBED_V23_END_736a4b__'
+#!/usr/bin/env bash
+# Nodes Lab v23: refresh the Node Agent installer served by "Добавить ноду".
+set -Eeuo pipefail
+umask 077
+AGENT=/opt/tproxy-panel/wpp-node-agent-install.sh
+SERVICE=tproxy-panel.service
+[[ $EUID -eq 0 ]] || { echo 'Запустите на основном VPS WPO от root.'; exit 1; }
+[[ -s "$AGENT" ]] || { echo 'Установщик ноды не найден. Сначала установите Nodes Lab v22.'; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Основная панель WPO не найдена.'; exit 1; }
+grep -Fq 'WEB PANEL ONLINE — Node Agent 0.2' "$AGENT" || { echo 'Ожидается Node Agent 0.2.'; exit 1; }
+
+if grep -Fq 'wpo-node-agent-reinstall-v23' "$AGENT"; then
+    echo 'Nodes Lab v23 уже установлен.'
+    exit 0
+fi
+
+TMP="$(mktemp)"
+trap 'rm -f "$TMP"' EXIT
+curl -4fsSL --retry 3 --connect-timeout 15 \
+  'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/nodes-lab/wpo-node-agent-install-v2.sh' -o "$TMP"
+[[ -s "$TMP" ]] || { echo 'Не удалось получить установщик Node Agent.'; exit 1; }
+
+for token in 'wpo-node-agent-reinstall-v23' \
+             'systemctl restart wpp-node-agent.service' \
+             'Регистрация: HTTP %d' \
+             'wpp-api/v1/status' \
+             '__WPO_CONTROLLER_ENROLL_URL__' \
+             '__WPO_CONTROLLER_STATUS_URL__' \
+             'PY_VALIDATE_EMAIL'; do
+    grep -Fq "$token" "$TMP" || { echo "Проверка нового установщика не прошла: $token"; exit 1; }
+done
+bash -n "$TMP" || { echo 'Синтаксис установщика Node Agent некорректен.'; exit 1; }
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v23-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$AGENT" "$BACKUP/wpp-node-agent-install.sh"
+
+if ! install -o root -g root -m 0700 "$TMP" "$AGENT" || ! bash -n "$AGENT"; then
+    cp -a "$BACKUP/wpp-node-agent-install.sh" "$AGENT"
+    echo 'Ошибка обновления: предыдущий установщик восстановлен.'
+    exit 1
+fi
+
+echo 'Nodes Lab v23: установщик из кнопки «Добавить ноду» обновлён.'
+echo 'Повторная установка перезапускает Node Agent с новым ключом API.'
+echo 'При ошибке регистрации показывается причина, возвращённая панелью.'
+echo "Резервная копия: $BACKUP"
+echo 'Работающие ноды не изменены. Перезапуск основной панели не нужен. GitHub main не затронут.'
+__WPO_EMBED_V23_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v24-install.sh" <<'__WPO_EMBED_V24_END_736a4b__'
+#!/usr/bin/env bash
+# Nodes Lab v24 — center spinner/error ring within installation flag tile.
+set -Eeuo pipefail
+umask 077
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS WPO.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Не найден $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo "Не найдена служба $SERVICE"; exit 1; }
+grep -Fq '/* wpo-node-pending-row-v22 */' "$UI" || { echo 'Нужен Nodes Lab v22 или новее.'; exit 1; }
+
+if grep -Fq '/* wpo-node-indicator-center-v24 */' "$UI"; then
+    echo 'Nodes Lab v24 уже установлен.'
+    exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v24-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1])
+src=p.read_text(encoding='utf-8')
+anchor="'''\n    js=r'''(()=>{const path=__PATH__"
+if src.count(anchor)!=1:
+    raise RuntimeError('Не найдено единственное место для стилей нод; интерфейс не изменён.')
+if src.count('/* wpo-node-pending-row-v22 */')!=1:
+    raise RuntimeError('Не найден базовый стиль v22; интерфейс не изменён.')
+
+css=r"""
+/* wpo-node-indicator-center-v24 */
+/* Keep the tile size untouched: only center the circular spinner / error icon. */
+.wpo-nodes-page .wpo-pending-node .wpo-node-card-head > .wpo-node-flag {
+    display:grid;
+    place-items:center;
+    align-items:center;
+    justify-items:center;
+    padding:0;
+    line-height:0;
+    position:relative;
+    box-sizing:border-box;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-card-head > .wpo-node-flag::after {
+    display:grid;
+    place-items:center;
+    justify-self:center;
+    align-self:center;
+    width:20px;
+    height:20px;
+    box-sizing:border-box;
+    margin:0;
+    flex:none;
+    border-radius:50%;
+    transform-origin:50% 50%;
+}
+.wpo-nodes-page .wpo-pending-node:has(.wpo-node-status.error) .wpo-node-flag::after {
+    display:grid;
+    place-items:center;
+    font:700 12px/1 system-ui,sans-serif;
+    text-align:center;
+    animation:none;
+}
+"""
+updated=src.replace(anchor, css+"\n"+anchor, 1)
+compile(updated,str(p),'exec')
+tmp=p.with_suffix('.py.nodes24tmp')
+tmp.write_text(updated,encoding='utf-8')
+tmp.chmod(p.stat().st_mode & 0o777)
+tmp.replace(p)
+print('Индикатор установки и красный значок ошибки выровнены по центру квадрата.')
+PY_PATCH
+then
+    cp -a "$BACKUP/wpp_ui.py" "$UI"
+    echo 'Ошибка правки, исходный интерфейс восстановлен.'
+    exit 1
+fi
+
+if ! python3 -m py_compile "$UI" ||
+   ! systemctl restart "$SERVICE" ||
+   ! systemctl is-active --quiet "$SERVICE"; then
+    cp -a "$BACKUP/wpp_ui.py" "$UI"
+    systemctl restart "$SERVICE" || true
+    echo 'Ошибка проверки или запуска. Исходный интерфейс восстановлен.'
+    exit 1
+fi
+echo 'Nodes Lab v24 установлен. Кружочки строго по центру; размеры карточек не менялись.'
+echo "Резервная копия: $BACKUP"
+echo 'GitHub main и установщик Node Agent не изменены.'
+__WPO_EMBED_V24_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v25-install.sh" <<'__WPO_EMBED_V25_END_736a4b__'
+#!/usr/bin/env bash
+# Nodes Lab v25 — always publish a chosen website immediately on Save.
+set -Eeuo pipefail
+umask 077
+APP=/opt/tproxy-panel
+PANEL="$APP/panel.py"
+UI="$APP/wpp_ui.py"
+AUTO="$APP/wpo_node_autotemplate.py"
+SERVICE=tproxy-panel.service
+
+[[ $EUID -eq 0 ]] || { echo 'Запускайте на основном VPS WPO от root.'; exit 1; }
+for file in "$PANEL" "$UI" "$AUTO"; do [[ -s "$file" ]] || { echo "Файл не найден: $file"; exit 1; }; done
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Основная служба панели не найдена.'; exit 1; }
+grep -Fq '# wpo-node-auto-v20' "$PANEL" || { echo 'Требуется Nodes Lab v20 или новее.'; exit 1; }
+grep -Fq '/* wpo-node-divider-v18' "$UI" || { echo 'Нужен компактный интерфейс v18 или новее.'; exit 1; }
+
+if grep -Fq '# wpo-node-template-save-v25' "$PANEL" &&
+   grep -Fq '# wpo-node-template-sync-v25' "$AUTO" &&
+   grep -Fq 'Шаблон: {esc(site_name)}' "$UI"; then
+    echo 'Nodes Lab v25 уже установлен.'
+    exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v25-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+for file in "$PANEL" "$UI" "$AUTO"; do cp -a "$file" "$BACKUP/$(basename "$file")"; done
+
+if ! python3 - "$PANEL" "$UI" "$AUTO" <<'PY_PATCH'
+from pathlib import Path
+import sys
+panel_path, ui_path, auto_path = map(Path, sys.argv[1:])
+panel=panel_path.read_text(encoding='utf-8')
+ui=ui_path.read_text(encoding='utf-8')
+auto=auto_path.read_text(encoding='utf-8')
+
+start_marker='                elif operation=="edit":\n'
+end_marker='                elif operation=="rename":\n'
+if panel.count(start_marker)!=1:
+    raise RuntimeError('Не найден единственный обработчик редактирования ноды; файлы не изменены.')
+start=panel.index(start_marker)
+end=panel.find(end_marker,start)
+if end==-1:
+    raise RuntimeError('Не найдена граница обработчика ноды; файлы не изменены.')
+previous=panel[start:end]
+for expected in (
+    'site-template',
+    'selected["site_template_id"]=template_id',
+    'selected.pop("auto_site_template_id",None)',
+    'node_api.save_nodes(NODES_FILE,nodes)',
+):
+    if expected not in previous:
+        raise RuntimeError('Неожиданная версия обработчика '+expected+'; файлы не изменены.')
+
+new_handler='''                elif operation=="edit":
+                    # wpo-node-template-save-v25: every Save publishes to the remote agent,
+                    # including re-selecting the currently stored template.
+                    # Lock with the auto-template worker to avoid a stale auto-push.
+                    with wpo_node_auto.registry_lock:
+                        nodes=node_api.load_nodes(NODES_FILE); uid=form.get("id","")
+                        selected=next((node for node in nodes if node.get("id")==uid),None)
+                        if selected is None: raise node_api.NodeError("Нода не найдена.")
+                        new_name=node_api.clean_text(form.get("name",""),"Название ноды",80)
+                        template_id=str(form.get("site_template","")).strip()
+                        presets=all_presets()
+                        allowed={str(item.get("id")):item for item in presets if isinstance(item,dict)}
+                        if template_id and template_id not in allowed:
+                            raise node_api.NodeError("Шаблон не найден в настройках панели.")
+                        # Capabilities are advertised by the live agent; older node
+                        # registrations did not persist them in the controller registry.
+                        # The authenticated POST itself is the authoritative check.
+                        if template_id:
+                            try:
+                                payload=wpo_node_auto._payload(presets,template_id)
+                            except (ValueError,OSError) as exc:
+                                raise node_api.NodeError("Не удалось подготовить шаблон: "+str(exc)) from exc
+                        else:
+                            payload={"template_id":"","html":"","assets":[]}
+                        try:
+                            response=node_api.request(
+                                selected,"POST",node_api.API_PREFIX+"/site-template",payload,timeout=35
+                            )
+                        except node_api.NodeError as exc:
+                            raise node_api.NodeError("Сайт ноды не обновлён: "+str(exc)) from exc
+                        if str(response.get("template_id",""))!=template_id:
+                            raise node_api.NodeError("Нода не подтвердила применение выбранного шаблона.")
+                        # Save the label only after the website was actually accepted.
+                        selected["site_template_id"]=template_id
+                        selected.pop("auto_site_template_id",None)
+                        selected["name"]=new_name
+                        node_api.save_nodes(NODES_FILE,nodes)
+                    if self.headers.get("X-WPP-Async","")=="1":
+                        self.send_json({"ok":True,"site_template_id":template_id}); return
+'''
+panel=panel[:start]+new_handler+panel[end:]
+
+# An auto-assign worker can otherwise overwrite a manually saved page between
+# its initial registry check and its subsequent POST. Keep its POST under the
+# same registry lock as the manual handler; the lock is reentrant.
+old_worker='''                        node_copy = dict(selected)
+                    payload = _payload(all_presets(), tid)
+                    node_api.request(
+                        node_copy, "POST", node_api.API_PREFIX + "/site-template",
+                        payload, timeout=30,
+                    )
+'''
+new_worker='''                        # wpo-node-template-sync-v25: serialize auto and manual publishing.
+                        payload = _payload(all_presets(), tid)
+                        node_api.request(
+                            dict(selected), "POST", node_api.API_PREFIX + "/site-template",
+                            payload, timeout=30,
+                        )
+'''
+if auto.count(old_worker)!=1:
+    raise RuntimeError('Не найдена ожидаемая фоновая отправка; файлы не изменены.')
+auto=auto.replace(old_worker,new_worker,1)
+
+old_title='<p class="wpo-node-template">{icon("settings")} {esc(site_name)}</p>'
+new_title='<p class="wpo-node-template" title="Шаблон: {esc(site_name)}">{icon("settings")} Шаблон: {esc(site_name)}</p>'
+if ui.count(old_title)!=1:
+    raise RuntimeError('Не найдена единственная подпись шаблона ноды; файлы не изменены.')
+ui=ui.replace(old_title,new_title,1)
+
+for path,content in [(panel_path,panel),(ui_path,ui),(auto_path,auto)]:
+    compile(content,str(path),'exec')
+# All validations complete. Install using temporary files on the same filesystem.
+staged=[]
+for path,content in [(panel_path,panel),(ui_path,ui),(auto_path,auto)]:
+    temporary=path.with_suffix('.py.nodes25tmp')
+    temporary.write_text(content,encoding='utf-8')
+    temporary.chmod(path.stat().st_mode & 0o777)
+    staged.append((temporary,path))
+for temporary,path in staged:
+    temporary.replace(path)
+print('Сохранение любого шаблона теперь публикует сайт сразу; подписи карточек обновлены.')
+PY_PATCH
+then
+    for name in panel.py wpp_ui.py wpo_node_autotemplate.py; do cp -a "$BACKUP/$name" "$APP/$name"; done
+    echo 'Изменения не применены. Исходные файлы восстановлены.'
+    exit 1
+fi
+
+if ! python3 -m py_compile "$PANEL" "$UI" "$AUTO" ||
+   ! systemctl restart "$SERVICE" ||
+   ! systemctl is-active --quiet "$SERVICE"; then
+    for name in panel.py wpp_ui.py wpo_node_autotemplate.py; do cp -a "$BACKUP/$name" "$APP/$name"; done
+    systemctl restart "$SERVICE" || true
+    echo 'Проверка завершилась ошибкой: предыдущая версия восстановлена.'
+    exit 1
+fi
+
+echo 'Nodes Lab v25 установлен: каждый выбор шаблона применяется при сохранении.'
+echo 'Автошаблоны не могут перезаписать ручной выбор.'
+echo 'В карточках отображается «Шаблон: ...».'
+echo "Резервная копия: $BACKUP"
+echo 'Существующие ноды, VPN и ветка GitHub main не изменены.'
+__WPO_EMBED_V25_END_736a4b__
+cat > "$STAGE/wpo-nodes-lab-v26-install.sh" <<'__WPO_EMBED_V26_END_736a4b__'
+#!/usr/bin/env bash
+# Nodes Lab v26 — center the yellow installation spinner and red error icon.
+set -Eeuo pipefail
+umask 077
+UI=/opt/tproxy-panel/wpp_ui.py
+SERVICE=tproxy-panel.service
+[[ $EUID -eq 0 ]] || { echo 'Запустите от root на основном VPS WPO.'; exit 1; }
+[[ -s "$UI" ]] || { echo "Не найден $UI"; exit 1; }
+systemctl cat "$SERVICE" >/dev/null 2>&1 || { echo 'Не найдена служба панели WPO.'; exit 1; }
+grep -Fq '/* wpo-node-indicator-center-v24 */' "$UI" || {
+    echo 'Сначала установите Nodes Lab v24 или новее.'; exit 1;
+}
+if grep -Fq '/* wpo-node-spinner-center-v26 */' "$UI"; then
+    echo 'Nodes Lab v26 уже установлен.'
+    exit 0
+fi
+
+BACKUP="/var/lib/tproxy-panel/nodes-lab-v26-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -m 0700 "$BACKUP"
+cp -a "$UI" "$BACKUP/wpp_ui.py"
+
+if ! python3 - "$UI" <<'PY_PATCH'
+from pathlib import Path
+import sys
+path=Path(sys.argv[1])
+src=path.read_text(encoding='utf-8')
+
+# The actual issue: the old diamond glyph becomes an anonymous *first*
+# CSS-grid item (even with font-size:0); ::after is laid out in a second row.
+# Remove it entirely so the animated ring is the only item in the flag tile.
+old='<div class="wpo-node-card-head"><span class="wpo-node-flag">◇</span><div class="wpo-node-label"><h3>Установка</h3></div>{status(uid,state)}</div>'
+new='<div class="wpo-node-card-head"><span class="wpo-node-flag" aria-hidden="true"></span><div class="wpo-node-label"><h3>Установка</h3></div>{status(uid,state)}</div>'
+if src.count(old)!=1:
+    raise RuntimeError('Не найдена единственная карточка установки версии v22. Файл не изменён.')
+src=src.replace(old,new,1)
+
+# The spinner rotates using transform; using flex centering on the PARENT
+# means transform rotation cannot override a translate-based centering.
+css=r"""
+/* wpo-node-spinner-center-v26 */
+.wpo-nodes-page .wpo-pending-node .wpo-node-card-head > .wpo-node-flag{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    line-height:0;
+}
+.wpo-nodes-page .wpo-pending-node .wpo-node-card-head > .wpo-node-flag::after{
+    position:static;
+    display:block;
+    flex:0 0 20px;
+    width:20px;
+    height:20px;
+    margin:0;
+    box-sizing:border-box;
+    transform-origin:center center;
+}
+.wpo-nodes-page .wpo-pending-node:has(.wpo-node-status.error) .wpo-node-card-head > .wpo-node-flag::after{
+    display:grid;
+    place-items:center;
+    font:700 12px/1 system-ui,sans-serif;
+    animation:none;
+}
+"""
+anchor="'''\n    js=r'''(()=>{const path=__PATH__"
+if src.count(anchor)!=1:
+    raise RuntimeError('Не найдено единственное место стилей карточек. Файл не изменён.')
+src=src.replace(anchor,css+"\n"+anchor,1)
+compile(src,str(path),'exec')
+temp=path.with_suffix('.py.nodes26tmp')
+temp.write_text(src,encoding='utf-8')
+temp.chmod(path.stat().st_mode & 0o777)
+temp.replace(path)
+print('Кружок загрузки и ошибка точно по центру: лишний символ из карточки удалён.')
+PY_PATCH
+then
+    cp -a "$BACKUP/wpp_ui.py" "$UI"
+    echo 'Ошибка правки. Исходный интерфейс восстановлен.'
+    exit 1
+fi
+
+if ! python3 -m py_compile "$UI" ||
+   ! systemctl restart "$SERVICE" ||
+   ! systemctl is-active --quiet "$SERVICE"; then
+    cp -a "$BACKUP/wpp_ui.py" "$UI"
+    systemctl restart "$SERVICE" || true
+    echo 'Ошибка проверки или перезапуска. Интерфейс восстановлен.'
+    exit 1
+fi
+echo 'Nodes Lab v26 установлен: жёлтый и красный индикаторы по центру.'
+echo "Резервная копия: $BACKUP"
+echo 'Размеры карточек, ноды, шаблоны, VPN и ветка GitHub main не менялись.'
+__WPO_EMBED_V26_END_736a4b__
+
+for v in $(seq 1 26); do
+    if [[ "$v" == 1 ]]; then file="wpo-nodes-lab-install.sh"; else file="wpo-nodes-lab-v$v-install.sh"; fi
+    [[ -s "$STAGE/$file" ]] || die "Нет встроенного этапа Nodes Lab: $file"
+    bash -n "$STAGE/$file" || die "Ошибка синтаксиса Nodes Lab: $file"
+done
+
 for file in wpo-node-agent-install-v2.sh wpo-node-geo-v13.py wpo-node-autotemplate-v20.py; do
     if (( USE_PACKAGE )); then
         [[ -s "$PACKAGE_DIR/$file" ]] || die "Неполный пакет: $file"
