@@ -102,24 +102,24 @@ ui=once(ui,
         caps=""",
 "node domain and selected template")
 ui=once(ui,
-"data-node-name=\\"{esc(name)}\\" title=\\"Переименовать\\"",
-"data-node-name=\\"{esc(name)}\\" data-node-template=\\"{esc(template_id)}\\" title=\\"Изменить ноду\\"",
+"data-node-name=\"{esc(name)}\" title=\"Переименовать\"",
+"data-node-name=\"{esc(name)}\" data-node-template=\"{esc(template_id)}\" title=\"Изменить ноду\"",
 "node edit template attribute")
 ui=once(ui,
-"<small>{esc(n.get(\\"country_name\\",\\"Страна не определена\\"))} · {esc(n.get(\\"url\\",\\"\\"))}</small>",
-"<small>{esc(n.get(\\"country_name\\",\\"Страна не определена\\"))}</small><a class=\\"wpo-node-domain\\" href=\\"https://{esc(domain)}\\" target=\\"_blank\\" rel=\\"noopener noreferrer\\">https://{esc(domain)}</a>",
+"<small>{esc(n.get(\"country_name\",\"Страна не определена\"))} · {esc(n.get(\"url\",\"\"))}</small>",
+"<small>{esc(n.get(\"country_name\",\"Страна не определена\"))}</small><a class=\"wpo-node-domain\" href=\"https://{esc(domain)}\" target=\"_blank\" rel=\"noopener noreferrer\">https://{esc(domain)}</a>",
 "node visible domain")
 ui=once(ui,
-"<span>{esc(cap)}</span></div><div class=\\"wpo-node-card-actions\\">{edit}{delete}</div>",
-"<span>{esc(cap)} · {esc(template_label)}</span></div><div class=\\"wpo-node-card-actions\\">{edit}{delete}</div>",
+"<span>{esc(cap)}</span></div><div class=\"wpo-node-card-actions\">{edit}{delete}</div>",
+"<span>{esc(cap)} · {esc(template_label)}</span></div><div class=\"wpo-node-card-actions\">{edit}{delete}</div>",
 "node template label")
 ui=once(ui,
-"<div class=\\"wpo-node-card-meta\\"><span>Установщик</span><span>{esc(p.get(\\"detail\\",\\"Ожидает установки\\"))}</span></div></article>')",
-"<div class=\\"wpo-node-card-meta\\"><span>Установщик</span><span>{esc(p.get(\\"detail\\",\\"Ожидает установки\\"))}</span></div><div class=\\"wpo-node-card-actions\\"><form method=\\"post\\" action=\\"{esc(path)}/node-action\\" data-confirm=\\"Убрать незавершённую установку из списка?\\">{hidden(csrf,operation=\\"delete-pending\\",id=uid)}<button class=\\"icon-btn danger\\" type=\\"submit\\" title=\\"Удалить запись установки\\" aria-label=\\"Удалить запись установки\\">{icon(\\"trash\\")}</button></form></div></article>')",
+"<div class=\"wpo-node-card-meta\"><span>Установщик</span><span>{esc(p.get(\"detail\",\"Ожидает установки\"))}</span></div></article>')",
+"<div class=\"wpo-node-card-meta\"><span>Установщик</span><span>{esc(p.get(\"detail\",\"Ожидает установки\"))}</span></div><div class=\"wpo-node-card-actions\"><form method=\"post\" action=\"{esc(path)}/node-action\" data-confirm=\"Убрать незавершённую установку из списка?\">{hidden(csrf,operation=\"delete-pending\",id=uid)}<button class=\"icon-btn danger\" type=\"submit\" title=\"Удалить запись установки\" aria-label=\"Удалить запись установки\">{icon(\"trash\")}</button></form></div></article>')",
 "pending card delete")
 ui=once(ui,
-"<label>Название<input name=\\"name\\" maxlength=\\"80\\" required></label><div class=\\"actions\\">",
-"<label>Название ноды<input name=\\"name\\" maxlength=\\"80\\" required></label><label>Шаблон сайта<select name=\\"template_id\\">{template_options}</select></label><div class=\\"actions\\">",
+"<label>Название<input name=\"name\" maxlength=\"80\" required></label><div class=\"actions\">",
+"<label>Название ноды<input name=\"name\" maxlength=\"80\" required></label><label>Шаблон сайта<select name=\"template_id\">{template_options}</select></label><div class=\"actions\">",
 "node edit template select")
 ui=once(ui,
 "f.elements.name.value=b.dataset.nodeName||'';document.getElementById('wpoRenameError').hidden=true;",
@@ -132,8 +132,8 @@ ui=once(ui,
 
 # Pass the installed site's real preset library into the node editor.
 panel=once(panel,
-"node_api.load_location(LOCATION_FILE),\\"\\",PANEL_PATH,self.csrf(),pending_rows)",
-"node_api.load_location(LOCATION_FILE),\\"\\",PANEL_PATH,self.csrf(),pending_rows,PRESETS)",
+"node_api.load_location(LOCATION_FILE),\"\",PANEL_PATH,self.csrf(),pending_rows)",
+"node_api.load_location(LOCATION_FILE),\"\",PANEL_PATH,self.csrf(),pending_rows,PRESETS)",
 "pass site presets into node UI")
 
 old="""                elif operation=="rename":
@@ -160,7 +160,7 @@ new="""                elif operation=="rename":
                             page=str(preset.get("html",""))
                             if not page: raise node_api.NodeError("У выбранного шаблона отсутствует HTML.")
                             assets=[]
-                            names=list(dict.fromkeys(re.findall(r'/(preset-[A-Za-z0-9_.-]+\\.(?:webp|png|jpe?g|svg|woff2?))',page,re.I)))
+                            names=list(dict.fromkeys(re.findall(r'/(preset-[A-Za-z0-9_.-]+\.(?:webp|png|jpe?g|svg|woff2?))',page,re.I)))
                             total=0
                             for asset_name in names:
                                 asset_path=os.path.join("/srv/tproxy-site",asset_name)
