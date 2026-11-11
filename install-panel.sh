@@ -902,11 +902,15 @@ def sync_profiles(d):
     with open(tmp,"w",encoding="utf-8") as f:
         json.dump({"profiles":keep},f,ensure_ascii=True,indent=2)
     os.chmod(tmp,0o400)
-    c=run("/usr/local/bin/tproxy-server","-config","/etc/tproxy-server/config.json","-profiles-file",tmp,"-check")
-    if c.returncode:
-        try: os.unlink(tmp)
-        except FileNotFoundError: pass
-        raise RuntimeError("tproxy-server config check failed: "+(c.stderr or c.stdout)[-2000:])
+    # tproxy-server requires at least one profile. An empty list is valid
+    # panel state after the primary WEB Proxy and the last client are deleted,
+    # so skip relay validation in that case and stop the service in apply().
+    if keep:
+        c=run("/usr/local/bin/tproxy-server","-config","/etc/tproxy-server/config.json","-profiles-file",tmp,"-check")
+        if c.returncode:
+            try: os.unlink(tmp)
+            except FileNotFoundError: pass
+            raise RuntimeError("tproxy-server config check failed: "+(c.stderr or c.stdout)[-2000:])
     os.replace(tmp,PROFILES)
 
 def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
@@ -1409,7 +1413,15 @@ def apply(d,restart=True,previous=None):
                         st=run("systemctl","status",unit,"--no-pager","--full")
                         raise RuntimeError("User MTProxy is active but backend port is not listening: "+(st.stdout or st.stderr)[-2000:])
             if web_changed and not os.path.exists(MTPROXY_ECONOMY):
-                run("systemctl","restart","tproxy-server.service",check=True)
+                with open(PROFILES,encoding="utf-8") as stream:
+                    relay_profiles=json.load(stream).get("profiles",[])
+                if relay_profiles:
+                    run("systemctl","enable","tproxy-server.service",check=True)
+                    run("systemctl","restart","tproxy-server.service",check=True)
+                else:
+                    # No public WEB Proxy profiles remain. Disable the relay
+                    # instead of restarting it with an invalid empty profile set.
+                    run("systemctl","disable","--now","tproxy-server.service",check=True)
     except Exception:
         with open(PROFILES,"w",encoding="utf-8") as f: f.write(old_profiles)
         os.chmod(PROFILES,0o400)
