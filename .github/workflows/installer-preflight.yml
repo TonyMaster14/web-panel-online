@@ -1,0 +1,80 @@
+name: Проверка установщика WPO 3.0
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  installer-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Синтаксис установщика и его модулей
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for script in install.sh install-final.sh install-webproxy-core.sh node-install.sh wpo-node-agent-install-v2.sh; do
+            echo "Checking $script"
+            bash -n "$script"
+          done
+          python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py wpo-node-geo-v13.py wpo-node-autotemplate-v20.py wpo-relay-zero-profiles-patch.py
+      - name: Сверка 26 встроенных Nodes Lab с исходниками
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile
+          source=Path("node-install.sh").read_text(encoding="utf-8")
+          pattern=re.compile(
+              r'^cat > "\$STAGE/(?P<name>wpo-nodes-lab(?:-v\d+)?-install\.sh)" '
+              r"<<'(?P<marker>__WPO_EMBED_V\d+_END_736a4b__)'\n"
+              r'(?P<body>[\s\S]*?)\n(?P=marker)$',
+              re.M)
+          matches=list(pattern.finditer(source))
+          assert len(matches)==26, f"Expected 26 embedded node steps, got {len(matches)}"
+          with tempfile.TemporaryDirectory() as directory:
+              for number,match in enumerate(matches,1):
+                  name=("wpo-nodes-lab-install.sh" if number==1
+                        else f"wpo-nodes-lab-v{number}-install.sh")
+                  assert match.group("name")==name, name
+                  actual=match.group("body").rstrip("\n")+"\n"
+                  expected=Path(name).read_text(encoding="utf-8").rstrip("\n")+"\n"
+                  assert actual==expected, f"Embedded stage changed: {name}"
+                  script=Path(directory)/name
+                  script.write_text(actual,encoding="utf-8")
+                  subprocess.run(["bash","-n",str(script)],check=True)
+          print("PASS: all 26 source-equivalent embedded stages and their Bash syntax")
+          PY
+      - name: Инварианты безопасности и готовности установки
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          boot=Path("install.sh").read_text()
+          final=Path("install-final.sh").read_text()
+          core=Path("install-webproxy-core.sh").read_text()
+          node=Path("node-install.sh").read_text()
+          checks={
+              "Russian install menu": "МАСТЕР УСТАНОВКИ" in boot,
+              "mask password": "read -r -s -p" in boot,
+              "protected credentials": "mktemp /run/wpo-ui-credentials." in boot and 'chmod 0600 "$CREDENTIALS"' in boot,
+              "progress milestones": "WPO_UI_PROGRESS_FILE" in boot and "WPO_UI_PROGRESS_FILE" in final and "wpo_emit_stage" in core,
+              "private logs": 'chmod 0600 "$LOG"' in boot,
+              "final access credentials": 'WPO_UI_RESULT_FILE' in final and 'cat -- "$RESULT"' in boot,
+              "single node installer": 'bash "$BASE/node-install.sh"' in final,
+              "node rollback": 'cp -a "$BACKUP/$name" "$APP/$name"' in node,
+              "nodes main and QR": 'node-agent-installer.sh' in node,
+              "fix BASE unbound": '"$PACKAGE_DIR/wpo-relay-zero-profiles-patch.py"' in core,
+              "ACME rate limit early exit": 'rateLimited|too many certificates|invalidContact' in core,
+              "do not skip security tests": 'go_binary" test ./internal/config ./internal/server' in core,
+              "Go pinned source": 'TPROXY_REF="52a5feb7fac38f68da5afef9cedd9b3bfc8473ca"' in core,
+              "domain/email preflight": 'valid_domain' in core and 'valid_email' in core,
+              "node scripts independently validated": 'bash -n "$STAGE/$file"' in node,
+          }
+          for key,ok in checks.items():
+              print(("OK" if ok else "FAIL"), key)
+          assert all(checks.values()), "Installer preflight invariant failed"
+          PY
