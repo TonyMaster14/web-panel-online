@@ -135,8 +135,8 @@ class H(BaseHTTPRequestHandler):
         if self.path=='/wpp-api/v1/site-template':
             try:
                 length=int(self.headers.get('Content-Length','0'))
-                if length<1 or length>2900000:
-                    self.out({'ok':False,'message':'Размер шаблона превышает лимит 2.9 МБ.'},413); return
+                if length<1 or length>12000000:
+                    self.out({'ok':False,'message':'Размер шаблона превышает лимит 12 МБ.'},413); return
                 data=json.loads(self.rfile.read(length).decode('utf-8'))
                 template_id=str(data.get('template_id',''))
                 if template_id and not re.fullmatch(r'[A-Za-z0-9_-]{1,80}',template_id):
@@ -156,8 +156,8 @@ class H(BaseHTTPRequestHandler):
                     if not ASSET_RE.fullmatch(name): continue
                     try: raw=base64.b64decode(encoded,validate=True)
                     except (binascii.Error,ValueError): continue
-                    if len(raw)>900000 or total+len(raw)>1800000:
-                        self.out({'ok':False,'message':'Ресурсы шаблона превышают лимит 1.8 МБ.'},413); return
+                    if len(raw)>2000000 or total+len(raw)>6500000:
+                        self.out({'ok':False,'message':'Ресурсы шаблона превышают лимит 6.5 МБ.'},413); return
                     atomic_write(os.path.join(SITE,name),raw)
                     total+=len(raw); written.append(name)
                 for name in os.listdir(SITE):
