@@ -76,6 +76,7 @@ finish_install() { local code=$?; cleanup_credentials; wpp_progress_finish "$cod
 trap finish_install EXIT
 
 wpp_progress_start "Проверка пакета"
+WPO_INSTALL_CLOCK=$SECONDS
 wpp_progress 5 "Подготовка сервера"
 
 echo "WEB PANEL ONLINE V 3.0.0: preparing server..."
@@ -101,6 +102,8 @@ install -o root -g root -m 0755 \
 echo "Installing proxy services..."
 wpp_progress 10 "Установка прокси-служб"
 WEB_PANEL_PROXY_PACKAGE_VERSION="3.0.0" bash "$BASE/install-webproxy-core.sh"
+WPO_CORE_SECONDS=$((SECONDS-WPO_INSTALL_CLOCK))
+echo "      ⏱ Прокси-службы: ${WPO_CORE_SECONDS} сек."
 wpp_progress 55 "Прокси-службы установлены"
 
 echo "Installing control panel..."
@@ -110,6 +113,8 @@ if [[ "$PANEL_UPDATE" == 1 ]]; then
 else
     bash "$BASE/install-panel.sh"
 fi
+WPO_PANEL_SECONDS=$((SECONDS-WPO_INSTALL_CLOCK-WPO_CORE_SECONDS))
+echo "      ⏱ Панель: ${WPO_PANEL_SECONDS} сек."
 wpp_progress 92 "Проверка служб"
 
 for unit in caddy.service mtproxy.service tproxy-server.service tproxy-panel.service web-proxy-panel-firewall.service; do
@@ -162,6 +167,10 @@ else
         die "Не удалось подключить Nodes Lab v26; изучите ошибку выше."
 fi
 
+WPO_TOTAL_SECONDS=$((SECONDS-WPO_INSTALL_CLOCK))
+WPO_NODES_SECONDS=$((WPO_TOTAL_SECONDS-WPO_CORE_SECONDS-WPO_PANEL_SECONDS))
+echo "      ⏱ Подключение нод и финальные проверки: ${WPO_NODES_SECONDS} сек."
+echo "      ⏱ Всего: ${WPO_TOTAL_SECONDS} сек. (без скачивания самого пакета GitHub)"
 echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
 wpp_progress 100 "Установка завершена"
 printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
