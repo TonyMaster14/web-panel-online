@@ -4,7 +4,7 @@
 **Основная ветка `main`:** не изменялась.  
 **Последний визуальный патч:** `wpo-nodes-lab-v22-install.sh`  
 **Зафиксированный снимок исходников:** `5197777c65ad2350d8cf3f4fef4ac0a59e51d2c0`  
-**Универсальный установщик:** [`wpo-nodes-lab-release-v21-install.sh`](./wpo-nodes-lab-release-v21-install.sh)
+**Универсальный установщик:** [`wpo-nodes-lab-release-v22-install.sh`](./wpo-nodes-lab-release-v22-install.sh)
 
 Это контрольная точка экспериментальной интеграции дополнительных VPS-нод с панелью WPO 3.0. Исходники обновлений v1–v21 и модули Node Agent, GeoIP и выбора шаблонов сохранены **в этой ветке**. Для восстановления набора изменений с нуля нужно сначала установить базовую WPO 3.0, затем применить общий установщик. Это не самостоятельный установщик всей панели.
 
@@ -37,7 +37,7 @@ sudo -i bash -c 'curl -4fsSL "https://raw.githubusercontent.com/TonyMaster14/web
 **Только на основном VPS, где уже установлена WPO 3.0:**
 
 ```bash
-sudo -i bash -c 'curl -4fsSL "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/nodes-lab/wpo-nodes-lab-release-v21-install.sh" -o /tmp/wpo-nodes-release-v21.sh && bash /tmp/wpo-nodes-release-v21.sh; code=$?; rm -f /tmp/wpo-nodes-release-v21.sh; exit $code'
+sudo -i bash -c 'curl -4fsSL "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/nodes-lab/wpo-nodes-lab-release-v22-install.sh" -o /tmp/wpo-nodes-release-v21.sh && bash /tmp/wpo-nodes-release-v21.sh; code=$?; rm -f /tmp/wpo-nodes-release-v21.sh; exit $code'
 ```
 
 Общий установщик скачивает и проверяет *все* обновления **из закреплённого коммита**, пропускает уже обнаруженные этапы, устанавливает финальный Node Agent с исправлениями v10–v12, создаёт резервную копию и в случае ошибки восстанавливает исходные исполняемые файлы панели. Реестры пользователей и нод не стираются. На работающем экземпляре, где v21 уже установлен, повторная установка **не требуется**.
