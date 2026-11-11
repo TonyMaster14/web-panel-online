@@ -31,10 +31,22 @@ def once(old,new,label):
         raise RuntimeError(f'{label}: ожидается 1 совпадение, найдено {n}; файл не изменён.')
     src=src.replace(old,new,1)
 
-once(
-    '<h2>⚙️ Управление нодами</h2><p>Подключённые серверы и состояние установок</p>',
-    '<h2>⚙️ Управление нодами</h2>',
-    'Удаление подписи раздела')
+# Earlier live UI edits may already have removed the subtitle; in that case
+# v21 must still apply the final spacing and alignment.
+heading='<h2>⚙️ Управление нодами</h2>'
+if src.count(heading)!=1 or 'def nodes_ui(' not in src:
+    raise RuntimeError('Заголовок нод не найден однозначно. Файл не изменён.')
+import re
+subtitle_re=r'<p(?:\\s[^>]*)?>\\s*Подключённые серверы и состояние установок\\s*</p>'
+# Keep any other page or help text untouched: this is restricted to nodes_ui.
+start=src.index('def nodes_ui(')
+end=src.index('\\n\\nCSS +=',start)
+section=src[start:end]
+section,removed=re.subn(subtitle_re,'',section)
+if removed>1:
+    raise RuntimeError('У подписи найдено более одного совпадения; файл не изменён.')
+src=src[:start]+section+src[end:]
+print('Подпись раздела:', 'удалена' if removed else 'уже отсутствовала')
 
 css="""
 /* wpo-node-heading-v21: start on left edge of first stats tile */
