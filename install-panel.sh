@@ -1014,7 +1014,12 @@ def sync_xray(d):
         protocol=u.get("protocol","web")
         if protocol=="vless":
             profile=u.get("cdn") if isinstance(u.get("cdn"),dict) else {}
-            if profile.get("enabled") and profile.get("provider")=="beget":
+            connection=wpp_connections.get(registry,str(u.get("connection_id","")))
+            route=(connection.get("config") or {}).get("route") if isinstance(connection,dict) else "direct"
+            if route=="reality":
+                target=vless_reality
+                bucket="reality"
+            elif profile.get("enabled") and profile.get("provider")=="beget":
                 target=vless_beget
                 bucket="beget"
             elif profile.get("enabled") and profile.get("provider")=="selectel":
@@ -1131,6 +1136,9 @@ def sync_xray(d):
             "sniffing":{"enabled":True,"destOverride":["http","tls","quic"],"routeOnly":True}
         })
         inbounds[-1]=customize(inbounds[-1],"timeweb","vless")
+    if vless_reality:
+        credentials=wpp_reality.load_or_create(XRAY_BIN)
+        inbounds.append(customize(wpp_reality.inbound(vless_reality,credentials),"reality","vless"))
     if hysteria:
         if not (os.path.isfile(XRAY_CERT) and os.path.isfile(XRAY_KEY)):
             raise RuntimeError("TLS certificate for Hysteria 2 is not ready")
