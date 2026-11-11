@@ -118,7 +118,11 @@ new='''            if web_changed:
                 run("systemctl","restart","tproxy-server.service",check=True)'''
 if old in manager:
     manager=manager.replace(old,new,1)
-elif new not in manager:
+elif new not in manager and not (
+    '            if web_changed:\n' in manager
+    and 'run("systemctl","restart","tproxy-server.service",check=True)' in manager
+    and 'run("systemctl","disable","--now","tproxy-server.service",check=True)' not in manager
+):
     raise RuntimeError("Менеджер имеет другой способ отключения релея; автоматическое исправление остановлено.")
 
 # Expose real failure diagnostics in the panel, instead of the unhelpful
