@@ -2955,6 +2955,7 @@ def connections_with_runtime(connections):
             bucket=connection_store._xray_bucket(item)
             if protocol=="vless" and bucket=="reality":
                 base=reality.inbound([],reality.load_or_create("/opt/web-panel-proxy/xray/xray"))
+                base.get("streamSettings",{}).get("realitySettings",{}).pop("privateKey",None)
             elif protocol=="vless":
                 ports={"direct":10000,"cdn":10001,"beget":10002,"selectel":10003,"vk":10004,"timeweb":10005}
                 base={"tag":tag,"listen":"127.0.0.1","port":ports[bucket],"protocol":"vless",
