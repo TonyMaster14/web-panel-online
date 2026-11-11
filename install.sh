@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Public one-command bootstrapper for WEB PANEL ONLINE V 3.0.0.
+# Nodes Lab branch bootstrapper: install WPO 3.0 with finalized Nodes Lab v21.
 set -Eeuo pipefail
 umask 077
 
@@ -10,7 +10,7 @@ export GIT_CONFIG_NOSYSTEM=1
 export GIT_CONFIG_GLOBAL=/dev/null
 
 REPOSITORY="https://github.com/TonyMaster14/web-panel-online.git"
-RELEASE_REF="${WEB_PANEL_PROXY_REF:-main}"
+RELEASE_REF="${WEB_PANEL_PROXY_REF:-nodes-lab}"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 [[ ${EUID:-1} -eq 0 ]] || die "Run this command with sudo or as root."
