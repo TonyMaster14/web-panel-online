@@ -211,6 +211,26 @@ else:
 PY_PATCH
 install -o root -g root -m 0644 "$STAGE/wpp_panel_extras.py" "$EXTRAS"
 python3 -m py_compile "$PANEL" "$UI" "$EXTRAS"
+# Smoke-test actual packaged pages and every photo before restarting panel.
+# The isolated preview must inline photographs without changing the doctype.
+python3 - "$APP" <<'PY_SMOKE'
+import sys
+sys.path.insert(0,sys.argv[1])
+from wpp_panel_extras import preview_document
+from wpp_presets import presets
+items=presets()
+required={"countdown","cars","auto-service","beauty-salon","phone-repair","medical-diagnostics"}
+assert required.issubset({str(p["id"]) for p in items}), "Missing built-in site preset"
+for p in items:
+    doc=preview_document(p["html"],None)
+    assert doc.lstrip().lower().startswith("<!doctype html>"), "HTML doctype was lost: "+p["id"]
+    assert "Content-Security-Policy" in doc, "Preview CSP missing: "+p["id"]
+    if p["id"]=="cars":
+        assert doc.count("data:image/webp;base64,")>=7, "Some car photos are missing in preview"
+    if p["id"]=="countdown":
+        assert "data:image/webp;base64," in doc, "Coffee preview photo is missing"
+print("✓ Site previews and all seven car photos verified.")
+PY_SMOKE
 systemctl restart "$SERVICE"
 systemctl is-active --quiet "$SERVICE" ||
     { echo 'Panel service did not become active.' >&2; exit 1; }
