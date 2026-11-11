@@ -59,7 +59,7 @@ panel=once(panel,
 
 panel=once(panel,
     'class Handler(BaseHTTPRequestHandler):',
-    'wpo_node_auto.start(NODES_FILE,all_presets,node_api)\n\nclass Handler(BaseHTTPRequestHandler):',
+    'wpo_node_auto.start(NODES_FILE,lambda: all_presets(),node_api)\n\nclass Handler(BaseHTTPRequestHandler):',
     'Запуск автоотправки шаблонов в фоне')
 
 # Reserve a template ONLY when a new node is enrolled. Reservations are
