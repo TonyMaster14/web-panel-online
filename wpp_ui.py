@@ -321,8 +321,8 @@ CSS += """
 """
  
 
-/* Compact centered QR modal shared by users, subscriptions and every protocol. */
-CSS += """
+CSS += """/* Compact centered QR modal shared by users, subscriptions and every protocol. */
+
 .connection-dialog{
   width:min(420px,calc(100vw - 40px));
   max-width:calc(100vw - 40px);
