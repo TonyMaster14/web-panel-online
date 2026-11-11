@@ -127,6 +127,14 @@ apply wpo-nodes-lab-v20-install.sh "$PANEL" "# wpo-node-auto-v20"
 apply wpo-nodes-lab-v21-install.sh "$UI" "/* wpo-node-heading-v21 */"
 
 for file in "$PANEL" "$UI" "$GEO" "$AUTO"; do [[ -s "$file" ]] || die "Отсутствует файл: $file"; done
+# Validate the final generated-node installer and controller feature set.
+grep -Fq 'node-agent-installer.sh' "$PANEL" || die 'Нет маршрута установщика ноды.'
+grep -Fq '# wpo-node-country-v13' "$PANEL" || die 'Нет геолокации нод.'
+grep -Fq '# wpo-node-auto-v20' "$PANEL" || die 'Нет автоматического выбора шаблона.'
+grep -Fq '/* wpo-node-heading-v21 */' "$UI" || die 'Не применён итоговый интерфейс v21.'
+grep -Fq 'site-template' "$AGENT" || die 'Установщик ноды не поддерживает шаблоны.'
+grep -Fq 'for EMAIL_ATTEMPT in 1 2 3' "$AGENT" || die 'Установщик ноды не обновлён до итоговой версии.'
+grep -Fq '__WPO_CONTROLLER_ENROLL_URL__' "$AGENT" || die 'Установщик ноды не связан с основной панелью.'
 python3 -m py_compile "$PANEL" "$UI" "$GEO" "$AUTO"
 bash -n "$AGENT"
 systemctl is-active --quiet "$SERVICE" || die "Служба $SERVICE не активна."
