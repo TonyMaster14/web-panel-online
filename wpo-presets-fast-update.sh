@@ -84,7 +84,10 @@ done
 # Extract the exact verified implementation from our official install-panel.sh.
 # Apply narrow, guarded edits to the running panel.py. All Nodes Lab code and
 # other customizations elsewhere in panel.py remain byte-for-byte unchanged.
-python3 - "$PANEL" "$STAGE/install-panel.sh" <<'PY_PATCH'
+# Never replace wpp_ui.py wholesale: Nodes Lab v26 customizes it on the VPS.
+# Patch only editor_ui and gallery-specific CSS, leaving every node change intact.
+MODIFIED=1
+python3 - "$PANEL" "$UI" "$STAGE/install-panel.sh" "$STAGE/wpp_ui.py" <<'PY_PATCH'
 from pathlib import Path
 import os
 import re
@@ -92,9 +95,13 @@ import sys
 import tempfile
 
 target=Path(sys.argv[1])
-reference=Path(sys.argv[2]).read_text(encoding="utf-8")
+ui_path=Path(sys.argv[2])
+reference=Path(sys.argv[3]).read_text(encoding="utf-8")
+ref_ui=Path(sys.argv[4]).read_text(encoding="utf-8")
 original=target.read_text(encoding="utf-8")
+original_ui=ui_path.read_text(encoding="utf-8")
 content=original
+ui_code=original_ui
 
 def span(text,start,end):
     a=text.find(start)
@@ -150,27 +157,58 @@ if not all(mark in content for mark in expected):
 node_marks=set(re.findall(r"# wpo-node-[^\n]+", original))
 if not all(mark in content for mark in node_marks):
     raise SystemExit("Nodes Lab feature marker changed. Refusing patch.")
+# Update the Settings gallery without clobbering Nodes Lab v26 UI changes.
+ui_start='def editor_ui(source, path, csrf, presets, has_draft):'
+ui_end='\ndef openflux_ui('
+latest_editor=span(ref_ui,ui_start,ui_end)
+current_editor=span(ui_code,ui_start,ui_end)
+if 'id="presetGallery"' not in current_editor:
+    if 'id="editorForm"' not in current_editor:
+        raise SystemExit("Unexpected existing settings editor; refusing to overwrite.")
+    ui_code=ui_code.replace(current_editor,latest_editor,1)
+
+css_anchor='# Compact outlined preset gallery'
+if css_anchor not in ui_code:
+    gallery_css=span(ref_ui,css_anchor,'\ndef editor_ui(')
+    if not gallery_css.startswith(css_anchor) or not gallery_css.count("CSS += '''")==1:
+        raise SystemExit("Cannot identify the new gallery stylesheet.")
+    ui_code=ui_code.replace(ui_start,gallery_css+'\n'+ui_start,1)
+
+# Keep every Nodes Lab marker in both files, not only the panel backend.
+ui_marks=set(re.findall(r'(?:#|/\*) wpo-node-[^\n]+',original_ui))
+if not all(mark in ui_code for mark in ui_marks):
+    raise SystemExit("A Nodes Lab UI marker was lost; refusing update.")
+if not all(mark in ui_code for mark in ('id="presetGallery"','id="previewDialog"',css_anchor)):
+    raise SystemExit("Gallery implementation is incomplete.")
 compile(content,str(target),"exec")
-if content!=original:
-    stat=target.stat()
-    fd,tmp=tempfile.mkstemp(prefix=".panel-presets-",dir=str(target.parent))
+compile(ui_code,str(ui_path),"exec")
+
+def atomic_source_replace(path,code):
+    st=path.stat()
+    fd,tmp=tempfile.mkstemp(prefix=".wpo-gallery-",dir=str(path.parent))
     try:
         with os.fdopen(fd,"w",encoding="utf-8") as stream:
-            stream.write(content)
+            stream.write(code)
             stream.flush()
             os.fsync(stream.fileno())
-        os.chown(tmp,stat.st_uid,stat.st_gid)
-        os.chmod(tmp,stat.st_mode & 0o777)
-        os.replace(tmp,target)
+        os.chown(tmp,st.st_uid,st.st_gid)
+        os.chmod(tmp,st.st_mode & 0o777)
+        os.replace(tmp,path)
     finally:
         if os.path.exists(tmp):
             os.unlink(tmp)
-    print("Controller preset preview and publish routes updated.")
+
+if content!=original:
+    atomic_source_replace(target,content)
+    print("Panel backend: preset routes updated.")
 else:
-    print("Controller routes already current.")
+    print("Panel backend: already up to date.")
+if ui_code!=original_ui:
+    atomic_source_replace(ui_path,ui_code)
+    print("Settings gallery updated; existing Nodes Lab UI retained.")
+else:
+    print("Settings gallery: already up to date.")
 PY_PATCH
-MODIFIED=1
-install -o root -g root -m 0644 "$STAGE/wpp_ui.py" "$UI"
 install -o root -g root -m 0644 "$STAGE/wpp_panel_extras.py" "$EXTRAS"
 python3 -m py_compile "$PANEL" "$UI" "$EXTRAS"
 systemctl restart "$SERVICE"
