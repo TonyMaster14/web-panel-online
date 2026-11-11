@@ -3706,7 +3706,7 @@ class Handler(BaseHTTPRequestHandler):
                     existing_config=dict(existing.get("config",{})) if isinstance(existing,dict) and isinstance(existing.get("config"),dict) else {}
                     existing_advanced=dict(existing.get("advanced",{})) if isinstance(existing,dict) and isinstance(existing.get("advanced"),dict) else {}
                     advanced_value=form.get("advanced",json.dumps(existing_advanced,ensure_ascii=False))
-                    if protocol=="vless" and form.get("route")=="reality" and form.get("xray_json","").strip():
+                    if protocol=="vless" and (form.get("route")=="reality" or (existing_config.get("route")=="reality")) and form.get("xray_json","").strip():
                         raise connection_store.ConnectionError("Редактор низкоуровневого Xray JSON для Reality отключён: приватный ключ хранится только на сервере.")
                     if protocol in ("vless","hysteria") and form.get("xray_json","").strip():
                         if not existing: raise connection_store.ConnectionError("Сначала создайте подключение, затем откройте его настройки карандашом.")
