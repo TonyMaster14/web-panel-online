@@ -104,7 +104,7 @@ ask_password(){
 
 # Classic mode remains compatible with previous invocation patterns.
 if (( ! USE_WIZARD )); then
-    if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" ]]; then
+    if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
         bash "$LOCAL_BASE/install-final.sh"
         exit $?
     fi
@@ -176,7 +176,7 @@ draw(){
 shown=1
 draw 1 'Загрузка GitHub' '◐' 0
 SOURCE=""
-if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" ]]; then
+if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
     SOURCE="$LOCAL_BASE"
 else
     if ! command -v git >/dev/null 2>&1; then
