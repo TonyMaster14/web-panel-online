@@ -11,6 +11,7 @@ import wpp_reality
 import wpp_routing
 import wpp_connections
 import wpp_cdn
+import wpp_subscriptions
 
 KEY_PRIVATE = "A" * 43
 KEY_PUBLIC = "B" * 43
@@ -65,6 +66,32 @@ class RealityTests(unittest.TestCase):
         server = wpp_reality.inbound([{"id": uuid, "email": "panel:test:1"}], config)
         self.assertEqual(server["streamSettings"]["realitySettings"]["privateKey"], KEY_PRIVATE)
         self.assertEqual(server["settings"]["clients"][0]["flow"], "xtls-rprx-vision")
+
+    def test_subscription_and_failover(self):
+        config = dict(private_key=KEY_PRIVATE, public_key=KEY_PUBLIC,
+                      short_id="0123456789abcdef", port=8444,
+                      target="www.microsoft.com:443", server_name="www.microsoft.com")
+        uuid = "8aee6613-a0d1-4f2b-a8be-a767d65870d6"
+        reality_link = wpp_reality.client_link(uuid, "vpn.example.com", "🇨🇿 Чехия", config)
+        xhttp_link = ("vless://" + uuid + "@vpn.example.com:443?encryption=none"
+                      "&security=tls&type=xhttp&path=%2Ftest&host=vpn.example.com#XHTTP")
+        sub = {
+            "id": "account123", "name": "Fenix VPN", "enabled": True,
+            "max_devices": 0, "profile_ids": [],
+            "connections": [{"id": "vless-reality", "name": "Reality", "protocol": "vless"}],
+            "protocols": ["vless"], "devices": [],
+        }
+        data = {"users": []}
+        wpp_subscriptions.provision(data, sub, {"id": "device123", "name": "iPhone"})
+        self.assertEqual(data["users"][0]["connection_id"], "vless-reality")
+        self.assertEqual(data["users"][0]["protocol"], "vless")
+        single = wpp_routing.plain_xray_config(reality_link, "Fenix VPN")
+        self.assertEqual(single["remarks"], "Fenix VPN")
+        self.assertEqual(single["outbounds"][0]["streamSettings"]["network"], "tcp")
+        combined = wpp_routing.failover_xray_config([reality_link, xhttp_link], name="Fenix VPN")
+        self.assertEqual(combined["remarks"], "Fenix VPN")
+        self.assertEqual([x["streamSettings"]["network"] for x in combined["outbounds"][:2]],
+                         ["tcp", "xhttp"])
 
     def test_original_xhttp_untouched(self):
         link = ("vless://8aee6613-a0d1-4f2b-a8be-a767d65870d6@vpn.example.com:443"
