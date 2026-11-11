@@ -498,7 +498,27 @@ git -C "$REPO_DIR" fetch --depth 1 origin "$TPROXY_REF"
 git -C "$REPO_DIR" checkout --detach --force FETCH_HEAD
 [[ "$(git -C "$REPO_DIR" rev-parse HEAD)" == "$TPROXY_REF" ]] ||
     die "Pinned tproxy-server source verification failed."
+# WPO-only patch: a public website is not itself a WEB Proxy. The relay must
+# work with profiles: [] after an operator removes the final proxy protocol.
+[[ -s "$BASE/wpo-relay-zero-profiles-patch.py" ]] ||
+    die "Missing zero-profile relay source patch from installation package."
+python3 "$BASE/wpo-relay-zero-profiles-patch.py" "$REPO_DIR" ||
+    die "Could not prepare the website-only relay build."
 cd "$REPO_DIR"
+
+# A pre-existing healthy process may be the OLD binary that refuses empty
+# profile sets. Do not reuse it simply because ports 8080/8081 are open.
+if [[ "$REUSE_RELAY" == "1" && -s /etc/tproxy-server/config.json ]]; then
+    zero_profile_check="$(mktemp /tmp/wpp-site-profiles.XXXXXX)"
+    chmod 0600 "$zero_profile_check"
+    printf '%s\n' '{"profiles":[]}' > "$zero_profile_check"
+    if ! /usr/local/bin/tproxy-server -config /etc/tproxy-server/config.json \
+            -profiles-file "$zero_profile_check" -check >/dev/null 2>&1; then
+        REUSE_RELAY=0
+        echo "      Existing relay does not support website-only mode; rebuilding."
+    fi
+    rm -f "$zero_profile_check"
+fi
 
 if [[ "$REUSE_CADDY" == "1" ]]; then
     echo "      Caddy already installed; keeping its binary and systemd service."
@@ -651,9 +671,10 @@ else
     go_binary="/opt/go${go_version}/bin/go"
 fi
 
-echo "      Building current relay..."
+echo "      Building relay (public site works with 0 WEB Proxy profiles)..."
 (
     cd "$REPO_DIR"
+    "$go_binary" test ./internal/config ./internal/server -run '^TestWPO' -count=1
     "$go_binary" build -trimpath -ldflags='-s -w' \
         -o /usr/local/bin/tproxy-server ./cmd/tproxy-server
 )
