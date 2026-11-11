@@ -1,0 +1,69 @@
+name: Preset gallery smoke checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "install-panel.sh"
+      - "wpp_ui.py"
+      - "wpp_panel_extras.py"
+      - "wpp_presets.py"
+      - "wpo-presets-fast-update.sh"
+      - ".github/workflows/preset-gallery-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shell and Python syntax
+        run: |
+          bash -n install-panel.sh
+          bash -n wpo-presets-fast-update.sh
+          python3 -m py_compile wpp_ui.py wpp_panel_extras.py wpp_presets.py
+      - name: Verify embedded server, isolated modal and WebP previews
+        run: |
+          sudo install -d -m 0755 /srv/tproxy-site
+          sudo cp -a assets/preset-*.webp /srv/tproxy-site/
+          python3 - <<'PY'
+          from pathlib import Path
+          from wpp_ui import editor_ui
+          from wpp_panel_extras import preview_document, inline_bundled_preset_photos
+
+          installer = Path("install-panel.sh").read_text(encoding="utf-8")
+          start_mark = "cat > \"$APP_FILE\" <<'PY'\n"
+          start = installer.index(start_mark) + len(start_mark)
+          end = installer.index("\nPY\n", start)
+          compile(installer[start:end], "generated-panel.py", "exec")
+
+          html = editor_ui("", "/panel-test", "test-csrf", [{
+              "id": "cars", "name": "Автосалон", "description": "Автомобили",
+              "html": "<!doctype html><html><head></head><body></body></html>"
+          }], False)
+          assert 'id="presetGallery"' in html
+          assert 'id="previewDialog"' in html
+          assert 'data-preset-preview="cars"' in html
+          assert 'id="editorForm"' not in html
+          assert 'action="/panel-test/apply-preset"' in html
+
+          source = '<!doctype html><html><head><style>.car{background:url("/preset-cars.webp")}</style></head><body></body></html>'
+          preview = preview_document(source, lambda x: x)
+          assert preview.startswith("<!doctype html>")
+          assert "http-equiv=\"Content-Security-Policy\"" in preview
+          assert 'data:image/webp;base64,' in preview
+          css = inline_bundled_preset_photos('.car{background:url("/preset-car-white.webp")}')
+          assert "data:image/webp;base64," in css
+          assert "inline_bundled_preset_photos(css)" in installer
+
+          ui = Path("wpp_ui.py").read_text(encoding="utf-8")
+          js_start = "    js = r'''<script>"
+          p = ui.index(js_start, ui.index("def editor_ui(")) + len(js_start)
+          q = ui.index("</script>'''", p)
+          Path("/tmp/wpo-preset-gallery.js").write_text(ui[p:q], encoding="utf-8")
+          print("Preset gallery, generated controller, CSP and local photos: OK")
+          PY
+          node --check /tmp/wpo-preset-gallery.js
