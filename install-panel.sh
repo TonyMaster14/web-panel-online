@@ -2499,18 +2499,22 @@ def restart_public_site():
     else:
         raise RuntimeError("Relay health endpoint did not become ready after restart")
 def fetch_published(path):
-    # wpo-presets-live-v3: verify through Caddy's real HTTPS route, not via
-    # a fallback direct relay HTTP port that could falsely report success
-    # even when the public hostname cannot serve the website.
-    command=["curl","-kfsS","--noproxy","*","--resolve",DOMAIN+":443:127.0.0.1",
-             "--connect-timeout","2","--max-time","4","https://"+DOMAIN+path]
+    # wpo-publish-v4: verify the running relay through its dedicated local
+    # public listener after restart. The admin UI is reached through Caddy,
+    # but local TLS probing can fail due to bind/proxy/network topology and
+    # MUST NOT roll back a successfully loaded static site.
+    # The admin browser will independently verify the real public HTTPS URL
+    # and its SHA-256 after this local check returns.
+    command=["curl","-fsS","--noproxy","*","-H","Host: "+DOMAIN,
+             "--connect-timeout","1","--max-time","3",
+             "http://127.0.0.1:8080"+path]
     last=""
-    for attempt in range(6):
-        result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=7)
+    for attempt in range(8):
+        result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=5)
         if result.returncode==0: return result.stdout
-        last=(result.stderr or result.stdout or "Caddy/relay недоступны").strip()
-        time.sleep(0.35+attempt*0.1)
-    raise RuntimeError("HTTPS не возвращает опубликованную страницу: "+last[-210:])
+        last=(result.stderr or result.stdout or "сайт не отвечает").strip()
+        time.sleep(0.25+attempt*0.12)
+    raise RuntimeError("Сервер сайта не загрузил шаблон: "+last[-180:])
 def verify_public_asset(path, marker):
     body=fetch_published(path)
     if marker not in body:
@@ -2676,6 +2680,7 @@ def write_site_html(source):
             for _,path in sorted(generated,reverse=True)[12:]:
                 try: os.unlink(path)
                 except FileNotFoundError: pass
+            return hashlib.sha256(raw).hexdigest()
         except Exception:
             if had_index_backup and os.path.exists(SITE_BACKUP):
                 try:
@@ -4047,9 +4052,14 @@ class Handler(BaseHTTPRequestHandler):
                 # Publish and verify before returning success to the card.
                 # Keep the previous public site if service checks fail.
                 with STATE_LOCK:
-                    write_site_html(preset["html"])
+                    published_hash=write_site_html(preset["html"])
                     if os.path.exists(SITE_DRAFT): os.unlink(SITE_DRAFT)
-                if async_apply: self.send_json({"ok":True,"name":preset["name"]})
+                if async_apply:
+                    # Browser-side confirmation verifies that the actual
+                    # publicly accessible origin serves the selected site.
+                    self.send_json({"ok":True,"name":preset["name"],
+                                    "published_hash":published_hash,
+                                    "url":"https://"+DOMAIN+"/"})
                 else: self.redirect("/settings")
             except ValueError as exc:
                 if async_apply: self.send_json({"ok":False,"message":str(exc)},400)
