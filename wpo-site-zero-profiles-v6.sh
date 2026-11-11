@@ -42,7 +42,9 @@ finish() {
     trap - EXIT
     if (( code != 0 && TOUCHED )); then
         echo "Ошибка исправления — возвращаю предыдущую версию файлов..." >&2
-        install -o root -g root -m 0755 "$BACKUP/tproxy-server" "$RELAY_BIN" || true
+        if install -o root -g root -m 0755 "$BACKUP/tproxy-server" "$RELAY_BIN.wpo-v6-restore"; then
+            mv -f -- "$RELAY_BIN.wpo-v6-restore" "$RELAY_BIN" || true
+        fi
         cp -a "$BACKUP/web-proxy-panelctl" "$MANAGER" || true
         cp -a "$BACKUP/panel.py" "$PANEL" || true
         cp -a "$BACKUP/profiles.json" "$PROFILES" || true
