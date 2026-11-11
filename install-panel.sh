@@ -899,16 +899,11 @@ def sync_profiles(d):
                     "backend":"127.0.0.1:%d"%int(u["backend_port"]),
                     "carrier_mode":"https"
                 })
-    # wpo-site-always-on-v5 — the relay serves the public website even when
-    # every WEB Proxy client and the original primary profile are removed.
-    # The upstream relay rejects an empty profiles list. Use one unguessable
-    # internal standby capability with a nonlistening loopback backend.
-    # This is NEVER returned to a client, user, QR, link or node.
-    if not keep:
-        keep.append({"name":"wpp-site-standby",
-                     "secret":secrets.token_hex(16),
-                     "backend":"127.0.0.1:2398",
-                     "carrier_mode":"https"})
+    # wpo-zero-profiles-v6: the patched tproxy-server serves the public
+    # website with {"profiles":[]}. Do not create any dummy, hidden or
+    # default transport credentials when WEB Proxy is removed.
+    # Stale "wpp-site-standby" placeholders from prior releases are filtered
+    # above and will disappear at the next profile sync.
     tmp=PROFILES+".tmp"
     with open(tmp,"w",encoding="utf-8") as f:
         json.dump({"profiles":keep},f,ensure_ascii=True,indent=2)
@@ -1351,8 +1346,8 @@ def set_mtproxy_economy(request):
         raise ValueError("Сначала выключите WEB Proxy и MTProto у клиентов. Активных подключений: "+str(len(users))+".")
     if enabled:
         atomic_text(MTPROXY_ECONOMY,"enabled\n",0o600)
-        # Economy disables MTProxy traffic, never the public website. The
-        # relay has a separate standby profile when no WEB users exist.
+        # Economy disables MTProxy traffic, never the public website.
+        # A zero-profile relay serves the public domain without proxy users.
         run("systemctl","disable","--now","mtproxy.service",check=False)
         sync_profiles(d)
         run("systemctl","enable","--now","tproxy-server.service",check=True)
@@ -1423,8 +1418,8 @@ def apply(d,restart=True,previous=None):
                         st=run("systemctl","status",unit,"--no-pager","--full")
                         raise RuntimeError("User MTProxy is active but backend port is not listening: "+(st.stdout or st.stderr)[-2000:])
             if web_changed:
-                # Keep the public hostname alive after deleting WEB users;
-                # tproxy-server still serves the site with a standby profile.
+                # Keep the public hostname alive after deleting WEB users.
+                # The patched relay can serve sites with zero WEB profiles.
                 run("systemctl","enable","tproxy-server.service",check=True)
                 run("systemctl","restart","tproxy-server.service",check=True)
     except Exception:
@@ -2489,8 +2484,8 @@ def install_private_file(path,raw):
         except FileNotFoundError: pass
         raise
 def restart_public_site():
-    # wpo-site-always-on-v5: the site-serving relay is a separate always-on
-    # dependency, even when the operator has no WEB Proxy profiles.
+    # wpo-zero-profiles-v6: the site-serving relay stays online with
+    # an empty WEB Proxy profile list; no hidden transport exists.
     service="tproxy-server.service"
     restart=subprocess.run(["systemctl","restart",service],
                            stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=30)
