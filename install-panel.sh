@@ -2812,11 +2812,12 @@ def direct_profile_config(user,secret):
     node_location=selected.get("node_location")
     node_title=node_api.location_prefix(node_location if isinstance(node_location,dict)
                                         else node_api.load_location(LOCATION_FILE))
-    # The Xray outbound keeps its flag/country node name. JSON remarks
-    # gets a visible client heading as a fallback if Happ imports the JSON
-    # as a standalone config and ignores the subscription's HTTP title.
+    # The Xray outbound retains its flag/country node name, while the
+    # imported Happ profile heading must match the client's saved name.
+    # Do not append the server location to JSON remarks: the server name
+    # is already carried by the outbound tag.
     profile_title=happ_profile_title(selected.get("name"),"WEB PANEL ONLINE")
-    display_title=profile_title+" · "+node_title
+    display_title=profile_title
     link=proxy_link(selected["protocol"],secret,selected.get("backend_port",443),node_title,selected.get("username",""))
     # A broken routing store must not silently downgrade a routed profile to a
     # plain VLESS link: surface a retryable error instead.
