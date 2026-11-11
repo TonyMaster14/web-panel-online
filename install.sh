@@ -221,8 +221,9 @@ if (( code == 0 )); then
     printf '\r\033[2K'
     draw 100 'Установка завершена' '✓' "$((SECONDS-started))"
     printf '\n'
+    printf '\n%s  Проверки завершены. Журнал сохранён на VPS.%s\n' "$gray" "$reset"
+    # The URL, login and password remain the very last content on screen.
     [[ -s "$RESULT" ]] && cat -- "$RESULT" || printf '\n  Готово. Данные доступа: WPP → информация о панели.\n'
-    printf '\n%s  Журнал: %s%s\n' "$gray" "$LOG" "$reset"
 else
     printf '\n\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
