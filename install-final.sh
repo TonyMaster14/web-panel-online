@@ -140,8 +140,10 @@ systemctl is-active --quiet web-panel-proxy-sync-tls.timer ||
 echo "Checking the latest Xray and OpenFlux releases..."
 wpp_progress 96 "Обновление Xray и OpenFlux"
 flock -u 9
-if ! systemctl start web-panel-proxy-component-auto-update.service; then
-    echo "WARNING: Latest Xray/OpenFlux check failed; the automatic timer will retry." >&2
+# Queue the component release check without waiting for every remote API.
+# systemd's auto-update timer handles subsequent retry independently.
+if ! systemctl start --no-block web-panel-proxy-component-auto-update.service; then
+    echo "WARNING: Xray/OpenFlux update check could not be queued; the timer will retry." >&2
 fi
 # Nodes Lab v26 is part of the official main installation.
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
@@ -149,7 +151,16 @@ fi
 # random site templates and the final compact node cards, including pending installs.
 wpp_progress 98 "Установка Nodes Lab v26"
 echo "Installing Nodes Lab v26 into the panel..."
-bash "$BASE/wpo-nodes-lab-release-v26-install.sh" || die "Не удалось подключить Nodes Lab v26; базовая панель установлена, изучите ошибку выше."
+# Clean installs use the already downloaded package and apply Nodes Lab
+# source patches in one batch; the controller restarts once at the end.
+# Existing installations retain the original cautious per-version behavior.
+if [[ "$PANEL_UPDATE" == 0 ]]; then
+    WPO_NODES_LOCAL_SOURCE=1 WPO_NODES_BATCH_RESTART=1 bash "$BASE/wpo-nodes-lab-release-v26-install.sh" ||
+        die "Не удалось подключить Nodes Lab v26; базовая панель установлена, изучите ошибку выше."
+else
+    WPO_NODES_LOCAL_SOURCE=1 bash "$BASE/wpo-nodes-lab-release-v26-install.sh" ||
+        die "Не удалось подключить Nodes Lab v26; изучите ошибку выше."
+fi
 
 echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
 wpp_progress 100 "Установка завершена"
