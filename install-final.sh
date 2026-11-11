@@ -42,7 +42,7 @@ wpp_progress_finish() {
 }
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-for file in install-panel.sh install-webproxy-core.sh uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpo-nodes-lab-release-v22-install.sh; do
+for file in install-panel.sh install-webproxy-core.sh uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpo-nodes-lab-release-v23-install.sh; do
     [[ -s "$BASE/$file" ]] || die "Package is incomplete: missing $file. Extract the complete archive."
 done
 for file in mtproxy-download.sh assets/mtproxy-bootstrap/proxy-secret assets/mtproxy-bootstrap/proxy-multi.conf; do
@@ -143,15 +143,15 @@ flock -u 9
 if ! systemctl start web-panel-proxy-component-auto-update.service; then
     echo "WARNING: Latest Xray/OpenFlux check failed; the automatic timer will retry." >&2
 fi
-# Nodes Lab v22 is bundled into the nodes-lab branch installation.
+# Nodes Lab v23 is bundled into the nodes-lab branch installation.
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
 # with the current Node Agent installer, auto-geolocation, status checks,
 # random site templates and the final compact node cards, including pending installs.
-wpp_progress 98 "Установка Nodes Lab v22"
-echo "Installing Nodes Lab v22 into the panel..."
-bash "$BASE/wpo-nodes-lab-release-v22-install.sh" || die "Не удалось подключить Nodes Lab v22; базовая панель установлена, изучите ошибку выше."
+wpp_progress 98 "Установка Nodes Lab v23"
+echo "Installing Nodes Lab v23 into the panel..."
+bash "$BASE/wpo-nodes-lab-release-v23-install.sh" || die "Не удалось подключить Nodes Lab v23; базовая панель установлена, изучите ошибку выше."
 
-echo "Installation complete (WPO 3.0 + Nodes Lab v22)."
+echo "Installation complete (WPO 3.0 + Nodes Lab v23)."
 wpp_progress 100 "Установка завершена"
 printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
 chmod 0600 /etc/web-proxy-panel/version
