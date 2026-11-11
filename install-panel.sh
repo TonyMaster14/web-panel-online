@@ -5054,18 +5054,39 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
-echo
-echo "============================================================"
-if [[ "$UPDATING" == "1" ]]; then
-echo "          WEB PANEL ONLINE V 3.0.0 UPDATED"
-else
-echo "         WEB PANEL ONLINE V 3.0.0 IS READY"
-fi
-echo "============================================================"
-echo
-echo "Panel URL:"
-echo "  https://${DOMAIN}${PANEL_PATH}/login"
-echo
+
+# Show completion details only after the full controller/Nodes setup in the
+# integrated installer. Standalone panel installation still prints directly.
+# The integrated caller provides an already-created root-only tmpfs file.
+wpo_print_install_summary() {
+    printf '\n'
+    printf '%s\n' '╔══════════════════════════════════════════════════════════════╗'
+    printf '%s\n' '║                WEB PANEL ONLINE 3.0                          ║'
+    if [[ "$UPDATING" == "1" ]]; then
+        printf '%s\n' '║                 ОБНОВЛЕНИЕ ЗАВЕРШЕНО                          ║'
+    else
+        printf '%s\n' '║                 УСТАНОВКА ЗАВЕРШЕНА                            ║'
+    fi
+    printf '%s\n' '╚══════════════════════════════════════════════════════════════╝'
+    printf '\n  🌐 АДРЕС ПАНЕЛИ\n'
+    printf '  https://%s%s/login\n' "$DOMAIN" "$PANEL_PATH"
+    printf '\n  👤 ДАННЫЕ ДЛЯ ВХОДА\n'
+    printf '  Логин:  %s\n' "$ADMIN"
+    if [[ "$UPDATING" == "1" ]]; then
+        printf '  Пароль: сохранён (не изменён)\n'
+    else
+        printf '  Пароль: %s\n' "$PASS"
+    fi
+    if [[ "$UPDATING" != "1" && "$NODE_API_TOKEN" == wppnode1_* ]]; then
+        printf '\n  🔐 NODE API TOKEN\n'
+        printf '  %s\n' "$NODE_API_TOKEN"
+    fi
+    printf '\n%s\n' '────────────────────────────────────────────────────────────────'
+    printf '%s\n' 'Сохраните адрес и данные доступа в надёжном месте.'
+    printf '%s\n' 'Не публикуйте пароль и Node API token.'
+    printf '%s\n' '────────────────────────────────────────────────────────────────'
+}
+
 NODE_API_TOKEN="$(python3 - "$DOMAIN" <<'PY'
 import sys
 sys.path.insert(0,"/opt/tproxy-panel")
@@ -5077,20 +5098,11 @@ except (OSError,ValueError):
     pass
 PY
 )"
-if [[ "$UPDATING" != "1" && "$NODE_API_TOKEN" == wppnode1_* ]]; then
-echo "Node API token:"
-echo "  ${NODE_API_TOKEN}"
-echo
-fi
-echo "Administrator login:"
-echo "  ${ADMIN}"
-echo
-if [[ "$UPDATING" == "1" ]]; then
-echo "Administrator password: retained (unchanged)"
-echo
+if [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" ]]; then
+    [[ -f "$WPO_FINAL_SUMMARY_FILE" && ! -L "$WPO_FINAL_SUMMARY_FILE" ]] ||
+        die "Missing secure installation summary file."
+    wpo_print_install_summary > "$WPO_FINAL_SUMMARY_FILE"
+    chmod 0600 "$WPO_FINAL_SUMMARY_FILE"
 else
-echo "Administrator password:"
-echo "  ${PASS}"
-echo
+    wpo_print_install_summary
 fi
-echo "============================================================"
