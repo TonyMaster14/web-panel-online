@@ -276,7 +276,17 @@ echo "      OK"
 WPP_PREFETCH_DIR="$(mktemp -d /tmp/wpo-build-prefetch.XXXXXXXX)"
 WPP_CADDY_PREFETCH_PID=""
 WPP_GO_PREFETCH_PID=""
-trap 'rm -rf -- "$WPP_PREFETCH_DIR"' EXIT
+wpp_prefetch_cleanup() {
+    local pid active
+    active="$(jobs -pr 2>/dev/null || true)"
+    for pid in "$WPP_CADDY_PREFETCH_PID" "$WPP_GO_PREFETCH_PID"; do
+        if [[ -n "$pid" ]] && grep -Fxq "$pid" <<<"$active"; then
+            kill "$pid" 2>/dev/null || true
+        fi
+    done
+    rm -rf -- "$WPP_PREFETCH_DIR"
+}
+trap wpp_prefetch_cleanup EXIT
 if [[ "$REUSE_CADDY" != 1 ]]; then
     (
         trap - ERR
@@ -530,7 +540,7 @@ if [[ "$REUSE_MT" != "1" ]]; then
         -e 's/^apt-get update$/: # APT metadata already refreshed by the controller/' \
         -e 's/^apt-get install -y --no-install-recommends ca-certificates curl build-essential libssl-dev util-linux zlib1g-dev$/: # MTProxy build dependencies already installed/' \
         "$MT_INSTALLER"
-    # The signed SHA-256 verified Telegram bootstrap snapshots are bundled.
+    # The SHA-256-verified Telegram bootstrap snapshots are bundled.
     # Use them for first install, saving potentially long network timeouts.
     # The normal refresh timer can fetch newer metadata after installation.
     # WEB_PANEL_PROXY_MTPROXY_OFFLINE=0 opts back into live downloads.
