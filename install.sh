@@ -31,8 +31,8 @@ echo "WEB PANEL ONLINE V 3.0.0 — downloading installation files..."
 
 if ! command -v git >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
-    apt-get -o DPkg::Lock::Timeout=600 update
-    apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends git ca-certificates
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends git ca-certificates
 fi
 
 INSTALL_WORK="$(mktemp -d /tmp/web-panel-proxy-install.XXXXXX)"
