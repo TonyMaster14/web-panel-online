@@ -63,7 +63,7 @@ jobs:
               "protected credentials": "mktemp /run/wpo-ui-credentials." in boot and 'chmod 0600 "$CREDENTIALS"' in boot,
               "progress milestones": "WPO_UI_PROGRESS_FILE" in boot and "WPO_UI_PROGRESS_FILE" in final and "wpo_emit_stage" in core,
               "private logs": 'chmod 0600 "$LOG"' in boot,
-              "safe EXIT trap": 'return 0\\n}\\ntrap cleanup EXIT' in boot,
+              "safe EXIT trap": "\n".join(["return 0","}","trap cleanup EXIT"]) in boot,
               "final summary remains last": boot.rfind('cat -- "$RESULT"') > boot.rfind('Журнал сохранён на VPS.'),
               "final access credentials": 'WPO_UI_RESULT_FILE' in final and 'cat -- "$RESULT"' in boot,
               "single node installer": 'bash "$BASE/node-install.sh"' in final,
