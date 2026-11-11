@@ -175,6 +175,19 @@ CSS += '''
 '''
 
 
+
+# Keep the QR card compact on phones; it remains a centered modal, not a full-screen sheet.
+CSS += """
+@media(max-width:700px){
+.connection-dialog{width:min(404px,calc(100vw - 32px));max-height:88dvh}
+.connection-header{padding:17px 18px 14px}
+.connection-body{padding:15px 18px;gap:13px}
+.qr-visual{padding:13px}
+.qr-canvas{width:min(232px,calc(100vw - 96px));height:auto;aspect-ratio:1}
+.connection-footer{padding:0 18px 18px}
+}
+"""
+
 def qr_dialog():
     return '''<dialog id="accountQr" class="connection-dialog" aria-labelledby="qrDialogTitle"><header class="connection-header"><div class="connection-heading"><small>ДОСТУП К КЛИЕНТУ</small><h2 id="qrDialogTitle">Подключение</h2></div><button type="button" class="connection-close" data-close-dialog aria-label="Закрыть QR">×</button></header><div class="connection-body"><section class="connection-info"><div class="connection-person"><span id="qrInitial" class="client-initial" aria-hidden="true"></span><div><h3 id="qrClientName"></h3><p id="qrKind" class="connection-kind"></p></div></div><div id="qrProtocol" class="connection-protocol"></div><div class="connection-meta"><span><small>Сервер</small><b id="qrHost"></b></span><span id="qrPortRow" hidden><small>Порт</small><b id="qrPort"></b></span></div></section><div class="qr-visual"><div class="qr-canvas" aria-busy="true"><img id="accountQrImage" alt="QR подключения" hidden><p id="qrImageStatus" role="status">Создаём QR…</p></div><button type="button" id="qrRetry" class="qr-retry quiet" hidden>Повторить загрузку</button><p class="qr-caption"><span id="qrStepOne"></span><br><span id="qrStepTwo"></span></p></div></div><footer class="connection-footer"><button type="button" class="primary" id="qrCopy">'''+icon('copy')+'''<span>Скопировать ссылку</span></button><p id="qrCopyStatus" class="connection-status" role="status"></p><details id="qrLinkDetails" class="connection-link"><summary>Показать ссылку вручную</summary><input id="qrLink" readonly aria-label="Ссылка подключения" spellcheck="false"></details><p class="connection-privacy">QR и ссылка открывают доступ к подключению.<br>Храните их как пароль.</p></footer></dialog>'''+QR_JS
 
