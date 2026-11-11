@@ -2795,7 +2795,7 @@ def direct_profile_url(user,secret=None):
 def happ_profile_title(value,fallback="WEB PANEL ONLINE"):
     # Happ documents a maximum 25-character profile-title. Normalize only
     # presentation text; never alter the client's saved account or link keys.
-    name=" ".join(re.sub(r"[\\x00-\\x1f\\x7f]+"," ",str(value or "")).split()).strip()
+    name=" ".join(re.sub(r"[\x00-\x1f\x7f]+"," ",str(value or "")).split()).strip()
     return (name or fallback)[:25]
 
 def direct_profile_config(user,secret):
