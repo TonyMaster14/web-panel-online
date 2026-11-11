@@ -37,10 +37,10 @@ heading='<h2>⚙️ Управление нодами</h2>'
 if src.count(heading)!=1 or 'def nodes_ui(' not in src:
     raise RuntimeError('Заголовок нод не найден однозначно. Файл не изменён.')
 import re
-subtitle_re=r'<p(?:\\s[^>]*)?>\\s*Подключённые серверы и состояние установок\\s*</p>'
+subtitle_re=r'<p(?:\s[^>]*)?>\s*Подключённые серверы и состояние установок\s*</p>'
 # Keep any other page or help text untouched: this is restricted to nodes_ui.
 start=src.index('def nodes_ui(')
-end=src.index('\\n\\nCSS +=',start)
+end=src.index('\n\nCSS +=',start)
 section=src[start:end]
 section,removed=re.subn(subtitle_re,'',section)
 if removed>1:
