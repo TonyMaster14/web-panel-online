@@ -278,7 +278,11 @@ if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: a
   ufw allow 443/tcp >/dev/null || true
 fi
 systemctl daemon-reload
-systemctl enable --now wpp-node-agent.service
+# A reinstall rotates the API key. --now alone leaves an already running agent
+# with the OLD key in memory; restart ensures the current config is loaded.
+systemctl enable wpp-node-agent.service
+systemctl restart wpp-node-agent.service
+systemctl is-active --quiet wpp-node-agent.service || { echo 'Не удалось перезапустить Node Agent.'; exit 4; }
 systemctl enable --now caddy
 systemctl reload caddy || systemctl restart caddy
 report installing 'Ожидание HTTPS-сертификата.'
@@ -288,17 +292,47 @@ for i in $(seq 1 60); do
   sleep 5
 done
 [[ "$TLS_OK" == "1" ]] || { report error 'HTTPS не готов. Проверьте DNS и доступность TCP 80/443.'; echo 'HTTPS не готов. Проверьте DNS и доступность TCP 80/443.'; exit 4; }
+# Check the AUTHENTICATED agent status, not just public /healthz.
+# This catches a stale agent key before controller registration.
+if ! curl -4fsS --connect-timeout 4 --max-time 12 \
+    -H "Authorization: Bearer $API_KEY" \
+    "https://$DOMAIN/wpp-api/v1/status" >/dev/null; then
+  report error 'Node Agent не принимает новый ключ API. Проверьте перезапуск службы.'
+  echo 'Node Agent не принимает новый ключ API (проверьте systemctl status wpp-node-agent.service).'
+  exit 4
+fi
 report registration 'HTTPS готов. Регистрация в основной панели.'
-python3 - "$ENROLL_URL" "$TOKEN" "$DOMAIN" "$API_KEY" <<'PY_ENROLL'
-import json,sys,urllib.request
+if ENROLL_RESULT="$(python3 - "$ENROLL_URL" "$TOKEN" "$DOMAIN" "$API_KEY" <<'PY_ENROLL'
+import json,sys,urllib.request,urllib.error
 url,token,domain,key=sys.argv[1:]
 body=json.dumps({'token':token,'url':'https://'+domain,'api_key':key,'name':domain.split('.')[0]}).encode()
 request=urllib.request.Request(url,data=body,headers={'Content-Type':'application/json'},method='POST')
-with urllib.request.urlopen(request,timeout=20) as response:
-    result=json.loads(response.read(32768))
-if not result.get('ok'):
-    raise SystemExit(result.get('message','Registration failed'))
+try:
+    with urllib.request.urlopen(request,timeout=20) as response:
+        result=json.loads(response.read(32768))
+except urllib.error.HTTPError as exc:
+    raw=exc.read(8192)
+    try:
+        details=json.loads(raw.decode('utf-8','replace'))
+        message=str(details.get('message') or 'Неизвестная ошибка')
+    except (ValueError,AttributeError):
+        message='Панель отклонила регистрацию'
+    raise SystemExit('Регистрация: HTTP %d — %s' % (exc.code,message[:180]))
+except (urllib.error.URLError,TimeoutError,OSError) as exc:
+    raise SystemExit('Связь с панелью при регистрации недоступна: '+str(exc.reason if hasattr(exc,'reason') else exc)[:140])
+except (ValueError,TypeError,UnicodeError):
+    raise SystemExit('Панель вернула некорректный ответ при регистрации.')
+if not isinstance(result,dict) or not result.get('ok'):
+    raise SystemExit(str(result.get('message','Registration failed')) if isinstance(result,dict) else 'Registration failed')
 print('Нода зарегистрирована:',result.get('node_id',''))
 PY_ENROLL
+)"; then
+  printf '%s\n' "$ENROLL_RESULT"
+else
+  echo "$ENROLL_RESULT" >&2
+  report error "$(printf '%s' "$ENROLL_RESULT" | head -c 160)"
+  echo 'Ошибка регистрации. Если ключ установки истёк, удалите незавершённую установку в панели и создайте новый ключ.'
+  exit 5
+fi
 trap - ERR
 echo "Готово: Node Agent зарегистрирован на https://$DOMAIN"
