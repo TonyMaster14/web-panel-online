@@ -32,6 +32,33 @@ elif original.count(new) == 1:
 else:
     raise SystemExit("Unsupported upstream tproxy-server config.go: exact pinned guard not found")
 
+# The pinned upstream credential-permissions test writes a mode 0444 file,
+# then assumes os.WriteFile created it with exactly those bits. With a secure
+# installer umask the newly created file can have fewer permission bits.
+# Explicit chmod makes the security assertion valid regardless of umask.
+# The test is retained and still requires Load() to REJECT the unsafe file
+# once CREDENTIALS_DIRECTORY has been cleared.
+permissions_test = source / "internal/config/config_test.go"
+permissions_source = permissions_test.read_text(encoding="utf-8")
+original_test = '''\tif err := os.WriteFile(profiles, []byte(content), 0444); err != nil {
+\t\tt.Fatal(err)
+\t}
+\tt.Setenv("CREDENTIALS_DIRECTORY", credentials)'''
+corrected_test = '''\tif err := os.WriteFile(profiles, []byte(content), 0444); err != nil {
+\t\tt.Fatal(err)
+\t}
+\t// WPO: Verify intended 0444 permissions independently of process umask.
+\tif err := os.Chmod(profiles, 0444); err != nil {
+\t\tt.Fatal(err)
+\t}
+\tt.Setenv("CREDENTIALS_DIRECTORY", credentials)'''
+if permissions_source.count(original_test) == 1:
+    permissions_test.write_text(
+        permissions_source.replace(original_test, corrected_test), encoding="utf-8"
+    )
+elif permissions_source.count(corrected_test) != 1:
+    raise SystemExit("Pinned upstream permissions test changed: refusing unexpected patch")
+
 # Tests run against actual Go types, not an imitation or mock of the relay.
 tests = {
     "internal/config/wpo_empty_profiles_test.go": r'''package config
