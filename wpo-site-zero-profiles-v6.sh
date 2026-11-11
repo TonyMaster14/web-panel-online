@@ -155,8 +155,51 @@ def swap_function(dst,src,name,needle):
     if needle not in new: raise RuntimeError("Отсутствует новая функция "+name)
     return dst[:start]+new+dst[end:]
 
-manager=swap_function(manager,manager_reference,"sync_profiles","wpo-zero-profiles-v6")
-manager=swap_function(manager,manager_reference,"set_mtproxy_economy","sync_profiles(d)")
+# Avoid replacing whole manager functions: their optional Nodes Lab
+# extensions are not always marked. Change only the few relay lines.
+def edit_function(text,name,transform):
+    start,end,old=func(text,name)
+    updated=transform(old)
+    if updated==old and name=="sync_profiles" and 'wpo-site-always-on-v5' in old:
+        raise RuntimeError("Не удалось удалить фиктивный профиль.")
+    return text[:start]+updated+text[end:]
+
+def site_only_sync(original):
+    code=original
+    marker='    # wpo-site-always-on-v5'
+    dummy='keep.append({"name":"wpp-site-standby"'
+    if dummy in code:
+        start=code.find(marker)
+        end=code.find('    tmp=PROFILES+".tmp"',start)
+        if start<0 or end<0 or end-start>1100:
+            raise RuntimeError("Неизвестная реализация фиктивного профиля.")
+        code=code[:start]+'''    # WPO v6: profiles: [] is valid. No hidden WEB Proxy credentials.
+'''+code[end:]
+    if '    if keep:\n        c=run(' in code:
+        begin=code.index('    if keep:\n        c=run(')
+        end=code.find('    os.replace(tmp,PROFILES)',begin)
+        if end<0 or end-begin>1000:
+            raise RuntimeError("Неизвестный блок проверки профилей.")
+        lines=code[begin:end].splitlines(keepends=True)
+        dedented=''.join(line[4:] if line.startswith('    ') else line for line in lines[1:])
+        code=code[:begin]+dedented+code[end:]
+    if dummy in code:
+        raise RuntimeError("В менеджере остался скрытый профиль.")
+    if 'tproxy-server","-config"' not in code:
+        raise RuntimeError("Не найдена проверка конфигурации релея.")
+    return code
+
+def site_only_economy(code):
+    old='run("systemctl","disable","--now","tproxy-server.service",check=False)'
+    new='run("systemctl","enable","--now","tproxy-server.service",check=True)'
+    if old in code:
+        return code.replace(old,new,1)
+    if new in code:
+        return code
+    raise RuntimeError("Неизвестная настройка экономии MTProxy.")
+
+manager=edit_function(manager,"sync_profiles",site_only_sync)
+manager=edit_function(manager,"set_mtproxy_economy",site_only_economy)
 panel=swap_function(panel,panel_reference,"restart_public_site","wpo-zero-profiles-v6")
 
 # Only adjust the obsolete relay shutdown block inside apply(), preserving
