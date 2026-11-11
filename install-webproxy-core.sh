@@ -2,6 +2,10 @@
 set -Eeuo pipefail
 umask 077
 
+# Resolve bundled companion scripts from this file's location, not from the
+# caller's shell: install-final.sh starts this script with a fresh `bash`.
+PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # The relay source is public and pinned below. Do not allow credential prompts
 # or root-level Git URL rewrites to change where it is fetched from.
 export GIT_TERMINAL_PROMPT=0
@@ -500,9 +504,9 @@ git -C "$REPO_DIR" checkout --detach --force FETCH_HEAD
     die "Pinned tproxy-server source verification failed."
 # WPO-only patch: a public website is not itself a WEB Proxy. The relay must
 # work with profiles: [] after an operator removes the final proxy protocol.
-[[ -s "$BASE/wpo-relay-zero-profiles-patch.py" ]] ||
+[[ -s "$PACKAGE_DIR/wpo-relay-zero-profiles-patch.py" ]] ||
     die "Missing zero-profile relay source patch from installation package."
-python3 "$BASE/wpo-relay-zero-profiles-patch.py" "$REPO_DIR" ||
+python3 "$PACKAGE_DIR/wpo-relay-zero-profiles-patch.py" "$REPO_DIR" ||
     die "Could not prepare the website-only relay build."
 cd "$REPO_DIR"
 
