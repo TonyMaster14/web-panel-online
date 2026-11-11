@@ -6,6 +6,12 @@ umask 077
 # caller's shell: install-final.sh starts this script with a fresh `bash`.
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# The graphical SSH wizard receives real milestones, not time-based fake progress.
+wpo_emit_stage() {
+    [[ -n "${WPO_UI_PROGRESS_FILE:-}" ]] || return 0
+    printf "%s\t%s\n" "$1" "$2" > "$WPO_UI_PROGRESS_FILE"
+}
+
 # The relay source is public and pinned below. Do not allow credential prompts
 # or root-level Git URL rewrites to change where it is fetched from.
 export GIT_TERMINAL_PROMPT=0
@@ -221,18 +227,31 @@ if [[ -s /var/lib/tproxy-panel/data.json ]] &&
     echo "      Existing panel account detected; login and password will be retained."
     rm -f /etc/web-proxy-panel/install-credentials
 else
-    echo
-    read -r -p "Panel administrator login [admin]: " PANEL_ADMIN
-    PANEL_ADMIN="${PANEL_ADMIN:-admin}"
-    while true; do
-        read -r -s -p "Panel administrator password: " PANEL_PASS
+    if [[ -n "${WPO_UI_CREDENTIALS_FILE:-}" ]]; then
+        [[ "$WPO_UI_CREDENTIALS_FILE" == /run/wpo-ui-credentials.* &&
+           -f "$WPO_UI_CREDENTIALS_FILE" && ! -L "$WPO_UI_CREDENTIALS_FILE" ]] ||
+            die "Файл учётных данных мастера установки недоступен."
+        exec 8< "$WPO_UI_CREDENTIALS_FILE"
+        IFS= read -r PANEL_ADMIN <&8 || die "Не удалось прочитать логин."
+        IFS= read -r PANEL_PASS <&8 || die "Не удалось прочитать пароль."
+        exec 8<&-
+        [[ -n "$PANEL_ADMIN" && ${#PANEL_PASS} -ge 3 ]] ||
+            die "Установщик получил некорректные данные администратора."
+        rm -f -- "$WPO_UI_CREDENTIALS_FILE"
+    else
         echo
-        if [[ ${#PANEL_PASS} -lt 3 ]]; then
-            echo "Password must contain at least 3 characters."
-            continue
-        fi
-        break
-    done
+        read -r -p "Panel administrator login [admin]: " PANEL_ADMIN
+        PANEL_ADMIN="${PANEL_ADMIN:-admin}"
+        while true; do
+            read -r -s -p "Panel administrator password: " PANEL_PASS
+            echo
+            if [[ ${#PANEL_PASS} -lt 3 ]]; then
+                echo "Password must contain at least 3 characters."
+                continue
+            fi
+            break
+        done
+    fi
     printf '%s\n%s\n' "$PANEL_ADMIN" "$PANEL_PASS" > /etc/web-proxy-panel/install-credentials
     chmod 0600 /etc/web-proxy-panel/install-credentials
     unset PANEL_PASS
@@ -266,6 +285,7 @@ valid_secret "$SECRET" || die "Secret generation failed."
 
 echo
 echo "[1/10] Checking system..."
+wpo_emit_stage 11 "Проверка системы"
 . /etc/os-release
 case "${ID:-}" in
     ubuntu)
@@ -328,6 +348,7 @@ if [[ -n "$WPP_CADDY_PREFETCH_PID" || -n "$WPP_GO_PREFETCH_PID" ]]; then
 fi
 
 echo "[2/10] Installing dependencies..."
+wpo_emit_stage 14 "Обновление системных компонентов"
 WPO_APT_CLOCK=$SECONDS
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
@@ -351,6 +372,7 @@ chmod 0600 /etc/web-proxy-panel/mtproto-host
 
 echo
 echo "[3/10] Checking ports..."
+wpo_emit_stage 20 "Проверка сетевых портов"
 check_install_port 443 caddy
 if EXISTING_MTPROXY_PORT="$(find_mtproxy_port 2>/dev/null)"; then
     MT_PORT="$EXISTING_MTPROXY_PORT"
@@ -374,6 +396,7 @@ fi
 
 echo
 echo "[4/10] Checking DNS..."
+wpo_emit_stage 22 "Проверка DNS"
 if [[ "$REUSE_EXISTING_HTTPS" == "1" ]]; then
     DNS_IP="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')"
     [[ -n "$DNS_IP" ]] || die "Existing HTTPS works, but DNS lookup failed for $DOMAIN."
@@ -392,6 +415,7 @@ else
 fi
 
 echo "[5/10] Creating public site..."
+wpo_emit_stage 24 "Подготовка защищённого сайта"
 if [[ -s "$SITE_TARGET/index.html" ]]; then
     PRESERVE_SITE=1
     echo "      Existing public site detected; preserving its HTML, CSS and JavaScript."
@@ -472,6 +496,7 @@ fi
 
 echo
 echo "[6/10] Installing Telegram Web Proxy components..."
+wpo_emit_stage 26 "Установка прокси-компонентов"
 
 
 if [[ -x /opt/MTProxy/objs/bin/mtproto-proxy ]] &&
@@ -640,6 +665,7 @@ fix_mtproxy_permissions() {
 }
 
 echo "      Installing Go relay..."
+wpo_emit_stage 33 "Подготовка Go-релея"
 WPO_GO_CLOCK=$SECONDS
 if [[ "$REUSE_RELAY" == "1" ]]; then
     echo "      Healthy tproxy-server already exists; binary build skipped."
@@ -676,6 +702,7 @@ else
 fi
 
 echo "      Building relay (public site works with 0 WEB Proxy profiles)..."
+wpo_emit_stage 36 "Компиляция защищённого релея"
 (
     cd "$REPO_DIR"
     "$go_binary" test ./internal/config ./internal/server -run '^TestWPO' -count=1
@@ -1207,6 +1234,7 @@ fi
 
 echo
 echo "[9/10] Running health checks..."
+wpo_emit_stage 48 "Проверка HTTPS и сертификата"
 curl -fsS --max-time 5 http://127.0.0.1:8081/healthz >/dev/null ||
     die "tproxy-server healthz failed."
 
@@ -1226,19 +1254,29 @@ if [[ "$REUSE_EXISTING_HTTPS" == "1" ]] &&
     HTTPS_READY=1
     echo "      Existing HTTPS certificate/config is already working."
 else
-    for _ in $(seq 1 120); do
-        if curl -fsSI --max-time 5 "https://${DOMAIN}/" >/dev/null 2>&1; then
+    # Cert issuance normally completes quickly. Detect irreversible ACME
+    # failures instead of waiting for the full retry window at a frozen 10%.
+    for _ in $(seq 1 36); do
+        if curl -fsSI --connect-timeout 3 --max-time 4 "https://${DOMAIN}/" >/dev/null 2>&1; then
             HTTPS_READY=1
             break
         fi
-        sleep 5
+        ACME_FAILURE="$(journalctl -u caddy --since '5 minutes ago' -n 100 --no-pager 2>/dev/null |
+            grep -F "$DOMAIN" |
+            grep -E 'rateLimited|too many certificates|invalidContact|invalid_email' |
+            tail -n 1 || true)"
+        if [[ -n "$ACME_FAILURE" ]]; then
+            echo "      Ошибка центра сертификации: $ACME_FAILURE" >&2
+            die "HTTPS-сертификат сейчас не может быть выпущен. Проверьте лимит Let's Encrypt или адрес почты."
+        fi
+        sleep 2
     done
 fi
 
 if [[ "$HTTPS_READY" != "1" ]]; then
     echo "      Caddy diagnostic:"
     journalctl -u caddy -n 60 --no-pager 2>/dev/null || true
-    die "HTTPS did not become ready within 600 seconds. Check Caddy/ACME/DNS."
+    die "HTTPS не готов: проверьте DNS, порт 443 и сертификат в журнале Caddy."
 fi
 
 echo "      HTTPS OK ($((SECONDS-WPO_TLS_CLOCK)) сек.)"
@@ -1248,6 +1286,7 @@ echo "      Services: mtproxy=$(systemctl is-active mtproxy 2>/dev/null || true)
 
 echo
 echo "[10/10] Checking persistence and ports..."
+wpo_emit_stage 53 "Проверка запуска и безопасности"
 for unit in mtproxy tproxy-server caddy; do
     systemctl is-active --quiet "$unit" || {
         echo "      $unit is not active; attempting final start..."
