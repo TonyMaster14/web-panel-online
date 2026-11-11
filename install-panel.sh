@@ -2499,22 +2499,18 @@ def restart_public_site():
     else:
         raise RuntimeError("Relay health endpoint did not become ready after restart")
 def fetch_published(path):
-    # Resolve the real HTTPS hostname to loopback. This validates Caddy and the
-    # relay without depending on public DNS, IPv6 routing or hairpin NAT.
-    commands=(
-        ["curl","-kfsS","--noproxy","*","--resolve",DOMAIN+":443:127.0.0.1",
-         "--connect-timeout","2","--max-time","5","https://"+DOMAIN+path],
-        ["curl","-fsS","--noproxy","*","-H","Host: "+DOMAIN,
-         "--connect-timeout","2","--max-time","5","http://127.0.0.1:8080"+path],
-    )
+    # wpo-presets-live-v3: verify through Caddy's real HTTPS route, not via
+    # a fallback direct relay HTTP port that could falsely report success
+    # even when the public hostname cannot serve the website.
+    command=["curl","-kfsS","--noproxy","*","--resolve",DOMAIN+":443:127.0.0.1",
+             "--connect-timeout","2","--max-time","4","https://"+DOMAIN+path]
     last=""
-    for attempt in range(12):
-        for command in commands:
-            result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=8)
-            if result.returncode==0: return result.stdout
-            last=(result.stderr or result.stdout or "relay request failed").strip()
-        time.sleep(min(0.5+attempt*0.15,1.5))
-    raise RuntimeError("Relay did not publish the landing page after restart: "+last[-300:])
+    for attempt in range(6):
+        result=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=7)
+        if result.returncode==0: return result.stdout
+        last=(result.stderr or result.stdout or "Caddy/relay недоступны").strip()
+        time.sleep(0.35+attempt*0.1)
+    raise RuntimeError("HTTPS не возвращает опубликованную страницу: "+last[-210:])
 def verify_public_asset(path, marker):
     body=fetch_published(path)
     if marker not in body:
