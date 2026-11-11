@@ -351,7 +351,8 @@ def profile_from_request(request):
     """Return a validated per-VLESS CDN profile or None for a direct route."""
     source = request if isinstance(request, dict) else {}
     route = str(source.get("vless_route", "direct")).strip().lower()
-    if route == "direct":
+    if route in ("direct", "reality"):
+        # Reality is a distinct direct VLESS transport, never a CDN profile.
         return None
     if route != "cdn":
         raise CDNError("Неизвестный маршрут VLESS.")
