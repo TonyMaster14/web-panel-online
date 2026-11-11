@@ -2949,7 +2949,7 @@ def connections_with_runtime(connections):
         tag=connection_store.inbound_tag(item) if protocol in ("vless","hysteria") else ""
         if tag and tag in by_tag:
             item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
-            if bucket=="reality":
+            if protocol=="vless" and cfg.get("route")=="reality":
                 item["runtime_inbound"].get("streamSettings",{}).get("realitySettings",{}).pop("privateKey",None)
         elif tag:
             bucket=connection_store._xray_bucket(item)
