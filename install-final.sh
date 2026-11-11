@@ -143,15 +143,15 @@ flock -u 9
 if ! systemctl start web-panel-proxy-component-auto-update.service; then
     echo "WARNING: Latest Xray/OpenFlux check failed; the automatic timer will retry." >&2
 fi
-# Nodes Lab v21 is bundled into the nodes-lab branch installation.
+# Nodes Lab v22 is bundled into the nodes-lab branch installation.
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
 # with the current Node Agent installer, auto-geolocation, status checks,
-# random site templates and the final compact node cards.
-wpp_progress 98 "Установка Nodes Lab v21"
-echo "Installing Nodes Lab v21 into the panel..."
-bash "$BASE/wpo-nodes-lab-release-v21-install.sh" || die "Не удалось подключить Nodes Lab v21; базовая панель установлена, изучите ошибку выше."
+# random site templates and the final compact node cards, including pending installs.
+wpp_progress 98 "Установка Nodes Lab v22"
+echo "Installing Nodes Lab v22 into the panel..."
+bash "$BASE/wpo-nodes-lab-release-v21-install.sh" || die "Не удалось подключить Nodes Lab v22; базовая панель установлена, изучите ошибку выше."
 
-echo "Installation complete (WPO 3.0 + Nodes Lab v21)."
+echo "Installation complete (WPO 3.0 + Nodes Lab v22)."
 wpp_progress 100 "Установка завершена"
 printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
 chmod 0600 /etc/web-proxy-panel/version
