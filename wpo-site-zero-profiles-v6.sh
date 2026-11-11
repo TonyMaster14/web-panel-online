@@ -123,6 +123,19 @@ manager_path,panel_path,reference_path,stage=map(Path,sys.argv[1:])
 manager=manager_path.read_text(encoding="utf-8")
 panel=panel_path.read_text(encoding="utf-8")
 reference=reference_path.read_text(encoding="utf-8")
+# install-panel.sh is Bash containing two separate Python heredocs. Parse
+# those Python scripts individually, not the entire Bash installer.
+def embedded_python(text,opening):
+    marker=opening+"\\n"
+    if text.count(marker)!=1: raise RuntimeError("Невозможно найти исходник "+opening)
+    pos=text.index(marker)+len(marker)
+    end=text.find("\\nPY\\n",pos)
+    if end<0: raise RuntimeError("Не найден конец встроенного Python-кода")
+    result=text[pos:end]+"\\n"
+    ast.parse(result)
+    return result
+manager_reference=embedded_python(reference,'''cat > "$MANAGER" <<'PY\'''')
+panel_reference=embedded_python(reference,'''cat > "$APP_FILE" <<'PY\'''')
 
 def func(text,name):
     tree=ast.parse(text)
@@ -140,9 +153,9 @@ def swap_function(dst,src,name,needle):
     if needle not in new: raise RuntimeError("Отсутствует новая функция "+name)
     return dst[:start]+new+dst[end:]
 
-manager=swap_function(manager,reference,"sync_profiles","wpo-zero-profiles-v6")
-manager=swap_function(manager,reference,"set_mtproxy_economy","sync_profiles(d)")
-panel=swap_function(panel,reference,"restart_public_site","wpo-zero-profiles-v6")
+manager=swap_function(manager,manager_reference,"sync_profiles","wpo-zero-profiles-v6")
+manager=swap_function(manager,manager_reference,"set_mtproxy_economy","sync_profiles(d)")
+panel=swap_function(panel,panel_reference,"restart_public_site","wpo-zero-profiles-v6")
 
 # Only adjust the obsolete relay shutdown block inside apply(), preserving
 # Node Lab and every other manager function.
