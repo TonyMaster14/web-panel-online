@@ -263,6 +263,7 @@ esac
 
 echo
 echo "[2/10] Installing dependencies..."
+WPO_APT_CLOCK=$SECONDS
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
 # Include panel tools now so later installers can skip their extra APT refreshes.
@@ -270,6 +271,7 @@ apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-in
     ca-certificates curl git openssl dnsutils nftables \
     build-essential libssl-dev util-linux zlib1g-dev \
     python3 iproute2 unzip xz-utils tar qrencode
+echo "      APT: $((SECONDS-WPO_APT_CLOCK)) сек."
 echo "      OK"
 
 # Download pinned Caddy and Go archives WHILE fetching/building MTProxy.
@@ -527,6 +529,7 @@ install -d -o root -g caddy -m 0750 /etc/caddy
 install -d -o caddy -g caddy -m 0750 /var/lib/caddy
 
 echo "      Installing official MTProxy..."
+WPO_MT_CLOCK=$SECONDS
 if [[ "$REUSE_MT" != "1" ]]; then
     # The base installer already ran a successful apt update AND installed
     # every package the pinned MTProxy bootstrap requests. On a clean VPS,
@@ -559,6 +562,7 @@ if [[ "$REUSE_MT" != "1" ]]; then
 else
     echo "      MTProxy installation skipped; existing instance is already listening on :2398."
 fi
+echo "      MTProxy: $((SECONDS-WPO_MT_CLOCK)) сек."
 
 if ! id tproxy >/dev/null 2>&1; then
     useradd --system --home /nonexistent --shell /usr/sbin/nologin tproxy
@@ -594,6 +598,7 @@ fix_mtproxy_permissions() {
 }
 
 echo "      Installing Go relay..."
+WPO_GO_CLOCK=$SECONDS
 if [[ "$REUSE_RELAY" == "1" ]]; then
     echo "      Healthy tproxy-server already exists; binary build skipped."
 else
@@ -637,6 +642,7 @@ echo "      Building current relay..."
 chown root:root /usr/local/bin/tproxy-server
 chmod 0755 /usr/local/bin/tproxy-server
 fi
+echo "      Go relay: $((SECONDS-WPO_GO_CLOCK)) сек."
 
 echo "      Preparing site..."
 install -d -o root -g tproxy -m 0750 "$SITE_TARGET"
@@ -1170,6 +1176,7 @@ if ! systemctl is-active --quiet caddy.service; then
 fi
 
 HTTPS_READY=0
+WPO_TLS_CLOCK=$SECONDS
 
 if [[ "$REUSE_EXISTING_HTTPS" == "1" ]] &&
    curl -fsSI --max-time 10 "https://${DOMAIN}/" >/dev/null 2>&1; then
@@ -1191,7 +1198,7 @@ if [[ "$HTTPS_READY" != "1" ]]; then
     die "HTTPS did not become ready within 600 seconds. Check Caddy/ACME/DNS."
 fi
 
-echo "      HTTPS OK"
+echo "      HTTPS OK ($((SECONDS-WPO_TLS_CLOCK)) сек.)"
 echo "      Backend MTProxy port: ${MT_PORT}"
 echo "      Services: mtproxy=$(systemctl is-active mtproxy 2>/dev/null || true) relay=$(systemctl is-active tproxy-server 2>/dev/null || true) caddy=$(systemctl is-active caddy 2>/dev/null || true)"
 
