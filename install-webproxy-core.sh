@@ -265,9 +265,11 @@ echo
 echo "[2/10] Installing dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o DPkg::Lock::Timeout=600 update
+# Include panel tools now so later installers can skip their extra APT refreshes.
 apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends \
     ca-certificates curl git openssl dnsutils nftables \
-    build-essential libssl-dev util-linux zlib1g-dev
+    build-essential libssl-dev util-linux zlib1g-dev \
+    python3 iproute2 unzip xz-utils tar qrencode
 echo "      OK"
 
 # Download pinned Caddy and Go archives WHILE fetching/building MTProxy.
