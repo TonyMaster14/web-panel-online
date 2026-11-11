@@ -5172,18 +5172,22 @@ fi
 # integrated installer. Standalone panel installation still prints directly.
 # The integrated caller provides an already-created root-only tmpfs file.
 wpo_print_install_summary() {
+    # Final access card: rendered only after all services and Nodes Lab finish.
+    # Keep the panel's real URL and the administrator-supplied credentials.
     printf '\n'
-    printf '%s\n' '╔══════════════════════════════════════════════════════════════╗'
-    printf '%s\n' '║                WEB PANEL ONLINE 3.0                          ║'
+    printf '%s\n' '╭──────────────────────────────────────────────────────────────╮'
+    printf '%s\n' '│                     WEB PANEL ONLINE 3.0                     │'
     if [[ "$UPDATING" == "1" ]]; then
-        printf '%s\n' '║                 ОБНОВЛЕНИЕ ЗАВЕРШЕНО                          ║'
+        printf '%s\n' '│                     ОБНОВЛЕНИЕ ЗАВЕРШЕНО                     │'
     else
-        printf '%s\n' '║                 УСТАНОВКА ЗАВЕРШЕНА                            ║'
+        printf '%s\n' '│                     УСТАНОВКА ЗАВЕРШЕНА                      │'
     fi
-    printf '%s\n' '╚══════════════════════════════════════════════════════════════╝'
+    printf '%s\n' '╰──────────────────────────────────────────────────────────────╯'
     printf '\n  🌐 АДРЕС ПАНЕЛИ\n'
+    printf '%s\n' '  ──────────────────────────────────────────────────────────'
     printf '  https://%s%s/login\n' "$DOMAIN" "$PANEL_PATH"
     printf '\n  👤 ДАННЫЕ ДЛЯ ВХОДА\n'
+    printf '%s\n' '  ──────────────────────────────────────────────────────────'
     printf '  Логин:  %s\n' "$ADMIN"
     if [[ "$UPDATING" == "1" ]]; then
         printf '  Пароль: сохранён (не изменён)\n'
@@ -5192,7 +5196,6 @@ wpo_print_install_summary() {
     fi
     printf '\n%s\n' '────────────────────────────────────────────────────────────────'
     printf '%s\n' 'Сохраните адрес и данные доступа в надёжном месте.'
-    printf '%s\n' 'Не публикуйте пароль и Node API token.'
     printf '%s\n' '────────────────────────────────────────────────────────────────'
 }
 
