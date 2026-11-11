@@ -682,13 +682,19 @@ def client_records(subs, profiles, traffic, domain, proxy_link, routing_profiles
         raw_link=link
         route_profile=(routing_profiles or {}).get(str(u.get('connection_id','')))
         routing_url=''
-        if (proto in ('vless','hysteria') and isinstance(route_profile,dict)
-                and route_profile.get('enabled',True) and callable(direct_profile_url)):
-            routing_url=direct_profile_url(u,u.get('secret',''))
-            link=happ_import_link(routing_url)
+        happ_url=''
+        # A raw vless:// or hysteria2:// key has only a server label. Happ
+        # profile URLs provide the user's name via the profile-title header.
+        # Use them for the main QR/copy controls even without split routing.
+        if proto in ('vless','hysteria') and callable(direct_profile_url):
+            happ_url=direct_profile_url(u,u.get('secret',''))
+            link=happ_import_link(happ_url)
+            if isinstance(route_profile,dict) and route_profile.get('enabled',True):
+                routing_url=happ_url
         records.append(dict(id=u['id'],name=u['name'],kind='direct',protocols=[proto],
             enabled=u.get('enabled',True),created=u.get('created_at',0),totals=aggregate([u['id']],traffic,u.get('enabled',True)),
-            link=link,raw_link=raw_link,routing_url=routing_url,source=u,devices=len(mt_devices),limit=len(mt_devices)))
+            link=link,raw_link=raw_link,routing_url=routing_url,happ_url=happ_url,
+            source=u,devices=len(mt_devices),limit=len(mt_devices)))
     return records
 
 
@@ -738,10 +744,11 @@ def client_glances(records,path):
         else:
             source=r['source']; proto=r['protocols'][0]
             port=int(source.get('backend_port',443))
-            qr=(path+'/__qr?'+urlencode({'id':r['id']}) if proto in ('awg20','awg31') else
+            qr=(path+'/direct-profile-qr?'+urlencode({'id':r['id'],'secret':source.get('secret',''),'import':'happ'}) if r.get('happ_url') else
+                path+'/__qr?'+urlencode({'id':r['id']}) if proto in ('awg20','awg31') else
                 path+'/__qr?'+urlencode({'secret':source.get('secret',''),'protocol':proto,
                     'port':port if proto in ('hysteria','mtproto','naive','mieru') else 443}))
-            qr_kind='direct'
+            qr_kind='routing' if r.get('routing_url') else 'happ' if r.get('happ_url') else 'direct'
             user_port=port
         access=qr_attributes(qr,r['name'],r['link'],r['protocols'],qr_kind,user_port=user_port)
         rows.append(f'<div class="client-glance"><div><strong>{esc(r["name"])}</strong><small>{kind}</small></div>{client_protocols(r["protocols"])}<div class="traffic-value">{size(t["up"]+t["down"])}</div><button class="btn quiet" {access}>Доступ / QR</button></div>')
@@ -820,15 +827,16 @@ def users_ui(subs, profiles, traffic, path, domain, csrf, proxy_link, openflux_p
         primary=uid=='primary'; kind=r['kind']; sub=kind=='subscription'
         proto=r['protocols'][0]
         routed=bool(r.get('routing_url'))
+        happ=bool(r.get('happ_url'))
         qr=(path+'/subscription-qr?'+urlencode({'id':uid}) if sub else
-            path+'/direct-profile-qr?'+urlencode({'id':uid,'secret':r['source']['secret'],'import':'happ'}) if routed else
+            path+'/direct-profile-qr?'+urlencode({'id':uid,'secret':r['source']['secret'],'import':'happ'}) if happ else
             path+'/__qr?'+urlencode({'id':uid}) if proto in ('awg20','awg31') else
             path+'/__qr?'+urlencode({'secret':r['source']['secret'],'protocol':proto,
                 'port':r['source'].get('backend_port',443) if proto in ('hysteria','mtproto','naive','mieru') else 443}))
         disabled='disabled title="Основное подключение установки"' if primary else ''
         state=f'<button class="access-switch" type="button" role="switch" aria-label="Доступ — {name}" aria-checked="{str(bool(enabled)).lower()}" data-state="{sid}" data-kind="{kind}" {disabled}></button>'
-        copy_title='Копировать для Happ · JSON с маршрутизацией' if routed else 'Копировать'
-        qr_kind='routing' if routed else kind
+        copy_title='Копировать для Happ · JSON с маршрутизацией' if routed else 'Копировать для Happ' if happ else 'Копировать'
+        qr_kind='routing' if routed else 'happ' if happ else kind
         action=f'<button class="icon-btn" {qr_attributes(qr,r["name"],r["link"],r["protocols"],qr_kind,user_port=r["source"].get("backend_port"))} aria-label="QR — {name}" title="QR">{icon("qr")}</button><button class="icon-btn" data-copy="{esc(r["link"])}" aria-label="Скопировать — {name}" title="{copy_title}">{icon("copy")}</button><button class="icon-btn" data-open-client="{sid}" aria-label="Настройки — {name}" title="Настройки">{icon("edit")}</button>'
         if not primary or not sub:
             route='subscription-action' if sub else 'delete-user'
