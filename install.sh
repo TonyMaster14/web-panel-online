@@ -31,6 +31,9 @@ cleanup(){
     [[ -n "$RESULT" && -f "$RESULT" ]] && { shred -u "$RESULT" 2>/dev/null || rm -f -- "$RESULT"; }
     [[ -n "$PROGRESS" && -f "$PROGRESS" ]] && rm -f -- "$PROGRESS"
     [[ -n "$WORK" && -d "$WORK" ]] && rm -rf -- "$WORK"
+    # EXIT traps must not turn a successful installation into exit code 1
+    # just because the final optional cleanup condition was false.
+    return 0
 }
 trap cleanup EXIT
 trap 'printf "\n"; exit 130' INT TERM
