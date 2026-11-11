@@ -45,7 +45,7 @@ banner(){
 }
 valid_domain(){
     local d="$1" part
-    [[ "$d" == *.* && ${#d} -le 253 && "$d" != *..* ]] || return 1
+    [[ "$d" == *.* && ${#d} -le 253 && "$d" != *..* && "$d" =~ ^[a-z0-9].*[a-z0-9]$ ]] || return 1
     IFS=. read -ra parts <<< "$d"
     for part in "${parts[@]}"; do
         [[ ${#part} -ge 1 && ${#part} -le 63 &&
