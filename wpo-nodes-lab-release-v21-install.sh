@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 umask 077
 
-REF="2188f32af6a6e895d803ef7c7946ffc9c6b3dead"
+REF="5197777c65ad2350d8cf3f4fef4ac0a59e51d2c0"
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF"
 APP="/opt/tproxy-panel"
 SERVICE="tproxy-panel.service"
@@ -50,7 +50,7 @@ cleanup(){
 trap cleanup EXIT
 
 # Download and syntax-check all versions BEFORE touching the panel.
-for v in $(seq 1 21); do
+for v in $(seq 1 22); do
     if [[ "$v" == 1 ]]; then file="wpo-nodes-lab-install.sh"
     else file="wpo-nodes-lab-v$v-install.sh"
     fi
@@ -125,13 +125,15 @@ apply wpo-nodes-lab-v18-install.sh "$UI" "# wpo-node-divider-v18"
 apply wpo-nodes-lab-v19-install.sh "$UI" "# wpo-node-server-icon-v19"
 apply wpo-nodes-lab-v20-install.sh "$PANEL" "# wpo-node-auto-v20"
 apply wpo-nodes-lab-v21-install.sh "$UI" "/* wpo-node-heading-v21 */"
+apply wpo-nodes-lab-v22-install.sh "$UI" "/* wpo-node-pending-row-v22 */"
 
 for file in "$PANEL" "$UI" "$GEO" "$AUTO"; do [[ -s "$file" ]] || die "Отсутствует файл: $file"; done
 # Validate the final generated-node installer and controller feature set.
 grep -Fq 'node-agent-installer.sh' "$PANEL" || die 'Нет маршрута установщика ноды.'
 grep -Fq '# wpo-node-country-v13' "$PANEL" || die 'Нет геолокации нод.'
 grep -Fq '# wpo-node-auto-v20' "$PANEL" || die 'Нет автоматического выбора шаблона.'
-grep -Fq '/* wpo-node-heading-v21 */' "$UI" || die 'Не применён итоговый интерфейс v21.'
+grep -Fq '/* wpo-node-heading-v21 */' "$UI" || die 'Не применён интерфейс v21.'
+grep -Fq '/* wpo-node-pending-row-v22 */' "$UI" || die 'Не применена компактная сетка v22.'
 grep -Fq 'site-template' "$AGENT" || die 'Установщик ноды не поддерживает шаблоны.'
 grep -Fq 'for EMAIL_ATTEMPT in 1 2 3' "$AGENT" || die 'Установщик ноды не обновлён до итоговой версии.'
 grep -Fq '__WPO_CONTROLLER_ENROLL_URL__' "$AGENT" || die 'Установщик ноды не связан с основной панелью.'
@@ -139,9 +141,9 @@ python3 -m py_compile "$PANEL" "$UI" "$GEO" "$AUTO"
 bash -n "$AGENT"
 systemctl is-active --quiet "$SERVICE" || die "Служба $SERVICE не активна."
 echo
-echo '✓ WPO Nodes Lab v21 установлен/проверен.'
+echo '✓ WPO Nodes Lab v22 установлен/проверен.'
 echo "✓ Фиксированная версия: $REF"
 echo "✓ Резервная копия до обновления: $BACKUP"
-echo '✓ Геолокация, флаги, одинаковые карточки и случайные шаблоны новых нод сохранены.'
+echo '✓ Геолокация, флаги, горизонтальная сетка карточек и случайные шаблоны новых нод сохранены.'
 echo '✓ Основная ветка GitHub main не затронута.'
 echo 'Важно: Node Agent 0.2 управляет HTTPS-страницей и статусом. VPN на удалённой ноде пока не активирован.'
