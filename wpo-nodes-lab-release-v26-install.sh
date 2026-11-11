@@ -5,6 +5,16 @@ umask 077
 
 REF="9fb7260fd7fa0b6c9d0490052d2a62e2df63f8c1"
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF"
+PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Complete first-install bundles already contain all the Nodes Lab source files.
+USE_PACKAGE=0
+if [[ "${WPO_NODES_LOCAL_SOURCE:-0}" == 1 ]] &&
+   [[ -s "$PACKAGE_DIR/install-final.sh" &&
+      -s "$PACKAGE_DIR/wpo-nodes-lab-v26-install.sh" &&
+      -s "$PACKAGE_DIR/wpo-node-agent-install-v2.sh" ]]; then
+    USE_PACKAGE=1
+    echo 'Nodes Lab: повторная загрузка файлов не нужна.'
+fi
 APP="/opt/tproxy-panel"
 SERVICE="tproxy-panel.service"
 DATA="/var/lib/tproxy-panel"
@@ -54,12 +64,22 @@ for v in $(seq 1 26); do
     if [[ "$v" == 1 ]]; then file="wpo-nodes-lab-install.sh"
     else file="wpo-nodes-lab-v$v-install.sh"
     fi
-    curl -4fsSL --retry 3 --connect-timeout 15 --max-time 80 "$BASE/$file" -o "$STAGE/$file"
+    if (( USE_PACKAGE )); then
+        [[ -s "$PACKAGE_DIR/$file" ]] || die "Неполный пакет: $file"
+        cp "$PACKAGE_DIR/$file" "$STAGE/$file"
+    else
+        curl -4fsSL --retry 3 --connect-timeout 15 --max-time 80 "$BASE/$file" -o "$STAGE/$file"
+    fi
     [[ -s "$STAGE/$file" ]] || die "Не удалось получить $file"
     bash -n "$STAGE/$file" || die "Повреждённый скрипт $file"
 done
 for file in wpo-node-agent-install-v2.sh wpo-node-geo-v13.py wpo-node-autotemplate-v20.py; do
-    curl -4fsSL --retry 3 --connect-timeout 15 --max-time 80 "$BASE/$file" -o "$STAGE/$file"
+    if (( USE_PACKAGE )); then
+        [[ -s "$PACKAGE_DIR/$file" ]] || die "Неполный пакет: $file"
+        cp "$PACKAGE_DIR/$file" "$STAGE/$file"
+    else
+        curl -4fsSL --retry 3 --connect-timeout 15 --max-time 80 "$BASE/$file" -o "$STAGE/$file"
+    fi
     [[ -s "$STAGE/$file" ]] || die "Не удалось получить $file"
 done
 bash -n "$STAGE/wpo-node-agent-install-v2.sh"
@@ -79,6 +99,36 @@ for version in (2,10,11,12,13,20,23):
         raise RuntimeError('Ожидаемый адрес не найден: '+path.name)
     path.write_text(content.replace(old,new),encoding='utf-8')
 PY_PIN
+
+# A clean installation already has a healthy running controller. Apply the
+# checked source patches without restarting it after every intermediate edit.
+# The controller is restarted once when the complete final code is ready.
+# Standalone upgrades retain the original per-version restart behavior.
+BATCH_RESTART=0
+if [[ "${WPO_NODES_BATCH_RESTART:-0}" == 1 ]]; then
+    BATCH_RESTART=1
+    python3 - "$STAGE" <<'PY_BATCH'
+from pathlib import Path
+import sys
+root=Path(sys.argv[1])
+old='systemctl restart "$SERVICE"'
+changed=0
+for script in sorted(root.glob('wpo-nodes-lab*-install.sh')):
+    content=script.read_text(encoding='utf-8')
+    if old not in content:
+        continue
+    # Only defer the controller restart. Source checks and other services
+    # are unchanged. The release-level rollback still restarts on failure.
+    script.write_text(content.replace(old,'true'),encoding='utf-8')
+    changed+=1
+if changed < 20:
+    raise SystemExit('Неожиданная версия Nodes Lab: пакетное ускорение не применено.')
+print('Nodes Lab: один итоговый перезапуск вместо повторных перезапусков.')
+PY_BATCH
+    for file in "$STAGE"/wpo-nodes-lab*-install.sh; do
+        bash -n "$file" || die "Неверный синтаксис: $file"
+    done
+fi
 
 BACKUP="$DATA/nodes-lab-release-v26-backup-$(date -u +%Y%m%dT%H%M%SZ)"
 install -d -m 0700 "$BACKUP"
@@ -149,6 +199,10 @@ grep -Fq '/* wpo-node-spinner-center-v26 */' "$UI" || die 'Центровка ж
 grep -Fq '__WPO_CONTROLLER_ENROLL_URL__' "$AGENT" || die 'Установщик ноды не связан с основной панелью.'
 python3 -m py_compile "$PANEL" "$UI" "$GEO" "$AUTO"
 bash -n "$AGENT"
+if (( BATCH_RESTART && TOUCHED )); then
+    echo '→ Перезапускаю панель один раз после всех правок Nodes Lab'
+    systemctl restart "$SERVICE" || die 'Не удалось запустить панель после установки Nodes Lab.'
+fi
 systemctl is-active --quiet "$SERVICE" || die "Служба $SERVICE не активна."
 echo
 echo '✓ WPO Nodes Lab v26 установлен/проверен.'
