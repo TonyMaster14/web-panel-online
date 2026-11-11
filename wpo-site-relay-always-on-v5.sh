@@ -25,6 +25,8 @@ flock -w 10 9 || { echo "Другое обновление ещё работае
 STAGE="$(mktemp -d /tmp/wpp-site-relay.XXXXXXXX)"
 BACKUP="/var/lib/tproxy-panel/site-relay-backup-$(date -u +%Y%m%dT%H%M%SZ)"
 TOUCHED=0
+RELAY_ENABLED_BEFORE="$(systemctl is-enabled "$RELAY" 2>/dev/null || true)"
+RELAY_ACTIVE_BEFORE="$(systemctl is-active "$RELAY" 2>/dev/null || true)"
 finish() {
     local rc=$?
     trap - EXIT
@@ -39,7 +41,15 @@ finish() {
             rm -f -- "$OVERRIDE"
         fi
         systemctl daemon-reload || true
-        systemctl try-restart "$RELAY" "$PANEL_SERVICE" >/dev/null 2>&1 || true
+        if [[ "$RELAY_ENABLED_BEFORE" != "enabled" ]]; then
+            systemctl disable "$RELAY" >/dev/null 2>&1 || true
+        fi
+        if [[ "$RELAY_ACTIVE_BEFORE" == "active" ]]; then
+            systemctl restart "$RELAY" >/dev/null 2>&1 || true
+        else
+            systemctl stop "$RELAY" >/dev/null 2>&1 || true
+        fi
+        systemctl try-restart "$PANEL_SERVICE" >/dev/null 2>&1 || true
         echo "Причина ошибки запуска сайта (без изменения паролей):" >&2
         journalctl -u "$RELAY" -n 12 --no-pager --output=cat 2>/dev/null |
           sed -E 's/(secret|token|password)=[^ ]+/\1=[hidden]/Ig' >&2 || true
