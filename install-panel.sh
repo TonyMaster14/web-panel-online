@@ -3967,8 +3967,11 @@ class Handler(BaseHTTPRequestHandler):
                     with STATE_LOCK:
                         if os.path.exists(SITE_DRAFT): os.unlink(SITE_DRAFT)
                 else:
-                    source=validate_html(get_preset(form.get("preset",""))["html"] if path.endswith("/draft-preset") else form.get("html",""))
+                    preset_id=form.get("preset","").strip()
+                    use_preset=path.endswith("/draft-preset") or (path.endswith("/preview-html") and bool(preset_id))
+                    source=validate_html(get_preset(preset_id)["html"] if use_preset else form.get("html",""))
                     if path.endswith("/preview-html"):
+                        # A card preview does not create or replace any draft.
                         self.send_json({"document":preview_document(source,externalize_inline_assets,DOMAIN)}); return
                     with STATE_LOCK: install_private_file(SITE_DRAFT,source.encode("utf-8"))
                 self.redirect("/settings")
@@ -4027,20 +4030,24 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path==PANEL_PATH+"/apply-preset":
+            async_apply=self.headers.get("X-WPP-Async","")=="1"
             try:
                 preset=get_preset(form.get("preset",""))
-                # Applying a bundled preset is an explicit publish operation.
-                # Remove a stale custom draft so it cannot overwrite the
-                # selected preset on the next save.
+                # Publish and verify before returning success to the card.
+                # Keep the previous public site if service checks fail.
                 with STATE_LOCK:
                     write_site_html(preset["html"])
                     if os.path.exists(SITE_DRAFT): os.unlink(SITE_DRAFT)
-                self.redirect("/settings")
+                if async_apply: self.send_json({"ok":True,"name":preset["name"]})
+                else: self.redirect("/settings")
             except ValueError as exc:
-                self.send_html("Ошибка применения пресета: "+esc(exc),400)
-            except (RuntimeError,OSError) as exc:
-                print("landing preset failed:",type(exc).__name__,file=sys.stderr,flush=True)
-                self.send_html("Не удалось применить пресет. Предыдущая страница сохранена; проверьте службы через SSH.",503)
+                if async_apply: self.send_json({"ok":False,"message":str(exc)},400)
+                else: self.send_html("Ошибка применения пресета: "+esc(exc),400)
+            except (RuntimeError,OSError,subprocess.TimeoutExpired) as exc:
+                print("landing preset failed:",type(exc).__name__,str(exc)[:300],file=sys.stderr,flush=True)
+                message="Не удалось опубликовать сайт. Предыдущая страница сохранена. Проверьте службы tproxy-server и caddy."
+                if async_apply: self.send_json({"ok":False,"message":message},503)
+                else: self.send_html(message,503)
             return
 
         if path==PANEL_PATH+"/password":
