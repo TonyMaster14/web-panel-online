@@ -30,6 +30,9 @@ wpp_progress() {
         printf '[%s] %3d%%  %s\n' "$bar" "$percent" "$label"
     fi
     WPP_PROGRESS_LAST="$percent"
+    if [[ -n "${WPO_UI_PROGRESS_FILE:-}" ]]; then
+        printf '%s\t%s\n' "$percent" "$label" > "$WPO_UI_PROGRESS_FILE"
+    fi
 }
 wpp_progress_finish() {
     local code="$1"
@@ -42,7 +45,7 @@ wpp_progress_finish() {
 }
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-for file in install-panel.sh install-webproxy-core.sh wpo-relay-zero-profiles-patch.py uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpo-nodes-lab-release-v26-install.sh; do
+for file in install-panel.sh install-webproxy-core.sh wpo-relay-zero-profiles-patch.py uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py node-install.sh; do
     [[ -s "$BASE/$file" ]] || die "Package is incomplete: missing $file. Extract the complete archive."
 done
 for file in mtproxy-download.sh assets/mtproxy-bootstrap/proxy-secret assets/mtproxy-bootstrap/proxy-multi.conf; do
@@ -97,7 +100,14 @@ finish_install() {
     # The last visible output is the full user access card, AFTER Nodes Lab
     # and progress finishing. The sensitive temporary card lives in /run.
     if (( code == 0 )); then
-        if [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" && -s "$WPO_FINAL_SUMMARY_FILE" ]]; then
+        if [[ -n "${WPO_UI_RESULT_FILE:-}" ]]; then
+            if [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" && -s "$WPO_FINAL_SUMMARY_FILE" ]]; then
+                cat -- "$WPO_FINAL_SUMMARY_FILE" > "$WPO_UI_RESULT_FILE"
+            else
+                wpp_print_final_panel_url > "$WPO_UI_RESULT_FILE"
+            fi
+            chmod 0600 "$WPO_UI_RESULT_FILE"
+        elif [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" && -s "$WPO_FINAL_SUMMARY_FILE" ]]; then
             cat -- "$WPO_FINAL_SUMMARY_FILE" || true
         else
             wpp_print_final_panel_url
@@ -192,7 +202,7 @@ flock -u 9
 if ! systemctl start --no-block web-panel-proxy-component-auto-update.service; then
     echo "WARNING: Xray/OpenFlux update check could not be queued; the timer will retry." >&2
 fi
-# Nodes Lab v26 is part of the official main installation.
+# Consolidated node-install.sh contains the verified v1–v26 node feature set.
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
 # with the current Node Agent installer, auto-geolocation, status checks,
 # random site templates and the final compact node cards, including pending installs.
@@ -207,12 +217,12 @@ chmod 0600 "$NODES_SETUP_LOG"
 # Clean installs use predownloaded sources and one final restart.
 # Updates retain conservative per-step checks and restarts.
 if [[ "$PANEL_UPDATE" == 0 ]]; then
-    if ! WPO_NODES_LOCAL_SOURCE=1 WPO_NODES_BATCH_RESTART=1 bash "$BASE/wpo-nodes-lab-release-v26-install.sh" >"$NODES_SETUP_LOG" 2>&1; then
+    if ! WPO_NODES_LOCAL_SOURCE=1 WPO_NODES_BATCH_RESTART=1 bash "$BASE/node-install.sh" >"$NODES_SETUP_LOG" 2>&1; then
         tail -n 80 "$NODES_SETUP_LOG" >&2 || true
         die "Ошибка настройки нод. Подробный журнал: $NODES_SETUP_LOG"
     fi
 else
-    if ! WPO_NODES_LOCAL_SOURCE=1 bash "$BASE/wpo-nodes-lab-release-v26-install.sh" >"$NODES_SETUP_LOG" 2>&1; then
+    if ! WPO_NODES_LOCAL_SOURCE=1 bash "$BASE/node-install.sh" >"$NODES_SETUP_LOG" 2>&1; then
         tail -n 80 "$NODES_SETUP_LOG" >&2 || true
         die "Ошибка обновления нод. Подробный журнал: $NODES_SETUP_LOG"
     fi
