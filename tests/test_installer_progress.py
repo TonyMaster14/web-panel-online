@@ -17,7 +17,7 @@ assert 'shown=$((shown+1))' not in boot, "No fabricated percentage animation"
 assert boot.index('started=$SECONDS') < boot.rindex('git clone --depth 1'), "Elapsed time must include wizard package download"
 assert boot.count('╭──────╮') == 0, "Old separate number tiles must be removed"
 assert 'ШАГ %s/4' not in boot and 'step(){' not in boot, "No extra step headings"
-assert all(p in boot for p in ("'  Домен: '", "'  Email: '", "'  Логин: '", "'  Пароль (не отображается): '")), "Prompts must be only label + colon"
+assert all(p in boot for p in ('Домен:${reset}', 'Email:${reset}', 'Логин:${reset}', 'Пароль (не отображается):${reset}')), "Prompts must be only label + colon"
 assert 'wpp_progress 80 "Настройка компонентов"' in final
 assert 'wpp_progress 100 "Установка завершена"' in final
 assert final.rindex('[[ -s "$WPO_UI_RESULT_FILE" ]]') < final.rindex('wpp_progress 100 "Установка завершена"'), "100 percent must follow the actual final access-card check"
