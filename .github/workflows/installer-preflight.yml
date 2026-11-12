@@ -108,6 +108,9 @@ jobs:
           probe.close()
           with tempfile.TemporaryDirectory() as folder:
               cfg=reality.haproxy_config("www.microsoft.com",ipv6=False)
+              # The production service starts as root and drops to haproxy.
+              # Hosted CI runs the ephemeral frontend as an unprivileged user.
+              cfg=cfg.replace("    user haproxy\n","").replace("    group haproxy\n","")
               cfg=cfg.replace("bind 0.0.0.0:443",f"bind 127.0.0.1:{front_port}")
               cfg=cfg.replace(f"127.0.0.1:{reality.CADDY_BACKEND_PORT}",f"127.0.0.1:{backends['caddy']['port']}")
               cfg=cfg.replace(f"127.0.0.1:{reality.REALITY_BACKEND_PORT}",f"127.0.0.1:{backends['reality']['port']}")
@@ -171,6 +174,7 @@ jobs:
                   frontend=probe.getsockname()[1]
               haproxy=base/'haproxy.cfg'
               config=reality.haproxy_config('www.microsoft.com',ipv6=False)
+              config=config.replace("    user haproxy\n","").replace("    group haproxy\n","")
               config=config.replace('bind 0.0.0.0:443',f'bind 127.0.0.1:{frontend}')
               haproxy.write_text(config)
               services=[]
