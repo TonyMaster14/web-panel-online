@@ -14,7 +14,7 @@ assert '█' in draw_function and '░' in draw_function, "Progress bar must be 
 assert 'elapsed/3600' in draw_function and 'elapsed%60' in draw_function
 assert 'shown="$target"' in boot, "Must use actual installer milestone"
 assert 'shown=$((shown+1))' not in boot, "No fabricated percentage animation"
-assert boot.index('started=$SECONDS') < boot.index('git clone --depth 1'), "Elapsed time must include package download"
+assert boot.index('started=$SECONDS') < boot.rindex('git clone --depth 1'), "Elapsed time must include wizard package download"
 assert boot.count('╭──────╮') == 0, "Old separate number tiles must be removed"
 assert 'ШАГ %s/4' in boot, "A single heading is required per form step"
 assert 'wpp_progress 80 "Установка Nodes Lab v26"' in final
