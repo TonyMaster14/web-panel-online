@@ -26,13 +26,13 @@ assert "Ноды: этап" not in nodes, "Internal node stages must not appear 
 assert 'wpo_node_stage 12' in nodes
 
 shell = ("set -Eeuo pipefail\n"
-    "blue=''\ncyan=''\nice=''\ngray=''\nreset=''\n"
+    "blue=''\ncyan=''\nice=''\ngray=''\nreset=''\nsuccess=''\n"
     + draw_function + "\n"
     + "draw 36 'Настройка Telegram Proxy' 114\n"
     + "printf '\\033[3B\\r\\n'\n"
     + "draw 80 'Настройка компонентов' 263\n"
     + "printf '\\033[3B\\r\\n'\n"
-    + "draw 100 'Установка завершена' 378\n"
+    + "draw 100 'Проверки завершены' 378\n"
     + "printf '\\033[3B\\r\\n'\n"
 )
 run = subprocess.run(["bash", "-c", shell], capture_output=True, text=True, timeout=10)
@@ -41,12 +41,16 @@ plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", run.stdout)
 assert "36%" in plain and "80%" in plain and "100%" in plain, plain
 assert "Этап: Настройка Telegram Proxy" in plain
 assert "Этап: Настройка компонентов" in plain
-assert "Прошло: 00:01:54" in plain
-assert "Прошло: 00:04:23" in plain
-assert "Прошло: 00:06:18" in plain
+assert "◷ 00:01:54" in plain
+assert "◷ 00:04:23" in plain
+assert "◷ 00:06:18" in plain
 lines = plain.splitlines()
 bars = [line for line in lines if "█" in line or "░" in line]
 assert len(bars) == 3, bars
 assert bars[0].count("█") < bars[1].count("█") < bars[2].count("█"), bars
 assert bars[-1].count("░") == 0, "100% must have a completely filled bar"
+assert "✓ Установка..." in plain and "✓ Установка завершена!" in plain, "Both progress states required"
+assert "Этап: Проверки завершены" in plain
+assert "✓ Установка..." not in plain.split("100%", 1)[-1], "Active status must vanish at 100%"
+assert plain.count("✓ Установка завершена!") == 1, "Completion must appear once below stage"
 print("PASS: thick stage-driven bar, actual elapsed clock, no fake percentage or step tiles")
