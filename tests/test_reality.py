@@ -42,7 +42,7 @@ class RealityTests(unittest.TestCase):
         value = self.item()
         value["config"]["port"] = 443
         self.assertEqual(con.validate(value, existing=value)["config"]["port"], 443)
-        for port in (1, 80, 442):
+        for port in (1, 80, 442, 18443, 24443, 10000, 8090):
             value["config"]["port"] = port
             with self.assertRaises(con.ConnectionError):
                 con.validate(value, existing=value)
