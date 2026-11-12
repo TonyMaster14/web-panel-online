@@ -175,7 +175,7 @@ draw(){
     printf -v donebar '%*s' "$filled" ''
     printf -v leftbar '%*s' "$empty" ''
     donebar="${donebar// /█}"; leftbar="${leftbar// /░}"
-    maxlabel=$((cols-12)); (( maxlabel < 16 )) && maxlabel=16
+    maxlabel=$((cols-17)); (( maxlabel < 16 )) && maxlabel=16
     # Both status messages occupy the same row above the blue bar.
     if (( pct == 100 )); then
         printf '\r\033[2K  %s✓ Установка завершена!%s\n' "$success" "$reset"
@@ -185,8 +185,13 @@ draw(){
     printf '\r\033[2K  %s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s\n' \
         "$cyan" "$donebar" "$blue" "$leftbar" "$reset" "$pct" \
         "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
-    # Actual operation appears immediately below the bar.
-    printf '\r\033[2K  %sЭтап: %s%s' "$ice" "${label:0:maxlabel}" "$reset"
+    # One blue-highlighted live stage/operation; never a separate "Операция" row.
+    # At 100%, clear the stage line before showing the completed access card.
+    if (( pct == 100 )); then
+        printf '\r\033[2K'
+    else
+        printf '\r\033[2K  %s◈ %sЭтап: %s%s' "$cyan" "$blue" "$ice" "${label:0:maxlabel}" "$reset"
+    fi
     printf '\033[2A\r'
 }
 
