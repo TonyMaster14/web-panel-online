@@ -58,7 +58,11 @@ jobs:
               result=subprocess.run(['haproxy','-c','-f',str(haproxy)],capture_output=True,text=True)
               print(result.stdout,result.stderr)
               assert result.returncode==0,'HAProxy rejected TLS SNI mux'
-          print('PASS: real Caddy + HAProxy accept shared-443 configuration')
+              haproxy.write_text(reality.haproxy_config('www.microsoft.com',ipv6=True))
+              result=subprocess.run(['haproxy','-c','-f',str(haproxy)],capture_output=True,text=True)
+              print(result.stdout,result.stderr)
+              assert result.returncode==0,'HAProxy rejected dual-stack IPv4/IPv6 TLS mux'
+          print('PASS: real Caddy + HAProxy accept shared-443 configuration (IPv4 + IPv6)')
           PY
       - name: TCP SNI — живой тест маршрутизации HTTPS и REALITY
         shell: bash
