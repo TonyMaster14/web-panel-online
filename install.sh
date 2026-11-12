@@ -91,20 +91,15 @@ ask_admin(){
 ask_password(){
     step 4 'Пароль администратора'
     while true; do
+        # Password is entered once, invisibly at the prompt after the colon.
         read -r -s -p '  Пароль (не отображается): ' PASS || exit 130
         printf '\n'
         if (( ${#PASS} < 3 )); then
             printf '%s  Пароль должен содержать минимум 3 символа.%s\n' "$gray" "$reset"
+            unset PASS
             continue
         fi
-        read -r -s -p '  Повторите пароль: ' CONFIRM || exit 130
-        printf '\n'
-        if [[ "$PASS" == "$CONFIRM" ]]; then
-            unset CONFIRM
-            break
-        fi
-        printf '%s  Пароли не совпали. Повторите ввод.%s\n' "$gray" "$reset"
-        unset CONFIRM
+        break
     done
 }
 
@@ -145,7 +140,7 @@ UPDATE=0
 if [[ -s /var/lib/tproxy-panel/data.json && -f /etc/systemd/system/tproxy-panel.service ]] &&
    grep -Eq 'Environment=WEBPROXY_PANEL_PATH=/panel-[a-z0-9-]{3,64}' /etc/systemd/system/tproxy-panel.service; then
     UPDATE=1
-    printf '\n%s  Найдена установленная панель: обновляем код, учётные данные сохраняем.%s\n' "$green" "$reset"
+    printf '\n%s  Найдена установленная панель: обновляем код, учётные данные сохраняем.%s\n' "$cyan" "$reset"
     DOMAIN="" EMAIL=""
 else
     ask_domain
@@ -157,7 +152,7 @@ else
     printf '%s\n%s\n' "$ADMIN" "$PASS" > "$CREDENTIALS"
     unset PASS ADMIN
 fi
-printf '\n%s  Подготовка и загрузка компонентов в начале установки.%s\n' "$green" "$reset"
+printf '\n%s  Подготовка и загрузка компонентов в начале установки.%s\n' "$cyan" "$reset"
 printf '  %sПодробный вывод будет записан в защищённый журнал.%s\n\n' "$gray" "$reset"
 
 install -d -o root -g root -m 0700 /var/log/web-panel-online
