@@ -54,6 +54,10 @@ jobs:
         shell: bash
         run: |
           python3 tests/test_installer_step_by_step.py
+      - name: Russian final access card for fresh installs and upgrades
+        shell: bash
+        run: |
+          python3 tests/test_installer_access_card.py
       - name: Verify all 26 embedded stages, exact legacy files
         shell: bash
         run: |
