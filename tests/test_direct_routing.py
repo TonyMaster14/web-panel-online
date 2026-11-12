@@ -84,7 +84,7 @@ class DirectRouting(unittest.TestCase):
                          awg=SimpleNamespace(PROTOCOLS=('awg20', 'awg31')), AWG_AVAILABLE=True)
         tree = ast.parse(PANEL)
         functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
-                     and node.name in ('direct_profile_token', 'direct_profile_url', 'direct_profile_config')]
+                     and node.name in ('direct_profile_token', 'direct_profile_url', 'happ_profile_title', 'direct_profile_config')]
         handler = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'Handler')
         methods = [node for node in handler.body if isinstance(node, ast.FunctionDef)
                    and node.name in ('do_GET', 'serve_direct_profile', 'send_data', 'send_png', 'send_html')]
