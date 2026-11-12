@@ -3376,9 +3376,8 @@ part=one(part,
 # The final Nodes Lab v18 card has a managed "Основная нода" metadata row.
 part=one(part,
     '<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p></div>',
-    '<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p></div>'
-    '<div class="wpo-node-sni-row"><span>REALITY SNI: <code>{esc(local_sni)}</code></span>{local_edit}</div>',
-    "Local SNI readout and pencil")
+    '<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p>{local_edit}</div>',
+    "Local SNI pencil only (no SNI text on node card)")
 part=one(part,
     '        site_id=str(n.get(\'site_template_id\',\'\'))',
     '        node_sni=str(n.get("reality_sni") or reality_module.DEFAULT_SNI)\n'
@@ -3388,11 +3387,6 @@ part=one(part,
     'data-node-template="{esc(site_id)}"',
     'data-node-template="{esc(site_id)}" data-node-sni="{esc(node_sni)}"',
     "Remote pencil SNI data")
-part=one(part,
-    '<p class="wpo-node-template" title="Шаблон: {esc(site_name)}">{icon("settings")} Шаблон: {esc(site_name)}</p>',
-    '<p class="wpo-node-template" title="Шаблон: {esc(site_name)}">{icon("settings")} Шаблон: {esc(site_name)}</p>'
-    '<p class="wpo-node-sni-pending" title="VPN на этой ноде пока не развёрнут">REALITY SNI: {esc(node_sni)} · запланирован</p>',
-    "Remote SNI information")
 part=one(part,
     '    options=\'<option value="">Стандартная страница ноды</option>\'+',
     '    reality_options="".join(f\'<option value="{esc(host)}">{esc(label)} · {esc(host)}</option>\' for host,label in reality_module.SNI_CANDIDATES)\n'
@@ -3411,7 +3405,7 @@ part=one(part,
 # Only a compact neutral row is added; retain node card dimensions/layout.
 part=one(part,
     '    js=js.replace(\'__PATH__\',json.dumps(path)).replace(\'__CSRF__\',json.dumps(csrf))',
-    '''    css+="\\n.wpo-node-sni-row{display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:10px;color:var(--muted);min-width:0}.wpo-node-sni-row code{font-size:10px;color:var(--text);overflow:hidden;text-overflow:ellipsis}.wpo-node-sni-pending{font-size:9px;line-height:1.4;color:var(--muted);margin:5px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wpo-node-sni-row .wpo-node-icon{flex:0 0 auto;width:28px;height:28px}\\n"
+    '''    css+="\\n.wpo-nodes-page .wpo-main-node-label + .wpo-node-icon{width:28px;height:28px;flex:0 0 28px;margin-left:auto}\\n"
     js=js.replace('__PATH__',json.dumps(path)).replace('__CSRF__',json.dumps(csrf))
     local_js=r"""(()=>{const b=document.querySelector('[data-wpo-local-sni]'),dlg=document.getElementById('wpoLocalSniDialog'),f=document.getElementById('wpoLocalSniForm');if(!b||!dlg||!f)return;const selection=f.elements.reality_sni;let custom=null;b.addEventListener('click',()=>{if(custom){custom.remove();custom=null}const wanted=b.dataset.realitySni||'www.microsoft.com';if(![...selection.options].some(x=>x.value===wanted)){custom=new Option('Свой · '+wanted,wanted);selection.add(custom)}selection.value=wanted;f.querySelector('[data-sni-error]').hidden=true;dlg.showModal()});f.querySelector('[data-sni-cancel]').addEventListener('click',()=>dlg.close());f.addEventListener('submit',async e=>{e.preventDefault();const button=f.querySelector('[type=submit]'),error=f.querySelector('[data-sni-error]');button.disabled=true;error.hidden=true;try{const body=new URLSearchParams({csrf:__LOCAL_CSRF__,operation:'save',id:b.dataset.realityId,name:b.dataset.realityName,protocol:'vless',route:'reality',reality_sni:selection.value,reality_port:b.dataset.realityPort,reality_address:b.dataset.realityAddress,reality_fingerprint:b.dataset.realityFingerprint});const r=await fetch(__LOCAL_PATH__+'/connection-action',{method:'POST',headers:{'X-WPP-Async':'1'},body});if(r.redirected)throw Error('Сессия истекла. Обновите страницу.');const d=await r.json();if(!r.ok||!d.ok)throw Error(d.message||'Не удалось изменить SNI');dlg.close();location.reload()}catch(ex){error.textContent=ex.message;error.hidden=false}finally{button.disabled=false}})})();"""
     js+=local_js.replace('__LOCAL_CSRF__',json.dumps(csrf)).replace('__LOCAL_PATH__',json.dumps(path))
