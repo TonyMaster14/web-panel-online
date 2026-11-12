@@ -117,7 +117,7 @@ MTPROTO_HOST="${MTPROTO_HOST:-$DOMAIN}"
 [[ -s "$PRIMARY_SECRET" ]] || die "Primary install-time secret not found."
 [[ -s "$LOGO_SOURCE" ]] || die "Panel logo file is missing: panel-logo.svg"
 [[ -s "$AWG_GUIDE_SOURCE" ]] || die "AWG video guide is missing: assets/awg-routing-guide.mp4"
-for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
+for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_reality.py wpp_backup.py wpp_routing.py wpp_presets.py; do
     [[ -s "$BASE/$module" ]] || die "Missing panel module: $module; extract the complete archive."
 done
 FLAG_ARCHIVE="$BASE/wpp-panel/flags.tar.gz"
@@ -536,7 +536,7 @@ fi
 
 echo "[1/6] Writing manager..."
 
-for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
+for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_reality.py wpp_backup.py wpp_routing.py wpp_presets.py; do
     [[ -s "$BASE/$module" ]] || die "Package is incomplete: $module is missing."
     install -o root -g root -m 0644 "$BASE/$module" "$APP_DIR/$module"
 done
@@ -592,6 +592,7 @@ import wpp_extra_protocols
 import wpp_firewall
 import wpp_cdn
 import wpp_connections
+import wpp_reality
 import wpp_cdn_doctor
 
 USERS="/etc/web-proxy-panel/users.json"
@@ -810,6 +811,13 @@ def sync_firewall(d):
         lines.append("nft 'add rule inet web_proxy_panel input iifname != \"lo\" tcp dport { %s } counter drop'" % ",".join(map(str,sorted(stats))))
     if hysteria_enabled:
         lines.append("nft 'add rule inet web_proxy_panel input udp dport %d counter accept'" % hysteria_port)
+    reality_ports={int(item.get("config",{}).get("port",0) or 0)
+        for item in connection_registry.get("connections",[])
+        if wpp_reality.is_reality(item) and item.get("enabled",True)
+        and any(u.get("enabled",True) and u.get("connection_id")==item.get("id")
+                for u in d["users"])}
+    for port in sorted(p for p in reality_ports if p):
+        lines.append("nft 'add rule inet web_proxy_panel input iifname != \"lo\" tcp dport %d counter accept'" % port)
     for u in awg_users:
         uid=u["id"]; port=int(u["backend_port"])
         lines.append("nft 'add rule inet web_proxy_panel input iifname != \"lo\" udp dport %d counter accept comment \"wpp:%s:up\"'"%(port,uid))
@@ -989,6 +997,7 @@ def sync_xray(d):
     vless_vk=[]
     vless_timeweb=[]
     hysteria=[]
+    reality_profiles={}
     registry=wpp_connections.ensure(CONNECTIONS,d["users"],persist=False)
     advanced_by_bucket={}
     advanced_owner={}
@@ -1011,6 +1020,15 @@ def sync_xray(d):
             continue
         protocol=u.get("protocol","web")
         if protocol=="vless":
+            connection=wpp_connections.get(registry,str(u.get("connection_id","")))
+            if wpp_reality.is_reality(connection):
+                if not connection.get("enabled",True):
+                    continue
+                target=reality_profiles.setdefault(connection["id"],[])
+                for index,secret in enumerate(direct_secrets(u),1):
+                    target.append({"id":secret,"email":"panel:"+u["id"]+":"+str(index),
+                                   "level":0,"flow":"xtls-rprx-vision"})
+                continue
             profile=u.get("cdn") if isinstance(u.get("cdn"),dict) else {}
             if profile.get("enabled") and profile.get("provider")=="beget":
                 target=vless_beget
@@ -1151,6 +1169,12 @@ def sync_xray(d):
             "sniffing":{"enabled":True,"destOverride":["http","tls","quic"],"routeOnly":True}
         })
         inbounds[-1]=customize(inbounds[-1],"hysteria","hysteria")
+    for connection in registry.get("connections",[]):
+        cid=str(connection.get("id",""))
+        if cid not in reality_profiles:
+            continue
+        profile=wpp_reality.ensure_profile(cid,XRAY_BIN)
+        inbounds.append(wpp_reality.server_inbound(connection,reality_profiles[cid],profile))
     config={
         "log":{"loglevel":"warning"},
         "api":{"tag":"api","listen":XRAY_API,"services":["StatsService"]},
@@ -2259,6 +2283,7 @@ import wpp_extra_protocols as extra_protocols
 import wpp_cdn as cdn
 import wpp_cdn_doctor as cdn_doctor
 import wpp_connections as connection_store
+import wpp_reality as reality
 import wpp_backup as backup_store
 import wpp_routing as routing_store
 
@@ -2931,7 +2956,14 @@ def connections_with_runtime(connections):
         if tag and tag in by_tag: item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
         elif tag:
             bucket=connection_store._xray_bucket(item)
-            if protocol=="vless":
+            if protocol=="vless" and cfg.get("route")=="reality":
+                base={"tag":tag,"listen":"0.0.0.0","port":int(cfg.get("port",0)),
+                      "protocol":"vless","settings":{"clients":[],"decryption":"none"},
+                      "streamSettings":{"network":"raw","security":"reality",
+                          "realitySettings":{"target":str(cfg.get("sni",""))+":443",
+                              "serverNames":[cfg.get("sni","")],
+                              "privateKey":"<generated on first use>","shortIds":[]}}}
+            elif protocol=="vless":
                 ports={"direct":10000,"cdn":10001,"beget":10002,"selectel":10003,"vk":10004,"timeweb":10005}
                 base={"tag":tag,"listen":"127.0.0.1","port":ports[bucket],"protocol":"vless",
                       "settings":{"clients":[],"decryption":"none"},
@@ -2963,6 +2995,10 @@ def proxy_link(protocol,secret,port=443,name="Proxy",username=""):
         name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
     label=quote(name or "Proxy",safe="")
     if protocol=="vless":
+        connection=proxy_connection(user)
+        if reality.is_reality(connection):
+            profile=reality.read_profile(connection["id"])
+            return reality.client_link(secret,DOMAIN,name,connection,profile)
         route=cdn.vless_route(DOMAIN,user.get("cdn") if user else None)
         connection=proxy_connection(user)
         if connection:
@@ -3686,7 +3722,12 @@ class Handler(BaseHTTPRequestHandler):
                     raw={"id":form.get("id","").strip(),"name":form.get("name",""),"protocol":protocol,
                          "enabled":existing.get("enabled",True) if existing else True,"config":{},"advanced":advanced_value}
                     if not raw["id"]: raw.pop("id")
-                    if protocol=="vless":
+                    if protocol=="vless" and form.get("route","direct")=="reality":
+                        raw["config"]={"route":"reality",
+                            "sni":form.get("reality_sni","www.microsoft.com"),
+                            "port":form.get("reality_port",existing_config.get("port",0)),
+                            "fingerprint":form.get("reality_fingerprint","chrome")}
+                    elif protocol=="vless":
                         provider=form.get("provider","custom")
                         transport=cdn.transport_defaults(provider) if form.get("route","direct")=="cdn" else {"mode":"auto","uplink_method":"post"}
                         raw["config"]={**existing_config,"route":form.get("route","direct"),"provider":provider,
@@ -3704,6 +3745,8 @@ class Handler(BaseHTTPRequestHandler):
                             raise connection_store.ConnectionError("Измените маршрут и сохраните подключение, затем откройте карандаш заново для редактирования JSON нового маршрута.")
                         raw["advanced"]={"client":existing_advanced.get("client",{})}
                     saved_connection=connection_store.upsert(CONNECTIONS_FILE,raw)
+                    if reality.is_reality(saved_connection):
+                        connection_store.claim_reality_port(CONNECTIONS_FILE,saved_connection["id"])
                     if protocol in ("awg20","awg31"):
                         connection_store.claim_awg_port(CONNECTIONS_FILE,saved_connection["id"],users())
                     elif protocol in ("naive","mieru"):
@@ -4359,7 +4402,7 @@ PY
 fi
 
 python3 -m py_compile "$APP_FILE"
-python3 -m py_compile "$APP_DIR/wpp_subscriptions.py" "$APP_DIR/wpp_subscription_dashboard.py" "$APP_DIR/wpp_panel_extras.py" "$APP_DIR/wpp_ui.py" "$APP_DIR/wpp_metrics.py" "$APP_DIR/wpp_update.py" "$APP_DIR/wpp_nodes.py" "$APP_DIR/wpp_openflux.py" "$APP_DIR/wpp_awg.py" "$APP_DIR/wpp_extra_protocols.py" "$APP_DIR/wpp_firewall.py" "$APP_DIR/wpp_components.py" "$APP_DIR/wpp_cdn.py" "$APP_DIR/wpp_cdn_doctor.py" "$APP_DIR/wpp_connections.py" "$APP_DIR/wpp_backup.py" "$APP_DIR/wpp_routing.py"
+python3 -m py_compile "$APP_DIR/wpp_subscriptions.py" "$APP_DIR/wpp_subscription_dashboard.py" "$APP_DIR/wpp_panel_extras.py" "$APP_DIR/wpp_ui.py" "$APP_DIR/wpp_metrics.py" "$APP_DIR/wpp_update.py" "$APP_DIR/wpp_nodes.py" "$APP_DIR/wpp_openflux.py" "$APP_DIR/wpp_awg.py" "$APP_DIR/wpp_extra_protocols.py" "$APP_DIR/wpp_firewall.py" "$APP_DIR/wpp_components.py" "$APP_DIR/wpp_cdn.py" "$APP_DIR/wpp_cdn_doctor.py" "$APP_DIR/wpp_connections.py" "$APP_DIR/wpp_reality.py" "$APP_DIR/wpp_backup.py" "$APP_DIR/wpp_routing.py"
 
 
 # ---- Finish installation: service, Caddy route, permissions, start ----
