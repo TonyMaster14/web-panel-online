@@ -5054,6 +5054,10 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
+# Keep access URL/login/password/API token out of the permanent installer log.
+# In wizard mode, write only to the root-only /run result file; the wrapper
+# prints this card after the entire Nodes Lab installation has succeeded.
+{
 echo
 echo "============================================================"
 if [[ "$UPDATING" == "1" ]]; then
@@ -5094,3 +5098,4 @@ echo "  ${PASS}"
 echo
 fi
 echo "============================================================"
+} > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
