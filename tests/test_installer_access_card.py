@@ -30,15 +30,17 @@ with tempfile.TemporaryDirectory(prefix="wpo-access-card-") as folder:
         assert completed.returncode == 0, completed.stderr
         assert "DemoSecret123" not in (completed.stdout + completed.stderr), "Secret printed to logs"
         text = destination.read_text(encoding="utf-8")
-        assert "Ссылка: https://panel.example.test/panel-sample-id/login" in text
-        assert "Логин:  TestAdmin" in text
-        assert "Сохраните данные, чтобы не потерять." in text
+        assert "Ссылка на панель: https://panel.example.test/panel-sample-id/login" in text
+        assert "Логин : TestAdmin" in text
+        assert "Сохраните данные,что бы не потерять!" in text
         assert "Node API" not in text and "Token" not in text
         assert all(english not in text for english in ("Panel URL:", "Administrator login:", "Administrator password:"))
         if updating == "0":
-            assert "Пароль: DemoSecret123" in text
+            assert "Пароль : DemoSecret123" in text
         else:
-            assert "Пароль: сохранён (без изменений)" in text
+            assert "Пароль : сохранён (без изменений)" in text
             assert "DemoSecret123" not in text
-        assert text.index("Ссылка:") < text.index("Логин:") < text.index("Пароль:") < text.index("Сохраните данные")
+        assert text.index("Ссылка на панель:") < text.index("Логин :") < text.index("Пароль :") < text.index("Сохраните данные")
+        assert "\n\n  Логин : " in text and "\n\n  Пароль : " in text, "Labels must each be on their own line with a blank spacer"
+        assert "\n\n  Сохраните данные,что бы не потерять!" in text, "Save warning must follow a blank line"
 print("PASS: Russian access card, correct order, save reminder, no token, no credential log leak")
