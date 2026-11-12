@@ -3729,6 +3729,7 @@ class Handler(BaseHTTPRequestHandler):
                     if protocol=="vless" and form.get("route","direct")=="reality":
                         raw["config"]={"route":"reality",
                             "sni":form.get("reality_sni","www.microsoft.com"),
+                            "address":form.get("reality_address",existing_config.get("address","")),
                             "port":form.get("reality_port",existing_config.get("port",0)),
                             "fingerprint":form.get("reality_fingerprint","chrome")}
                     elif protocol=="vless":
