@@ -160,7 +160,7 @@ chmod 0600 "$PROGRESS" "$RESULT"
 printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 
 # Display a live, accurate stage indicator: numbers come from the actual
-# installer stages. The small spinner moves while a long task is running.
+# installer stages. The active stage stays below the bar while the timer measures elapsed time.
 draw(){
     local pct="$1" label="$2" elapsed="$3"
     local cols width filled empty donebar leftbar maxlabel
@@ -176,21 +176,18 @@ draw(){
     printf -v leftbar '%*s' "$empty" ''
     donebar="${donebar// /█}"; leftbar="${leftbar// /░}"
     maxlabel=$((cols-12)); (( maxlabel < 16 )) && maxlabel=16
-    if (( pct < 100 )); then
-        printf '\r\033[2K  %s✓ Установка...%s\n' "$success" "$reset"
+    # Both status messages occupy the same row above the blue bar.
+    if (( pct == 100 )); then
+        printf '\r\033[2K  %s✓ Установка завершена!%s\n' "$success" "$reset"
     else
-        printf '\r\033[2K\n'
+        printf '\r\033[2K  %s✓ Установка...%s\n' "$success" "$reset"
     fi
     printf '\r\033[2K  %s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s\n' \
         "$cyan" "$donebar" "$blue" "$leftbar" "$reset" "$pct" \
         "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
-    printf '\r\033[2K  %sЭтап: %s%s\n' "$ice" "${label:0:maxlabel}" "$reset"
-    if (( pct == 100 )); then
-        printf '\r\033[2K  %s✓ Установка завершена!%s' "$success" "$reset"
-    else
-        printf '\r\033[2K'
-    fi
-    printf '\033[3A\r'
+    # Actual operation appears immediately below the bar.
+    printf '\r\033[2K  %sЭтап: %s%s' "$ice" "${label:0:maxlabel}" "$reset"
+    printf '\033[2A\r'
 }
 
 # One clock for the entire installation, starting at package preparation.
@@ -218,13 +215,13 @@ else
     done
     if ! wait "$INSTALL_PID"; then
         INSTALL_PID=""
-        printf '\033[3B\r\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
+        printf '\033[2B\r\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
     fi
     INSTALL_PID=""
     SOURCE="$WORK/source"
 fi
 [[ -s "$SOURCE/install-final.sh" && -s "$SOURCE/node-install.sh" ]] || {
-    printf '\033[3B\r\n'; error "Неполный пакет установщика. Журнал: $LOG"
+    printf '\033[2B\r\n'; error "Неполный пакет установщика. Журнал: $LOG"
 }
 chmod 0700 "$SOURCE"/*.sh
 printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
@@ -254,13 +251,13 @@ wait "$INSTALL_PID" || code=$?
 INSTALL_PID=""
 if (( code == 0 )); then
     draw 100 'Проверки завершены' "$((SECONDS-started))"
-    printf '\033[3B\r\n'
+    printf '\033[2B\r\n'
     printf '\n%s  Проверки завершены. Журнал сохранён на VPS.%s\n' "$gray" "$reset"
     # The URL, login and password remain the very last content on screen.
     [[ -s "$RESULT" ]] || error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     cat -- "$RESULT"
 else
-    printf '\033[3B\r\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
+    printf '\033[2B\r\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
     [[ -z "$hint" ]] || printf '  %s\n' "$hint"
     printf '  Подробности: %s\n' "$LOG"
