@@ -23,6 +23,16 @@ CADDY_BACKEND_PORT = 18443
 REALITY_BACKEND_PORT = 24443
 ROUTER_CONFIG = "/etc/web-proxy-panel/tls-mux.cfg"
 ROUTER_SERVICE = "web-panel-proxy-tls-mux.service"
+# Shared candidates for connection and node editors.
+SNI_CANDIDATES = (
+    ("www.microsoft.com", "Microsoft"),
+    ("www.apple.com", "Apple"),
+    ("www.google.com", "Google"),
+    ("www.amazon.com", "Amazon"),
+    ("www.wikipedia.org", "Wikipedia"),
+)
+DEFAULT_SNI = SNI_CANDIDATES[0][0]
+
 MUX_BEGIN = "# WPP REALITY TLS MUX BEGIN"
 MUX_END = "# WPP REALITY TLS MUX END"
 
