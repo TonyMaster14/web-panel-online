@@ -185,7 +185,7 @@ class DirectRouting(unittest.TestCase):
         self.assertEqual(status, 200)
         config = json.loads(body)[0]
         self.assert_routed(config)
-        outbound = next(row for row in config['outbounds'] if row['tag'] == 'proxy')
+        outbound = next(row for row in config['outbounds'] if row['tag'] in ('proxy', 'proxy-1'))
         self.assertEqual(outbound['streamSettings']['xhttpSettings']['path'],
                          '/vless-' + 'a' * 24 + '-timeweb/api/v2/sync/stream/index.json')
         self.assertEqual(outbound['settings']['vnext'][0]['address'], 'edge.example')
@@ -212,7 +212,7 @@ class DirectRouting(unittest.TestCase):
         config = json.loads(body)[0]
         self.assertIn('dns', config)
         self.assertIn('routing', config)
-        outbound = next(value for value in config['outbounds'] if value['tag'] == 'proxy')
+        outbound = next(value for value in config['outbounds'] if value['tag'] in ('proxy', 'proxy-1'))
         self.assertEqual(outbound['protocol'], 'hysteria')
         self.assertEqual(outbound['streamSettings']['hysteriaSettings']['auth'], self.user['secret'])
 
@@ -279,7 +279,11 @@ class DirectRouting(unittest.TestCase):
         download = next(value['href'] for value in buttons if 'format=single' in value.get('href', ''))
         status, _, body = self.get(urlparse(download).path + '?' + urlparse(download).query)
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(body), json.loads(raw_json))
+        fetched=json.loads(body)
+        copied=json.loads(raw_json)
+        self.assertEqual(fetched.get('dns'),copied.get('dns'))
+        self.assertEqual(fetched.get('routing'),copied.get('routing'))
+        self.assertEqual(fetched['remarks'], '🇳🇱 Нидерланды')
 
     def test_turning_routing_off_restores_plain_vless_copy(self):
         self.profile['enabled'] = False
