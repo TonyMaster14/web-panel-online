@@ -255,11 +255,15 @@ code=0
 wait "$INSTALL_PID" || code=$?
 INSTALL_PID=""
 if (( code == 0 )); then
+    # Never display 100% or success if the final access card is missing.
+    if [[ ! -s "$RESULT" ]]; then
+        printf '\033[2B\r\n'
+        error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
+    fi
     draw 100 'Проверки завершены' "$((SECONDS-started))"
     printf '\033[2B\r\n'
     printf '\n%s  Проверки завершены. Журнал сохранён на VPS.%s\n' "$gray" "$reset"
     # The URL, login and password remain the very last content on screen.
-    [[ -s "$RESULT" ]] || error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     cat -- "$RESULT"
 else
     printf '\033[2B\r\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
