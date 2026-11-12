@@ -80,11 +80,11 @@ class DirectRouting(unittest.TestCase):
                          allow_subscription_request=lambda client: True, client_id=lambda handler: 'local',
                          SUB_FETCH_SLOTS=threading.BoundedSemaphore(2),
                          happ_import_link=ui.happ_import_link,
-                         load=lambda: {}, primary=lambda: '',
+                         load=lambda: {}, primary=lambda: '', traffic=lambda: {},
                          awg=SimpleNamespace(PROTOCOLS=('awg20', 'awg31')), AWG_AVAILABLE=True)
         tree = ast.parse(PANEL)
         functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
-                     and node.name in ('direct_profile_token', 'direct_profile_url', 'direct_profile_config')]
+                     and node.name in ('direct_profile_token', 'direct_profile_url', 'happ_profile_title', 'direct_profile_config')]
         handler = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == 'Handler')
         methods = [node for node in handler.body if isinstance(node, ast.FunctionDef)
                    and node.name in ('do_GET', 'serve_direct_profile', 'send_data', 'send_png', 'send_html')]
@@ -185,7 +185,7 @@ class DirectRouting(unittest.TestCase):
         self.assertEqual(status, 200)
         config = json.loads(body)[0]
         self.assert_routed(config)
-        outbound = next(row for row in config['outbounds'] if row['tag'] == 'proxy')
+        outbound = next(row for row in config['outbounds'] if row.get('protocol') == 'vless')
         self.assertEqual(outbound['streamSettings']['xhttpSettings']['path'],
                          '/vless-' + 'a' * 24 + '-timeweb/api/v2/sync/stream/index.json')
         self.assertEqual(outbound['settings']['vnext'][0]['address'], 'edge.example')
@@ -212,7 +212,7 @@ class DirectRouting(unittest.TestCase):
         config = json.loads(body)[0]
         self.assertIn('dns', config)
         self.assertIn('routing', config)
-        outbound = next(value for value in config['outbounds'] if value['tag'] == 'proxy')
+        outbound = next(value for value in config['outbounds'] if value.get('protocol') == 'hysteria')
         self.assertEqual(outbound['protocol'], 'hysteria')
         self.assertEqual(outbound['streamSettings']['hysteriaSettings']['auth'], self.user['secret'])
 
@@ -279,13 +279,18 @@ class DirectRouting(unittest.TestCase):
         download = next(value['href'] for value in buttons if 'format=single' in value.get('href', ''))
         status, _, body = self.get(urlparse(download).path + '?' + urlparse(download).query)
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(body), json.loads(raw_json))
+        fetched=json.loads(body)
+        copied=json.loads(raw_json)
+        self.assertEqual(fetched.get('dns'),copied.get('dns'))
+        self.assertEqual(fetched.get('routing'),copied.get('routing'))
+        self.assertEqual(fetched['remarks'], '🇳🇱 Нидерланды')
 
     def test_turning_routing_off_restores_plain_vless_copy(self):
         self.profile['enabled'] = False
         records = ui.client_records([], self.profiles, {}, 'vpn.example', self.proxy,
                                     self.state['profiles'], self.namespace['direct_profile_url'])
-        self.assertTrue(records[0]['link'].startswith('vless://'))
+        self.assertTrue(records[0]['raw_link'].startswith('vless://'))
+        self.assertEqual(records[0]['link'], ui.happ_import_link(self.profile_url()))
         self.assertEqual(records[0]['routing_url'], '')
 
 

@@ -1,7 +1,7 @@
 name: Проверка установщика WPO 3.0
 on:
   push:
-    branches: [main]
+    branches: [main, feature/vless-tcp-reality-vision-20261112]
   pull_request:
     branches: [main]
 permissions:
@@ -16,11 +16,292 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          for script in install.sh install-final.sh install-webproxy-core.sh node-install.sh wpo-node-agent-install-v2.sh; do
+          for script in install.sh install-final.sh install-panel.sh update.sh uninstall-web-proxy.sh install-webproxy-core.sh node-install.sh wpo-node-agent-install-v2.sh; do
             echo "Checking $script"
             bash -n "$script"
           done
           python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py wpo-node-geo-v13.py wpo-node-autotemplate-v20.py wpo-relay-zero-profiles-patch.py
+          python3 -m py_compile wpp_connections.py wpp_reality.py
+          python3 -m unittest discover -s tests -p 'test_reality.py' -v
+          python3 -m unittest discover -s tests -p 'test_node_reality_sni.py' -v
+          python3 -m unittest discover -s tests -p 'test_connection_json.py' -v
+          python3 -m unittest discover -s tests -p 'test_direct_routing.py' -v
+      - name: Реальный HAProxy и Caddy — конфигурация общего TCP/443
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends haproxy
+          # Match the exact Caddy release pinned by install-webproxy-core.sh.
+          curl --fail --location --retry 2 --connect-timeout 20 \
+            'https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_linux_amd64.tar.gz' \
+            -o /tmp/wpo-caddy-2.11.4.tar.gz
+          echo '8220d1f013b6f27510247b2360c9e0ca9f018feebd82515f07635318b34ff9777ccc8fd0b6e6f2486ce3a33fe389fbb7db12d05baa474f4587509fb4f5ebf1c9  /tmp/wpo-caddy-2.11.4.tar.gz' | sha512sum -c -
+          mkdir -p /tmp/wpo-caddy-bin
+          tar -xzf /tmp/wpo-caddy-2.11.4.tar.gz -C /tmp/wpo-caddy-bin caddy
+          sudo install -m 0755 /tmp/wpo-caddy-bin/caddy /usr/local/bin/caddy
+          caddy version
+          python3 - <<'PY'
+          import subprocess, tempfile
+          from pathlib import Path
+          import wpp_reality as reality
+          with tempfile.TemporaryDirectory() as folder:
+              root=Path(folder)
+              caddy=root/'Caddyfile'
+              caddy.write_text(reality.configure_caddy_mux(
+                  '{\n    auto_https disable_redirects\n}\n\nvpn.example.net {\n    respond "READY"\n}\n',True))
+              result=subprocess.run(['caddy','validate','--config',str(caddy),'--adapter','caddyfile'],
+                                    capture_output=True,text=True)
+              print(result.stdout,result.stderr)
+              assert result.returncode==0,'Caddy rejected internal HTTPS/18443'
+              haproxy=root/'haproxy.cfg'
+              haproxy.write_text(reality.haproxy_config('www.microsoft.com',ipv6=False))
+              result=subprocess.run(['haproxy','-c','-f',str(haproxy)],capture_output=True,text=True)
+              print(result.stdout,result.stderr)
+              assert result.returncode==0,'HAProxy rejected TLS SNI mux'
+              haproxy.write_text(reality.haproxy_config('www.microsoft.com',ipv6=True))
+              result=subprocess.run(['haproxy','-c','-f',str(haproxy)],capture_output=True,text=True)
+              print(result.stdout,result.stderr)
+              assert result.returncode==0,'HAProxy rejected dual-stack IPv4/IPv6 TLS mux'
+          print('PASS: real Caddy + HAProxy accept shared-443 configuration (IPv4 + IPv6)')
+          PY
+      - name: TCP SNI — живой тест маршрутизации HTTPS и REALITY
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import socket, ssl, subprocess, tempfile, threading, time
+          from pathlib import Path
+          import wpp_reality as reality
+
+          def listener():
+              sock=socket.socket()
+              sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+              sock.bind(("127.0.0.1",0)); sock.listen(8)
+              sock.settimeout(0.5)
+              return sock,sock.getsockname()[1]
+
+          backends={}
+          for name in ("caddy","reality"):
+              server,port=listener()
+              received=threading.Event()
+              backends[name]={"socket":server,"port":port,"received":received}
+              def receive(which=name):
+                  item=backends[which]
+                  deadline=time.monotonic()+12
+                  while time.monotonic()<deadline and not item["received"].is_set():
+                      try: conn,_=item["socket"].accept()
+                      except socket.timeout: continue
+                      except OSError: break
+                      with conn:
+                          conn.settimeout(1)
+                          try: data=conn.recv(4096)
+                          except (OSError,TimeoutError): data=b""
+                          # Caddy receives a PROXY v2 header before TLS.
+                          # REALITY must still receive untouched TLS bytes.
+                          proxy_v2=b"\r\n\r\n\x00\r\nQUIT\n"
+                          correct=(data.startswith(proxy_v2) if which=="caddy"
+                                   else data[:1]==b"\x16")
+                          if data and correct:
+                              item["received"].set()
+              threading.Thread(target=receive,daemon=True).start()
+
+          probe,front_port=listener()
+          probe.close()
+          with tempfile.TemporaryDirectory() as folder:
+              cfg=reality.haproxy_config("www.microsoft.com",ipv6=False)
+              # The production service starts as root and drops to haproxy.
+              # Hosted CI runs the ephemeral frontend as an unprivileged user.
+              cfg=cfg.replace("    user haproxy\n","").replace("    group haproxy\n","")
+              cfg=cfg.replace("bind 0.0.0.0:443",f"bind 127.0.0.1:{front_port}")
+              cfg=cfg.replace(f"127.0.0.1:{reality.CADDY_BACKEND_PORT}",f"127.0.0.1:{backends['caddy']['port']}")
+              cfg=cfg.replace(f"127.0.0.1:{reality.REALITY_BACKEND_PORT}",f"127.0.0.1:{backends['reality']['port']}")
+              path=Path(folder)/"haproxy.cfg"; path.write_text(cfg)
+              process=subprocess.Popen(["haproxy","-db","-f",str(path)],
+                                       stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+              try:
+                  # Send genuine TLS ClientHello bytes with their actual SNI,
+                  # not a hand-coded fake header.
+                  for hostname,backend in (("www.microsoft.com","reality"),
+                                           ("vpn.example.net","caddy")):
+                      context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                      context.check_hostname=False
+                      context.verify_mode=ssl.CERT_NONE
+                      inbound,outbound=ssl.MemoryBIO(),ssl.MemoryBIO()
+                      handshake=context.wrap_bio(inbound,outbound,server_side=False,server_hostname=hostname)
+                      try: handshake.do_handshake()
+                      except ssl.SSLWantReadError: pass
+                      hello=outbound.read()
+                      assert hello.startswith(b"\x16") and len(hello)>100,hostname
+                      for attempt in range(30):
+                          try:
+                              with socket.create_connection(("127.0.0.1",front_port),timeout=2) as conn:
+                                  conn.sendall(hello)
+                                  assert backends[backend]["received"].wait(3),f"Wrong backend for {hostname}"
+                              break
+                          except ConnectionRefusedError:
+                              time.sleep(0.1)
+                      else: raise AssertionError("HAProxy frontend not ready")
+                  print("PASS: Microsoft SNI -> REALITY; panel domain SNI -> Caddy")
+              finally:
+                  process.terminate()
+                  try: _,err=process.communicate(timeout=4)
+                  except subprocess.TimeoutExpired:
+                      process.kill(); _,err=process.communicate()
+                  for item in backends.values(): item["socket"].close()
+                  if process.returncode not in (0,-15,-2):
+                      print("HAProxy diagnostics:",err)
+          PY
+      - name: HTTPS через HAProxy и Caddy — реальный TLS и исходный IP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import os, socket, ssl, subprocess, tempfile, time
+          from pathlib import Path
+          import wpp_reality as reality
+
+          with tempfile.TemporaryDirectory() as folder:
+              base=Path(folder)
+              env=dict(os.environ, XDG_DATA_HOME=str(base/'data'), XDG_CONFIG_HOME=str(base/'config'))
+              site='vpn.example.net'
+              caddy=base/'Caddyfile'
+              caddy.write_text(reality.configure_caddy_mux(
+                  '{\n    auto_https disable_redirects\n}\n\n'
+                  + site + ' {\n    tls internal\n    respond "CLIENT={remote_host}"\n}\n',True))
+              # The local test uses a random public frontend port but keeps
+              # the exact production Caddy listener and PROXY v2 settings.
+              with socket.socket() as probe:
+                  probe.bind(('127.0.0.1',0))
+                  frontend=probe.getsockname()[1]
+              haproxy=base/'haproxy.cfg'
+              config=reality.haproxy_config('www.microsoft.com',ipv6=False)
+              config=config.replace("    user haproxy\n","").replace("    group haproxy\n","")
+              config=config.replace('bind 0.0.0.0:443',f'bind 127.0.0.1:{frontend}')
+              haproxy.write_text(config)
+              services=[]
+              try:
+                  services.append(subprocess.Popen(
+                      ['caddy','run','--config',str(caddy),'--adapter','caddyfile'],
+                      stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,env=env))
+                  services.append(subprocess.Popen(
+                      ['haproxy','-db','-f',str(haproxy)],
+                      stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True))
+                  received=b''
+                  last_error=None
+                  for attempt in range(65):
+                      try:
+                          with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as source:
+                              # 127.0.0.2 is a distinct address in the loopback
+                              # network, to prove that Caddy sees the *client*,
+                              # rather than just HAProxy's 127.0.0.1.
+                              source.bind(('127.0.0.2',0))
+                              source.settimeout(2)
+                              source.connect(('127.0.0.1',frontend))
+                              context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                              context.check_hostname=False
+                              context.verify_mode=ssl.CERT_NONE
+                              with context.wrap_socket(source,server_hostname=site) as stream:
+                                  stream.sendall(('GET / HTTP/1.1\r\nHost: '+site
+                                                  +'\r\nConnection: close\r\n\r\n').encode())
+                                  fragments=[]
+                                  while True:
+                                      part=stream.recv(8192)
+                                      if not part: break
+                                      fragments.append(part)
+                                  received=b''.join(fragments)
+                          if b'CLIENT=127.0.0.2' in received and b'200 OK' in received:
+                              break
+                          last_error=RuntimeError('Unexpected HTTPS reply: '+repr(received[:350]))
+                      except (OSError,ssl.SSLError,TimeoutError) as exc:
+                          last_error=exc
+                      if any(proc.poll() is not None for proc in services):
+                          raise AssertionError('Caddy or HAProxy stopped unexpectedly: '+repr(last_error))
+                      time.sleep(.2)
+                  else:
+                      raise AssertionError('HTTPS and PROXY v2 verification failed: '+repr(last_error))
+                  print('PASS: HTTPS on shared TCP port; site served by Caddy; source IP preserved by PROXY v2')
+              finally:
+                  for proc in reversed(services):
+                      proc.terminate()
+                  for proc in reversed(services):
+                      try: _,err=proc.communicate(timeout=5)
+                      except subprocess.TimeoutExpired:
+                          proc.kill(); _,err=proc.communicate(timeout=5)
+                      if proc.returncode not in (0,-15,-2):
+                          print('Process diagnostics:',err[-1600:])
+          PY
+      - name: Xray REALITY + Vision — проверка настоящим ядром
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/wpo-reality-xray
+          curl --fail --location --retry 2 --connect-timeout 20 \
+            'https://github.com/XTLS/Xray-core/releases/download/v26.7.28/Xray-linux-64.zip' \
+            -o /tmp/wpo-reality-xray/xray.zip
+          echo '8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40  /tmp/wpo-reality-xray/xray.zip' | sha256sum -c -
+          unzip -q /tmp/wpo-reality-xray/xray.zip xray -d /tmp/wpo-reality-xray
+          chmod 0755 /tmp/wpo-reality-xray/xray
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import tempfile
+          import uuid
+          from pathlib import Path
+          import wpp_connections as con
+          import wpp_reality as reality
+          with tempfile.TemporaryDirectory() as directory:
+              entry=con.validate(con.defaults()[-1],existing=con.defaults()[-1])
+              profile=reality.ensure_profile(entry['id'], '/tmp/wpo-reality-xray/xray',
+                                            str(Path(directory)/'reality.json'))
+              inbound=reality.server_inbound(entry,[{
+                  'id':str(uuid.uuid4()),'email':'panel:realitytest:1',
+                  'level':0,'flow':'xtls-rprx-vision'}],profile)
+              config={'log':{'loglevel':'warning'},'inbounds':[inbound],
+                      'outbounds':[{'tag':'direct','protocol':'freedom'}]}
+              path=Path(directory)/'config.json'
+              path.write_text(json.dumps(config),encoding='utf-8')
+              result=subprocess.run(['/tmp/wpo-reality-xray/xray','run','-test',
+                                     '-config',str(path)],text=True,capture_output=True)
+              print(result.stdout)
+              if result.returncode:
+                  print(result.stderr)
+                  raise SystemExit('Xray rejected REALITY + Vision inbound')
+          print('REALITY + Vision inbound accepted by Xray 26.7.28')
+          PY
+      - name: Проверка встроенного Python установщика и панели
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import py_compile
+          import tempfile
+          script=Path("install-panel.sh").read_text(encoding="utf-8")
+          for marker in ('cat > "$MANAGER" <<\'PY\'', 'cat > "$APP_FILE" <<\'PY\''):
+              assert script.count(marker)==1, "Expected exactly one "+marker
+              source=script.split(marker,1)[1].split("\nPY\n",1)[0]
+              assert source.startswith("\n"), "Missing source block after "+marker
+              with tempfile.NamedTemporaryFile(mode="w",suffix=".py",encoding="utf-8") as f:
+                  f.write(source)
+                  f.flush()
+                  py_compile.compile(f.name,doraise=True)
+          print("PASS: embedded manager and panel Python source syntax")
+          PY
+      - name: Синтаксис нового редактора SNI для нод
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("node-install.sh").read_text(encoding="utf-8")
+          mark='python3 - "$UI" "$PANEL" <<\'PY_NODE_REALITY_SNI\'\n'
+          assert src.count(mark)==1, "Expected one node SNI patch"
+          body=src.split(mark,1)[1].split("\nPY_NODE_REALITY_SNI\n",1)[0]
+          compile(body,"embedded-node-sni.py","exec")
+          assert "wpo-node-reality-sni-settings" in body
+          assert "connection_store.ensure(CONNECTIONS_FILE,users())" in body
+          assert "selected[\"reality_sni\"]=requested_sni" in body
+          print("PASS: node SNI patch syntax, primary connection binding, remote storage")
+          PY
       - name: Сверка 26 встроенных Nodes Lab с исходниками
         shell: bash
         run: |

@@ -25,6 +25,7 @@ import wpp_cdn as cdn
 import wpp_cdn_doctor as doctor
 import wpp_routing as routing
 import wpp_ui as ui
+import wpp_reality as reality
 
 INSTALLER = (ROOT / 'install-panel.sh').read_text(encoding='utf-8')
 MANAGER = INSTALLER.split('cat > "$MANAGER" <<\'PY\'\n', 1)[1].split('\nPY\n', 1)[0]
@@ -174,7 +175,7 @@ class ConnectionJSON(unittest.TestCase):
             'XRAY_VLESS_PORT':10000,'XRAY_VLESS_CDN_PORT':10001,'XRAY_VLESS_BEGET_PORT':10002,
             'XRAY_VLESS_SELECTEL_PORT':10003,'XRAY_VLESS_VK_PORT':10004,'XRAY_VLESS_TIMEWEB_PORT':10005,
             'direct_secrets':lambda user:user.get('device_secrets',[user['secret']]),
-            'activate_xray_config':lambda *args:captures.append(copy.deepcopy(args))}
+            'wpp_reality':reality,'activate_xray_config':lambda *args,**kwargs:captures.append(copy.deepcopy(args))}
         functions(MANAGER,{'sync_xray'},ns)
         users=[{'id':'b'*16,'protocol':'vless','connection_id':'vless-direct','secret':UUID,'enabled':True}]
         ns['sync_xray']({'users':users})
@@ -210,10 +211,11 @@ class Activation(unittest.TestCase):
         self.caddy=self.root/'Caddyfile'; self.caddy.write_text('previous caddy')
         self.running=True; self.enabled=True; self.failure=None; self.calls=[]
         self.caddy_can_reload=True
+        self.router_active=False; self.router_enabled=False
         def run(*args,check=False,**kwargs):
             self.calls.append(args); code=0
-            if args[:2]==('systemctl','is-active'): code=0 if self.running else 3
-            elif args[:2]==('systemctl','is-enabled'): code=0 if self.enabled else 1
+            if args[:2]==('systemctl','is-active'): code=0 if (self.router_active if args[-1]==reality.ROUTER_SERVICE else self.running) else 3
+            elif args[:2]==('systemctl','is-enabled'): code=0 if (self.router_enabled if args[-1]==reality.ROUTER_SERVICE else self.enabled) else 1
             elif args[:2]==('systemctl','restart'):
                 if self.failure=='restart': self.failure=None; code=1; self.running=False
                 else: self.running=True
@@ -230,7 +232,7 @@ class Activation(unittest.TestCase):
             return SimpleNamespace(returncode=code,stdout='',stderr='simulated rejection' if code else '')
         self.ns={'os':os,'copy':copy,'json':json,'grp':SimpleNamespace(getgrnam=lambda *a:SimpleNamespace(gr_gid=0)),
                  'shutil':shutil,'time':SimpleNamespace(sleep=lambda *a:None),'run':run,
-                 'wpp_cdn_doctor':doctor,'XRAY_CONFIG':str(self.runtime),'XRAY_BIN':'xray',
+                 'wpp_reality':reality,'wpp_cdn_doctor':doctor,'XRAY_CONFIG':str(self.runtime),'XRAY_BIN':'xray',
                  'XRAY_SERVICE':'xray.service','CADDYFILE':str(self.caddy)}
         functions(MANAGER,{'activate_xray_config'},self.ns)
         for context in (patch.object(os,'chown',lambda *a:None,create=True),patch.object(shutil,'chown',lambda *a,**k:None)):
@@ -258,7 +260,8 @@ class Activation(unittest.TestCase):
         self.assertEqual(self.caddy.read_text(),'previous caddy')
         self.assertEqual(self.runtime.read_text(),'{"previous": true}')
         self.assertTrue(self.running)
-        self.assertIn(('systemctl','reload-or-restart','caddy.service'),self.calls)
+        # When Xray fails before the Caddy restart, the existing listener stays untouched.
+        self.assertNotIn(('systemctl','restart','caddy.service'),self.calls)
 
     def test_unchanged_caddy_does_not_reload_or_restart_it(self):
         self.ns['activate_xray_config']({'inbounds':[inbound()]},'previous caddy')

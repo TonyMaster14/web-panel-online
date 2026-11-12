@@ -95,7 +95,7 @@ for unit in \
   web-panel-proxy-metrics.timer web-panel-proxy-metrics.service \
   tproxy-panel.service web-proxy-panel.service web-proxy-panel-mtproxy.service \
   web-proxy-panel-firewall.service web-proxy-panel-firewall-maintenance.timer web-proxy-panel-firewall-maintenance.service \
-  web-proxy-panel-traffic.timer web-proxy-panel-traffic.service web-panel-proxy-xray.service \
+  web-proxy-panel-traffic.timer web-proxy-panel-traffic.service web-panel-proxy-xray.service web-panel-proxy-tls-mux.service \
   web-panel-proxy-sync-tls.timer web-panel-proxy-sync-tls.service \
   web-panel-proxy-naive.service web-panel-proxy-mieru.service \
   tproxy-firewall.service refresh-mtproxy-config.timer refresh-mtproxy-config.service \
@@ -166,6 +166,7 @@ source,target,domain=sys.argv[1:]
 text=open(source,encoding="utf-8").read()
 text=re.sub(r"\n?[ \t]*# WPP NAIVE GLOBAL BEGIN\n.*?\n[ \t]*# WPP NAIVE GLOBAL END\n?","\n",text,flags=re.S)
 text=re.sub(r"\n?[ \t]*# WPP NAIVE BEGIN\n.*?\n[ \t]*# WPP NAIVE END\n?","\n",text,flags=re.S)
+text=re.sub(r"(?ms)^[ \t]*# WPP REALITY TLS MUX BEGIN\n.*?^[ \t]*# WPP REALITY TLS MUX END\n?","",text)
 text=re.sub(r"(?m)^\s*:443,\s*"+re.escape(domain)+r"\s*\{\s*$",domain+" {",text,count=1)
 lines=text.splitlines(keepends=True)
 start=None
@@ -269,6 +270,7 @@ rm -f -- \
   /etc/systemd/system/web-proxy-panel-traffic.service \
   /etc/systemd/system/web-proxy-panel-traffic.timer \
   /etc/systemd/system/web-panel-proxy-xray.service \
+  /etc/systemd/system/web-panel-proxy-tls-mux.service \
   /etc/systemd/system/web-panel-proxy-openflux.service \
   /etc/systemd/system/web-panel-proxy-awg@.service \
   /etc/systemd/system/web-panel-proxy-naive.service \

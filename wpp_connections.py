@@ -7,6 +7,7 @@ operator repair a CDN hostname or TLS setting once without rotating UUIDs.
 """
 import copy
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -50,6 +51,7 @@ def defaults():
         _base("awg31-primary", "AmneziaWG 3.1 · отдельный профиль", "awg31", port=0),
         _base("naive-primary", "NaiveProxy · отдельный TLS-порт", "naive", port=53000),
         _base("mieru-primary", "Mieru · TCP", "mieru", port=54000, transport="TCP"),
+        _base("vless-reality-primary", "VLESS REALITY · TCP Vision", "vless", route="reality", sni="www.microsoft.com", port=443, fingerprint="chrome"),
     ]
 
 
@@ -262,6 +264,8 @@ def apply_server_advanced(inbound, advanced, protocol="vless"):
 def inbound_tag(connection):
     override = connection.get("advanced", {}).get("inbound", {})
     if override.get("tag"): return override["tag"]
+    if connection.get("protocol") == "vless" and connection.get("config", {}).get("route") == "reality":
+        return "vless-reality-" + str(connection["id"])
     bucket = _xray_bucket(connection)
     return "hysteria2" if bucket == "hysteria" else "vless-xhttp" + ("-" + bucket if bucket and bucket != "direct" else "")
 
@@ -317,36 +321,53 @@ def validate(raw, existing=None):
               "config": {}, "advanced": {}}
     if protocol == "vless":
         route = str(config.get("route", "direct"))
-        if route not in ("direct", "cdn"): raise ConnectionError("Неизвестный маршрут VLESS.")
-        provider = str(config.get("provider", "custom"))
-        if provider not in PROVIDERS: raise ConnectionError("Неизвестный CDN-провайдер.")
-        public_host = _host(config.get("public_host"), "публичный домен CDN", route == "cdn")
-        if public_host.endswith(".selcdn.net"):
-            provider = "selectel"
-        elif provider == "custom" and public_host.endswith(".cdn.twcstorage.ru"):
-            provider = "timeweb"
-        fingerprint = str(config.get("fingerprint", "chrome"))
-        if fingerprint not in FINGERPRINTS: raise ConnectionError("Неизвестный TLS fingerprint.")
-        transport = wpp_cdn.transport_defaults(provider) if route == "cdn" else {"mode": "auto", "uplink_method": "post"}
-        mode = str(config.get("mode", transport["mode"]))
-        if mode not in MODES: raise ConnectionError("Неизвестный режим XHTTP.")
-        method = str(config.get("uplink_method", transport["uplink_method"])).upper()
-        if method not in METHODS: raise ConnectionError("Метод XHTTP должен быть GET, POST или DELETE.")
-        if route == "cdn":
-            # Provider presets are applied as one atomic pair.  Mixing an old
-            # method with a new server mode produces links that download but
-            # cannot upload.
-            mode = transport["mode"]
-            method = transport["uplink_method"].upper()
+        if route not in ("direct", "cdn", "reality"): raise ConnectionError("Неизвестный маршрут VLESS.")
+        if route == "reality":
+            sni = _host(config.get("sni") or "www.microsoft.com", "SNI REALITY", True)
+            port = _integer(config.get("port"), "Порт REALITY", 0, 65535)
+            if port and port < 1025 and port != 443:
+                raise ConnectionError("Для REALITY разрешён общий TCP/443 либо отдельный TCP-порт от 1025 до 65535.")
+            if port in {8090, 2398, 2399, 10000, 10001, 10002, 10003, 10004, 10005, 10085, 18443, 24443}:
+                raise ConnectionError("Выбранный TCP-порт занят внутренней службой WPO.")
+            fingerprint = str(config.get("fingerprint", "chrome"))
+            if fingerprint not in ("chrome", "firefox", "safari"):
+                raise ConnectionError("REALITY: отпечаток должен быть chrome, firefox или safari.")
+            address = str(config.get("address") or "").strip().lower().rstrip(".")
+            if address:
+                try: ipaddress.ip_address(address.strip("[]"))
+                except ValueError: address = _host(address, "адрес VPS", True)
+            result["config"] = {"route": "reality", "sni": sni, "port": port,
+                                "address": address, "fingerprint": fingerprint}
         else:
-            mode = "auto"
-            method = "POST"
-        result["config"] = {"route": route, "provider": provider, "public_host": public_host,
-            "sni": _host(config.get("sni"), "TLS SNI"), "host_header": _host(config.get("host_header"), "HTTP Host"),
-            "fingerprint": fingerprint, "mode": mode, "uplink_method": method,
-            "padding": str(config.get("padding", "100-1000"))[:40],
-            "xmux": bool(config.get("xmux", provider in ("beget", "selectel", "timeweb"))),
-            "no_sse_header": bool(config.get("no_sse_header", False))}
+            provider = str(config.get("provider", "custom"))
+            if provider not in PROVIDERS: raise ConnectionError("Неизвестный CDN-провайдер.")
+            public_host = _host(config.get("public_host"), "публичный домен CDN", route == "cdn")
+            if public_host.endswith(".selcdn.net"):
+                provider = "selectel"
+            elif provider == "custom" and public_host.endswith(".cdn.twcstorage.ru"):
+                provider = "timeweb"
+            fingerprint = str(config.get("fingerprint", "chrome"))
+            if fingerprint not in FINGERPRINTS: raise ConnectionError("Неизвестный TLS fingerprint.")
+            transport = wpp_cdn.transport_defaults(provider) if route == "cdn" else {"mode": "auto", "uplink_method": "post"}
+            mode = str(config.get("mode", transport["mode"]))
+            if mode not in MODES: raise ConnectionError("Неизвестный режим XHTTP.")
+            method = str(config.get("uplink_method", transport["uplink_method"])).upper()
+            if method not in METHODS: raise ConnectionError("Метод XHTTP должен быть GET, POST или DELETE.")
+            if route == "cdn":
+                # Provider presets are applied as one atomic pair.  Mixing an old
+                # method with a new server mode produces links that download but
+                # cannot upload.
+                mode = transport["mode"]
+                method = transport["uplink_method"].upper()
+            else:
+                mode = "auto"
+                method = "POST"
+            result["config"] = {"route": route, "provider": provider, "public_host": public_host,
+                "sni": _host(config.get("sni"), "TLS SNI"), "host_header": _host(config.get("host_header"), "HTTP Host"),
+                "fingerprint": fingerprint, "mode": mode, "uplink_method": method,
+                "padding": str(config.get("padding", "100-1000"))[:40],
+                "xmux": bool(config.get("xmux", provider in ("beget", "selectel", "timeweb"))),
+                "no_sse_header": bool(config.get("no_sse_header", False))}
     else:
         result["config"] = {"port": _integer(config.get("port"), "Порт", 0, 65535)}
         if protocol in EXTERNAL_PROTOCOLS and result["config"]["port"] and result["config"]["port"] < 1025:
@@ -438,10 +459,12 @@ def request_for_connection(connection):
     cfg = connection["config"]
     request = {"protocol": connection["protocol"], "connection_id": connection["id"]}
     if connection["protocol"] == "vless":
-        request.update({"vless_route": cfg["route"], "vless_cdn_provider": cfg.get("provider", "custom"),
+        request.update({"vless_route": "direct" if cfg["route"] == "reality" else cfg["route"], "vless_cdn_provider": cfg.get("provider", "custom"),
             "vless_cdn_public_host": cfg.get("public_host", ""), "vless_cdn_sni": cfg.get("sni", ""),
             "vless_cdn_host_header": cfg.get("host_header", ""), "vless_cdn_fingerprint": cfg.get("fingerprint", "chrome"),
             "vless_cdn_mode": cfg.get("mode", "packet-up"), "vless_cdn_uplink_method": cfg.get("uplink_method", "GET")})
+        if cfg["route"] == "reality" and not cfg["port"]:
+            raise ConnectionError("Сначала назначьте порт REALITY.")
     elif connection["protocol"] in AWG_PROTOCOLS | EXTERNAL_PROTOCOLS:
         if not cfg.get("port"):
             raise ConnectionError("Для подключения ещё не назначен порт.")
@@ -518,6 +541,31 @@ def claim_external_port(path, cid):
     return item
 
 
+
+def claim_reality_port(path, cid):
+    """Allocate one persistent public TCP port per REALITY inbound."""
+    data = load(path)
+    item = get(data, cid)
+    if not item or item.get("protocol") != "vless" or item.get("config", {}).get("route") != "reality":
+        raise ConnectionError("Подключение REALITY не найдено.")
+    config = item["config"]
+    current = int(config.get("port", 0) or 0)
+    used = {int(row.get("config", {}).get("port", 0) or 0)
+            for row in data["connections"] if row.get("id") != cid}
+    # HAProxy shares TCP/443 with Caddy using SNI. One REALITY inbound can
+    # claim it; other inbounds keep their independent high ports.
+    used.update({8090, 2398, 2399, 10000, 10001, 10002, 10003, 10004, 10005, 10085, 18443, 24443})
+    if (current == 443 or current >= 1025) and current not in used:
+        return item
+    port = 443 if 443 not in used else next(
+        (value for value in range(20443, 20543) if value not in used), None)
+    if port is None:
+        raise ConnectionError("Нет свободных портов REALITY.")
+    item["config"] = {**config, "port": port}
+    save(path, data)
+    return item
+
+
 def apply_to_user(user, connection):
     """Apply mutable transport settings without touching client credentials."""
     connection = validate(connection, existing=connection)
@@ -529,7 +577,7 @@ def apply_to_user(user, connection):
         user["transport"] = str(connection["config"].get("transport", "TCP")).upper()
     if user.get("protocol") == "vless":
         cfg = connection["config"]
-        if cfg.get("route") == "direct":
+        if cfg.get("route") in ("direct", "reality"):
             user.pop("cdn", None)
         else:
             method = str(cfg.get("uplink_method", "GET")).lower()
@@ -589,6 +637,7 @@ def _xray_bucket(connection):
     if protocol == "hysteria": return "hysteria"
     if protocol != "vless": return None
     config = connection.get("config") if isinstance(connection.get("config"), dict) else {}
+    if config.get("route") == "reality": return None
     if config.get("route") != "cdn": return "direct"
     provider = str(config.get("provider", "custom"))
     return provider if provider in ("beget", "selectel", "vk", "timeweb") else "cdn"
@@ -657,11 +706,12 @@ def clone(path, cid, users=None):
     if not source: raise ConnectionError("Подключение не найдено.")
     previous = copy.deepcopy(data)
     item = copy.deepcopy(source); item["id"] = secrets.token_hex(8); item["name"] += " · копия"; item["created_at"] = int(time.time())
-    if item.get("protocol") in AWG_PROTOCOLS | EXTERNAL_PROTOCOLS: item["config"] = {**item.get("config", {}), "port": 0}
+    if item.get("protocol") in AWG_PROTOCOLS | EXTERNAL_PROTOCOLS or (item.get("protocol") == "vless" and item.get("config", {}).get("route") == "reality"): item["config"] = {**item.get("config", {}), "port": 0}
     data["connections"].append(item); save(path, data)
     try:
         if item.get("protocol") in AWG_PROTOCOLS: return claim_awg_port(path, item["id"], users)
         if item.get("protocol") in EXTERNAL_PROTOCOLS: return claim_external_port(path, item["id"])
+        if item.get("protocol") == "vless" and item.get("config", {}).get("route") == "reality": return claim_reality_port(path, item["id"])
     except Exception:
         save(path, previous)
         raise

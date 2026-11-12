@@ -117,7 +117,7 @@ MTPROTO_HOST="${MTPROTO_HOST:-$DOMAIN}"
 [[ -s "$PRIMARY_SECRET" ]] || die "Primary install-time secret not found."
 [[ -s "$LOGO_SOURCE" ]] || die "Panel logo file is missing: panel-logo.svg"
 [[ -s "$AWG_GUIDE_SOURCE" ]] || die "AWG video guide is missing: assets/awg-routing-guide.mp4"
-for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
+for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_reality.py wpp_backup.py wpp_routing.py wpp_presets.py; do
     [[ -s "$BASE/$module" ]] || die "Missing panel module: $module; extract the complete archive."
 done
 FLAG_ARCHIVE="$BASE/wpp-panel/flags.tar.gz"
@@ -383,6 +383,34 @@ if ! command -v qrencode >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 |
     apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends qrencode unzip xz-utils
 fi
 
+# The default HAProxy unit and its config are never modified. WPO owns a
+# separate, dormant systemd unit which becomes active only for REALITY/443.
+if ! command -v haproxy >/dev/null 2>&1; then
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends haproxy
+fi
+command -v haproxy >/dev/null 2>&1 || die "HAProxy is required for REALITY sharing TCP/443."
+cat > /etc/systemd/system/web-panel-proxy-tls-mux.service <<'WPO_TLS_MUX_UNIT'
+[Unit]
+Description=WEB PANEL ONLINE TCP/443 TLS SNI passthrough (Caddy + REALITY)
+After=network-online.target caddy.service web-panel-proxy-xray.service
+Wants=network-online.target caddy.service web-panel-proxy-xray.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/haproxy -db -f /etc/web-proxy-panel/tls-mux.cfg
+ExecStartPre=/usr/sbin/haproxy -c -f /etc/web-proxy-panel/tls-mux.cfg
+Restart=on-failure
+RestartSec=2
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+WPO_TLS_MUX_UNIT
+chmod 0644 /etc/systemd/system/web-panel-proxy-tls-mux.service
+
 install -d -m 0755 "$APP_DIR" /etc/web-proxy-panel
 install -d -m 0700 "$DATA_DIR"
 install -o root -g root -m 0644 "$LOGO_SOURCE" "$LOGO_FILE"
@@ -536,7 +564,7 @@ fi
 
 echo "[1/6] Writing manager..."
 
-for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
+for module in wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_reality.py wpp_backup.py wpp_routing.py wpp_presets.py; do
     [[ -s "$BASE/$module" ]] || die "Package is incomplete: $module is missing."
     install -o root -g root -m 0644 "$BASE/$module" "$APP_DIR/$module"
 done
@@ -592,6 +620,7 @@ import wpp_extra_protocols
 import wpp_firewall
 import wpp_cdn
 import wpp_connections
+import wpp_reality
 import wpp_cdn_doctor
 
 USERS="/etc/web-proxy-panel/users.json"
@@ -810,6 +839,13 @@ def sync_firewall(d):
         lines.append("nft 'add rule inet web_proxy_panel input iifname != \"lo\" tcp dport { %s } counter drop'" % ",".join(map(str,sorted(stats))))
     if hysteria_enabled:
         lines.append("nft 'add rule inet web_proxy_panel input udp dport %d counter accept'" % hysteria_port)
+    reality_ports={int(item.get("config",{}).get("port",0) or 0)
+        for item in connection_registry.get("connections",[])
+        if wpp_reality.is_reality(item) and item.get("enabled",True)
+        and any(u.get("enabled",True) and u.get("connection_id")==item.get("id")
+                for u in d["users"])}
+    for port in sorted(p for p in reality_ports if p):
+        lines.append("nft 'add rule inet web_proxy_panel input iifname != \"lo\" tcp dport %d counter accept'" % port)
     for u in awg_users:
         uid=u["id"]; port=int(u["backend_port"])
         lines.append("nft 'add rule inet web_proxy_panel input iifname != \"lo\" udp dport %d counter accept comment \"wpp:%s:up\"'"%(port,uid))
@@ -848,7 +884,7 @@ def sync_firewall(d):
     match=re.search(r"\bdev\s+([A-Za-z0-9_.:-]+)",route)
     external_if=match.group(1) if match else ""
     wpp_firewall.reconcile(
-        tcp={443,*mtproto_ports} | {int(u["backend_port"]) for u in extra_users if u.get("protocol")=="naive" or str(u.get("transport","TCP")).upper()=="TCP"},
+        tcp={443,*mtproto_ports,*reality_ports} | {int(u["backend_port"]) for u in extra_users if u.get("protocol")=="naive" or str(u.get("transport","TCP")).upper()=="TCP"},
         udp=({hysteria_port} if hysteria_enabled else set()) | {int(u["backend_port"]) for u in awg_users} | {int(u["backend_port"]) for u in extra_users if str(u.get("transport","TCP")).upper()=="UDP"},
         routes={(u["awg_interface"],external_if) for u in awg_users if external_if},
     )
@@ -867,6 +903,11 @@ def maintain_firewall(d):
         if item.get("enabled",True) and item.get("protocol") in wpp_extra_protocols.PROTOCOLS}
     extra_users=[u for u in d["users"] if u.get("enabled",True) and u.get("protocol") in wpp_extra_protocols.PROTOCOLS
         and str(u.get("connection_id","")) in enabled_extra_connections]
+    reality_ports={int(item.get("config",{}).get("port",0) or 0)
+        for item in connection_registry.get("connections",[])
+        if wpp_reality.is_reality(item) and item.get("enabled",True)
+        and any(u.get("enabled",True) and u.get("connection_id")==item.get("id")
+                for u in d["users"])}
     inet=run("nft","list","table","inet","web_proxy_panel")
     awg_table=run("nft","list","table","ip","web_proxy_awg")
     healthy=inet.returncode==0 and awg_table.returncode==0
@@ -915,18 +956,34 @@ def sync_profiles(d):
         raise RuntimeError("tproxy-server config check failed: "+(c.stderr or c.stdout)[-2000:])
     os.replace(tmp,PROFILES)
 
-def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
-    """Validate both candidates, activate together, restore both on failure."""
+def activate_xray_config(config, caddy_text=None, validation_inbounds=None, tls_mux_sni=""):
+    """Validate Xray/Caddy/HAProxy, activate and roll back the owned services."""
     previous=None
     if os.path.exists(XRAY_CONFIG):
         with open(XRAY_CONFIG,"rb") as stream: previous=stream.read()
     with open(CADDYFILE,encoding="utf-8") as stream: old_caddy=stream.read()
-    caddy_changed=caddy_text is not None and caddy_text!=old_caddy
+    old_mux=wpp_reality.caddy_mux_enabled(old_caddy)
+    wanted_mux=bool(tls_mux_sni)
+    proposed_caddy=caddy_text if caddy_text is not None else old_caddy
+    proposed_caddy=wpp_reality.configure_caddy_mux(proposed_caddy,wanted_mux)
+    caddy_changed=proposed_caddy!=old_caddy
     active=run("systemctl","is-active","--quiet",XRAY_SERVICE).returncode==0
     enabled=run("systemctl","is-enabled","--quiet",XRAY_SERVICE).returncode==0
+    router_service=wpp_reality.ROUTER_SERVICE
+    router_file=wpp_reality.ROUTER_CONFIG
+    router_active=run("systemctl","is-active","--quiet",router_service).returncode==0
+    router_enabled=run("systemctl","is-enabled","--quiet",router_service).returncode==0
+    old_router=None
+    if os.path.exists(router_file):
+        with open(router_file,"rb") as stream: old_router=stream.read()
     tmp=os.path.splitext(XRAY_CONFIG)[0]+".tmp.json"
     caddy_tmp=CADDYFILE+".xray-tmp"
+    router_tmp=router_file+".candidate"
     replaced=False
+    runtime_touched=False
+    router_file_changed=False
+    router_service_touched=False
+    caddy_runtime_touched=False
     try:
         candidate=copy.deepcopy(config)
         candidate["inbounds"]=candidate.get("inbounds",[])+list(validation_inbounds or [])
@@ -937,13 +994,31 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
         if validation_inbounds:
             with open(tmp,"w",encoding="utf-8") as stream: json.dump(config,stream,indent=2,allow_nan=False)
         if caddy_changed:
-            with open(caddy_tmp,"w",encoding="utf-8") as stream: stream.write(caddy_text)
+            with open(caddy_tmp,"w",encoding="utf-8") as stream: stream.write(proposed_caddy)
             shutil.copystat(CADDYFILE,caddy_tmp)
             shutil.chown(caddy_tmp,user="root",group="caddy")
             result=run("caddy","validate","--config",caddy_tmp,"--adapter","caddyfile",timeout=30)
             if result.returncode: raise ValueError("Caddy не принял настройки: "+(result.stderr or result.stdout)[-2000:])
+        if wanted_mux:
+            if not shutil.which("haproxy"):
+                raise RuntimeError("HAProxy не установлен; повторите установщик тестовой ветки.")
+            if not os.path.isfile("/etc/systemd/system/"+router_service):
+                raise RuntimeError("Не установлена служба TLS-маршрутизатора.")
+            ipv6=os.path.isfile("/proc/net/if_inet6") and bool(open("/proc/net/if_inet6",encoding="ascii").read().strip())
+            wanted_router=wpp_reality.haproxy_config(tls_mux_sni,ipv6=ipv6).encode("ascii")
+            if wanted_router!=old_router:
+                with open(router_tmp,"wb") as stream: stream.write(wanted_router)
+                os.chown(router_tmp,0,0); os.chmod(router_tmp,0o600)
+                result=run("haproxy","-c","-f",router_tmp,timeout=30)
+                if result.returncode: raise ValueError("HAProxy не принял TCP/443: "+(result.stderr or result.stdout)[-2000:])
+        else:
+            wanted_router=None
+        # Commit only after every candidate passed syntax/config validation.
         os.replace(tmp,XRAY_CONFIG); replaced=True
         if caddy_changed: os.replace(caddy_tmp,CADDYFILE)
+        if wanted_mux and wanted_router!=old_router:
+            os.replace(router_tmp,router_file); router_file_changed=True
+        runtime_touched=True
         if config.get("inbounds"):
             run("systemctl","enable",XRAY_SERVICE,check=True)
             run("systemctl","restart",XRAY_SERVICE,check=True,timeout=45)
@@ -951,11 +1026,36 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
                 if run("systemctl","is-active","--quiet",XRAY_SERVICE).returncode:
                     raise RuntimeError("Xray не запустился. Возвращена предыдущая конфигурация.")
                 if attempt<2: time.sleep(0.5)
-        else: run("systemctl","disable","--now",XRAY_SERVICE,check=True)
-        # Some supported Caddy units do not define ExecReload. Let systemd
-        # restart those units instead of failing an otherwise valid update.
-        if caddy_changed: run("systemctl","reload-or-restart","caddy.service",check=True,timeout=30)
+        else:
+            run("systemctl","disable","--now",XRAY_SERVICE,check=True)
+        # A transition from Caddy's 443 to HAProxy's 443 must release the
+        # listening socket. Regular Caddyfile edits can still use reload.
+        if not wanted_mux and (router_active or old_mux):
+            router_service_touched=True
+            run("systemctl","disable","--now",router_service,check=True,timeout=30)
+        if caddy_changed:
+            caddy_action="restart" if wanted_mux!=old_mux else "reload-or-restart"
+            caddy_runtime_touched=True
+            run("systemctl",caddy_action,"caddy.service",check=True,timeout=45)
+        if wanted_mux and (not router_active or old_router!=wanted_router or caddy_changed):
+            router_service_touched=True
+            run("systemctl","enable",router_service,check=True)
+            run("systemctl","restart",router_service,check=True,timeout=45)
+        if wanted_mux and run("systemctl","is-active","--quiet",router_service).returncode:
+            raise RuntimeError("TLS-маршрутизатор не запущен; переключение на TCP/443 отменено.")
     except Exception:
+        if runtime_touched and router_service_touched:
+            # Release 443 before restoring Caddy; re-enable the old router
+            # after restoring the previous Caddy and Xray configurations.
+            run("systemctl","disable","--now",router_service,timeout=30)
+        if router_file_changed:
+            if old_router is not None:
+                with open(router_tmp,"wb") as stream: stream.write(old_router)
+                os.chown(router_tmp,0,0); os.chmod(router_tmp,0o600)
+                os.replace(router_tmp,router_file)
+            else:
+                try: os.unlink(router_file)
+                except FileNotFoundError: pass
         if replaced:
             if previous is not None:
                 with open(tmp,"wb") as stream: stream.write(previous)
@@ -966,13 +1066,19 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
                 except FileNotFoundError: pass
             if caddy_changed:
                 wpp_cdn_doctor.restore_caddyfile(CADDYFILE,old_caddy)
-                run("systemctl","reload-or-restart","caddy.service",timeout=30)
+                if caddy_runtime_touched:
+                    run("systemctl","restart","caddy.service",timeout=45)
             run("systemctl","enable" if enabled else "disable",XRAY_SERVICE)
             result=run("systemctl","restart" if active and previous is not None else "stop",XRAY_SERVICE,timeout=45)
-            if result.returncode: raise RuntimeError("Конфигурация восстановлена, но службу Xray необходимо проверить через SSH.")
+            if result.returncode:
+                raise RuntimeError("Конфигурация восстановлена, но службу Xray необходимо проверить через SSH.")
+        if runtime_touched and router_service_touched and router_active:
+            run("systemctl","enable" if router_enabled else "disable",router_service)
+            if run("systemctl","restart",router_service,timeout=30).returncode:
+                raise RuntimeError("Предыдущий TLS-маршрутизатор не восстановлен; проверьте HTTPS через SSH.")
         raise
     finally:
-        for temporary in (tmp,caddy_tmp):
+        for temporary in (tmp,caddy_tmp,router_tmp):
             try: os.unlink(temporary)
             except FileNotFoundError: pass
 
@@ -989,6 +1095,7 @@ def sync_xray(d):
     vless_vk=[]
     vless_timeweb=[]
     hysteria=[]
+    reality_profiles={}
     registry=wpp_connections.ensure(CONNECTIONS,d["users"],persist=False)
     advanced_by_bucket={}
     advanced_owner={}
@@ -1011,6 +1118,15 @@ def sync_xray(d):
             continue
         protocol=u.get("protocol","web")
         if protocol=="vless":
+            connection=wpp_connections.get(registry,str(u.get("connection_id","")))
+            if connection and connection.get("config",{}).get("route")=="reality":
+                if not connection.get("enabled",True):
+                    continue
+                target=reality_profiles.setdefault(connection["id"],[])
+                for index,secret in enumerate(direct_secrets(u),1):
+                    target.append({"id":secret,"email":"panel:"+u["id"]+":"+str(index),
+                                   "level":0,"flow":"xtls-rprx-vision"})
+                continue
             profile=u.get("cdn") if isinstance(u.get("cdn"),dict) else {}
             if profile.get("enabled") and profile.get("provider")=="beget":
                 target=vless_beget
@@ -1151,6 +1267,12 @@ def sync_xray(d):
             "sniffing":{"enabled":True,"destOverride":["http","tls","quic"],"routeOnly":True}
         })
         inbounds[-1]=customize(inbounds[-1],"hysteria","hysteria")
+    for connection in registry.get("connections",[]):
+        cid=str(connection.get("id",""))
+        if cid not in reality_profiles:
+            continue
+        profile=wpp_reality.ensure_profile(cid,XRAY_BIN)
+        inbounds.append(wpp_reality.server_inbound(connection,reality_profiles[cid],profile))
     config={
         "log":{"loglevel":"warning"},
         "api":{"tag":"api","listen":XRAY_API,"services":["StatsService"]},
@@ -1171,7 +1293,18 @@ def sync_xray(d):
             inactive.append(copy.deepcopy(override))
             inactive[-1].setdefault("settings",{})["clients"]=[]
             active_tags.add(override.get("tag"))
-    activate_xray_config(config,caddy_text,inactive)
+    active_realities={cid for cid,clients in reality_profiles.items() if clients}
+    panel_hostname=os.environ.get("WEBPROXY_DOMAIN","") or os.environ.get("TPROXY_HOSTNAME","")
+    if not panel_hostname:
+        try:
+            with open("/etc/systemd/system/caddy.service.d/tproxy.conf",encoding="utf-8") as domain_file:
+                match=re.search(r"(?m)^Environment=TPROXY_HOSTNAME=([a-z0-9.-]+)\s*$",domain_file.read())
+                if match: panel_hostname=match.group(1)
+        except OSError:
+            pass
+    shared_sni=wpp_reality.shared_443_sni(
+        registry.get("connections",[]),active_realities,panel_hostname)
+    activate_xray_config(config,caddy_text,inactive,tls_mux_sni=shared_sni)
 
 def _load_traffic():
     try:
@@ -2259,6 +2392,7 @@ import wpp_extra_protocols as extra_protocols
 import wpp_cdn as cdn
 import wpp_cdn_doctor as cdn_doctor
 import wpp_connections as connection_store
+import wpp_reality as reality
 import wpp_backup as backup_store
 import wpp_routing as routing_store
 
@@ -2928,10 +3062,21 @@ def connections_with_runtime(connections):
         protocol=item.get("protocol")
         cfg=item.get("config") if isinstance(item.get("config"),dict) else {}
         tag=connection_store.inbound_tag(item) if protocol in ("vless","hysteria") else ""
-        if tag and tag in by_tag: item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
+        if tag and tag in by_tag:
+            item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
+            if protocol=="vless" and cfg.get("route")=="reality":
+                # REALITY private keys are server-only; never serialize them to UI.
+                item["runtime_inbound"].get("streamSettings",{}).get("realitySettings",{}).pop("privateKey",None)
         elif tag:
             bucket=connection_store._xray_bucket(item)
-            if protocol=="vless":
+            if protocol=="vless" and cfg.get("route")=="reality":
+                base={"tag":tag,"listen":"0.0.0.0","port":int(cfg.get("port",0)),
+                      "protocol":"vless","settings":{"clients":[],"decryption":"none"},
+                      "streamSettings":{"network":"raw","security":"reality",
+                          "realitySettings":{"target":str(cfg.get("sni",""))+":443",
+                              "serverNames":[cfg.get("sni","")],
+                              "privateKey":"<generated on first use>","shortIds":[]}}}
+            elif protocol=="vless":
                 ports={"direct":10000,"cdn":10001,"beget":10002,"selectel":10003,"vk":10004,"timeweb":10005}
                 base={"tag":tag,"listen":"127.0.0.1","port":ports[bucket],"protocol":"vless",
                       "settings":{"clients":[],"decryption":"none"},
@@ -2963,6 +3108,10 @@ def proxy_link(protocol,secret,port=443,name="Proxy",username=""):
         name=node_api.location_prefix(node_api.load_location(LOCATION_FILE))
     label=quote(name or "Proxy",safe="")
     if protocol=="vless":
+        connection=proxy_connection(user)
+        if connection and connection.get("config",{}).get("route")=="reality":
+            profile=reality.read_profile(connection["id"])
+            return reality.client_link(secret,DOMAIN,name,connection,profile)
         route=cdn.vless_route(DOMAIN,user.get("cdn") if user else None)
         connection=proxy_connection(user)
         if connection:
@@ -3686,7 +3835,13 @@ class Handler(BaseHTTPRequestHandler):
                     raw={"id":form.get("id","").strip(),"name":form.get("name",""),"protocol":protocol,
                          "enabled":existing.get("enabled",True) if existing else True,"config":{},"advanced":advanced_value}
                     if not raw["id"]: raw.pop("id")
-                    if protocol=="vless":
+                    if protocol=="vless" and form.get("route","direct")=="reality":
+                        raw["config"]={"route":"reality",
+                            "sni":form.get("reality_sni","www.microsoft.com"),
+                            "address":form.get("reality_address",existing_config.get("address","")),
+                            "port":form.get("reality_port",existing_config.get("port",0)),
+                            "fingerprint":form.get("reality_fingerprint","chrome")}
+                    elif protocol=="vless":
                         provider=form.get("provider","custom")
                         transport=cdn.transport_defaults(provider) if form.get("route","direct")=="cdn" else {"mode":"auto","uplink_method":"post"}
                         raw["config"]={**existing_config,"route":form.get("route","direct"),"provider":provider,
@@ -3704,6 +3859,8 @@ class Handler(BaseHTTPRequestHandler):
                             raise connection_store.ConnectionError("Измените маршрут и сохраните подключение, затем откройте карандаш заново для редактирования JSON нового маршрута.")
                         raw["advanced"]={"client":existing_advanced.get("client",{})}
                     saved_connection=connection_store.upsert(CONNECTIONS_FILE,raw)
+                    if saved_connection.get("protocol")=="vless" and saved_connection.get("config",{}).get("route")=="reality":
+                        connection_store.claim_reality_port(CONNECTIONS_FILE,saved_connection["id"])
                     if protocol in ("awg20","awg31"):
                         connection_store.claim_awg_port(CONNECTIONS_FILE,saved_connection["id"],users())
                     elif protocol in ("naive","mieru"):
@@ -4359,7 +4516,7 @@ PY
 fi
 
 python3 -m py_compile "$APP_FILE"
-python3 -m py_compile "$APP_DIR/wpp_subscriptions.py" "$APP_DIR/wpp_subscription_dashboard.py" "$APP_DIR/wpp_panel_extras.py" "$APP_DIR/wpp_ui.py" "$APP_DIR/wpp_metrics.py" "$APP_DIR/wpp_update.py" "$APP_DIR/wpp_nodes.py" "$APP_DIR/wpp_openflux.py" "$APP_DIR/wpp_awg.py" "$APP_DIR/wpp_extra_protocols.py" "$APP_DIR/wpp_firewall.py" "$APP_DIR/wpp_components.py" "$APP_DIR/wpp_cdn.py" "$APP_DIR/wpp_cdn_doctor.py" "$APP_DIR/wpp_connections.py" "$APP_DIR/wpp_backup.py" "$APP_DIR/wpp_routing.py"
+python3 -m py_compile "$APP_DIR/wpp_subscriptions.py" "$APP_DIR/wpp_subscription_dashboard.py" "$APP_DIR/wpp_panel_extras.py" "$APP_DIR/wpp_ui.py" "$APP_DIR/wpp_metrics.py" "$APP_DIR/wpp_update.py" "$APP_DIR/wpp_nodes.py" "$APP_DIR/wpp_openflux.py" "$APP_DIR/wpp_awg.py" "$APP_DIR/wpp_extra_protocols.py" "$APP_DIR/wpp_firewall.py" "$APP_DIR/wpp_components.py" "$APP_DIR/wpp_cdn.py" "$APP_DIR/wpp_cdn_doctor.py" "$APP_DIR/wpp_connections.py" "$APP_DIR/wpp_reality.py" "$APP_DIR/wpp_backup.py" "$APP_DIR/wpp_routing.py"
 
 
 # ---- Finish installation: service, Caddy route, permissions, start ----

@@ -418,6 +418,24 @@ def _vless_outbound(link):
         raise RoutingError("Маршрутизация поддерживается только для VLESS.")
     query = parse_qs(parsed.query)
     one = lambda key, default="": query.get(key, [default])[0]
+    if one("security") == "reality":
+        if (one("type") not in ("tcp", "raw")
+                or one("flow") != "xtls-rprx-vision"
+                or not one("pbk") or not one("sid") or not one("sni")):
+            raise RoutingError("Некорректные параметры VLESS REALITY.")
+        return {
+            "tag": "proxy", "protocol": "vless",
+            "settings": {"vnext": [{
+                "address": parsed.hostname, "port": parsed.port or 443,
+                "users": [{"id": unquote(parsed.username), "encryption": "none",
+                           "flow": "xtls-rprx-vision"}]}]},
+            "streamSettings": {
+                "network": "raw", "security": "reality",
+                "realitySettings": {
+                    "serverName": one("sni"), "fingerprint": one("fp", "chrome"),
+                    "password": one("pbk"), "shortId": one("sid"),
+                    "spiderX": one("spx", "/")}},
+        }
     extra = {}
     if one("extra"):
         try:

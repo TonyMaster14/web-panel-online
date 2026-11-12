@@ -57,7 +57,7 @@ fi
 if [[ "${1:-}" == "--local" || "$AUTO_LOCAL" == 1 ]]; then
     LOCAL_SOURCE="$SCRIPT_DIR"
     RELEASE_REF="v3.0.0"
-    for file in install-panel.sh update.sh uninstall-web-proxy.sh repair-landing-pages.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
+    for file in install-panel.sh update.sh uninstall-web-proxy.sh repair-landing-pages.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_reality.py wpp_backup.py wpp_routing.py wpp_presets.py; do
         [[ -s "$LOCAL_SOURCE/$file" ]] || { echo "Incomplete local archive: $file is missing." >&2; exit 1; }
     done
     [[ -s "$LOCAL_SOURCE/assets/OpenFlux-linux-amd64" || -s "$LOCAL_SOURCE/OpenFlux-linux-amd64" ]] || {
@@ -163,7 +163,7 @@ chmod 0700 "$BACKUP"
 early_finish() { local code=$?; if [[ "$PANEL_WAS_RUNNING" == 1 ]]; then systemctl start tproxy-panel.service || true; fi; rm -rf -- "${BACKUP:-}"; wpp_progress_finish "$code"; }
 trap early_finish EXIT
 BACKUP_ITEMS=()
-for item in /opt/tproxy-panel /opt/web-panel-proxy /opt/MTProxy /usr/local/bin/caddy /usr/local/bin/tproxy-server /usr/local/bin/amneziawg-go /usr/local/bin/awg /usr/local/bin/awg-quick /usr/local/sbin/web-proxy-panelctl /usr/local/sbin/web-proxy-panel-user-firewall /usr/local/sbin/web-panel-proxy-sync-tls /usr/local/sbin/web-panel-proxy-awg-run /usr/local/sbin/web-panel-proxy-awg-up /usr/local/sbin/web-panel-proxy-awg-down /usr/local/sbin/web-proxy-panel-update /usr/local/sbin/web-panel-proxy-uninstall /usr/local/sbin/WPP /usr/local/sbin/wpp /etc/systemd/system/tproxy-panel.service /etc/systemd/system/tproxy-panel.service.d/go-runtime.conf /etc/systemd/system/web-panel-proxy-web-update.service.d/go-runtime.conf /etc/systemd/system/web-panel-proxy-auto-update.service.d/go-runtime.conf /etc/systemd/system/web-panel-proxy-awg@.service.d/go-runtime.conf /etc/systemd/system/web-proxy-panel-firewall.service /etc/systemd/system/web-proxy-panel-traffic.service /etc/systemd/system/web-proxy-panel-traffic.timer /etc/systemd/system/web-panel-proxy-xray.service /etc/systemd/system/web-panel-proxy-openflux.service /etc/systemd/system/web-panel-proxy-awg@.service /etc/systemd/system/web-panel-proxy-sync-tls.service /etc/systemd/system/web-panel-proxy-sync-tls.timer /etc/systemd/system/web-panel-proxy-component-update.service /etc/systemd/system/tproxy-server.service /etc/systemd/system/mtproxy.service /etc/systemd/system/caddy.service.d/tproxy.conf /etc/caddy/Caddyfile /etc/tproxy-server /etc/mtproxy /etc/mita /etc/web-panel-proxy-xray /etc/sysctl.d/90-web-panel-proxy-awg.conf /var/lib/web-panel-proxy-xray /var/lib/web-panel-proxy-components /var/lib/tproxy-panel /etc/web-proxy-panel /srv/tproxy-site; do
+for item in /opt/tproxy-panel /opt/web-panel-proxy /opt/MTProxy /usr/local/bin/caddy /usr/local/bin/tproxy-server /usr/local/bin/amneziawg-go /usr/local/bin/awg /usr/local/bin/awg-quick /usr/local/sbin/web-proxy-panelctl /usr/local/sbin/web-proxy-panel-user-firewall /usr/local/sbin/web-panel-proxy-sync-tls /usr/local/sbin/web-panel-proxy-awg-run /usr/local/sbin/web-panel-proxy-awg-up /usr/local/sbin/web-panel-proxy-awg-down /usr/local/sbin/web-proxy-panel-update /usr/local/sbin/web-panel-proxy-uninstall /usr/local/sbin/WPP /usr/local/sbin/wpp /etc/systemd/system/tproxy-panel.service /etc/systemd/system/tproxy-panel.service.d/go-runtime.conf /etc/systemd/system/web-panel-proxy-web-update.service.d/go-runtime.conf /etc/systemd/system/web-panel-proxy-auto-update.service.d/go-runtime.conf /etc/systemd/system/web-panel-proxy-awg@.service.d/go-runtime.conf /etc/systemd/system/web-proxy-panel-firewall.service /etc/systemd/system/web-proxy-panel-traffic.service /etc/systemd/system/web-proxy-panel-traffic.timer /etc/systemd/system/web-panel-proxy-xray.service /etc/systemd/system/web-panel-proxy-tls-mux.service /etc/systemd/system/web-panel-proxy-openflux.service /etc/systemd/system/web-panel-proxy-awg@.service /etc/systemd/system/web-panel-proxy-sync-tls.service /etc/systemd/system/web-panel-proxy-sync-tls.timer /etc/systemd/system/web-panel-proxy-component-update.service /etc/systemd/system/tproxy-server.service /etc/systemd/system/mtproxy.service /etc/systemd/system/caddy.service.d/tproxy.conf /etc/caddy/Caddyfile /etc/tproxy-server /etc/mtproxy /etc/mita /etc/web-panel-proxy-xray /etc/sysctl.d/90-web-panel-proxy-awg.conf /var/lib/web-panel-proxy-xray /var/lib/web-panel-proxy-components /var/lib/tproxy-panel /etc/web-proxy-panel /srv/tproxy-site; do
     [[ -e "$item" ]] && BACKUP_ITEMS+=("$item")
     [[ -e "$item" ]] && cp -a --parents "$item" "$BACKUP"
 done
@@ -217,6 +217,8 @@ HAD_PRIMARY_SECRET=0
 HAD_CADDY_DROPIN=0
 HAD_PANEL_STATE_DIR=0
 HAD_XRAY_STATE=0
+HAD_TLS_MUX_UNIT=0
+HAD_TLS_MUX_ACTIVE=0
 HAD_XRAY_USER=0
 HAD_XRAY_GROUP=0
 HAD_MITA_USER=0
@@ -243,6 +245,8 @@ getent group xray >/dev/null 2>&1 && HAD_XRAY_GROUP=1
 id mita >/dev/null 2>&1 && HAD_MITA_USER=1
 getent group mita >/dev/null 2>&1 && HAD_MITA_GROUP=1
 [[ -e /etc/systemd/system/web-panel-proxy-openflux.service ]] && HAD_OPENFLUX_UNIT=1
+[[ -e /etc/systemd/system/web-panel-proxy-tls-mux.service ]] && HAD_TLS_MUX_UNIT=1
+systemctl is-active --quiet web-panel-proxy-tls-mux.service && HAD_TLS_MUX_ACTIVE=1 || true
 id wpp-openflux >/dev/null 2>&1 && HAD_OPENFLUX_USER=1
 [[ -e /etc/systemd/system/web-panel-proxy-awg@.service || -x /usr/local/bin/amneziawg-go ]] && HAD_AWG=1
 [[ -e /etc/systemd/system/web-panel-proxy-naive.service || -e /etc/systemd/system/web-panel-proxy-mieru.service || -e /etc/systemd/system/web-panel-proxy-mieru@.service ]] && HAD_EXTRA_PROTOCOLS=1
@@ -252,10 +256,15 @@ rollback_update() {
     local code="$1"
     [[ "$UPDATE_COMMITTED" == 1 || "$code" == 0 ]] && return 0
     echo "Update failed; restoring the previous working state..." >&2
+    systemctl disable --now web-panel-proxy-tls-mux.service 2>/dev/null || true
     systemctl stop tproxy-panel.service web-proxy-panel-firewall.service web-proxy-panel-traffic.timer web-proxy-panel-traffic.service web-panel-proxy-metrics.timer web-panel-proxy-metrics.service web-panel-proxy-xray.service web-panel-proxy-openflux.service web-panel-proxy-naive.service web-panel-proxy-mieru.service web-panel-proxy-sync-tls.timer web-panel-proxy-auto-update.timer web-panel-proxy-auto-update.service 2>/dev/null || true
     for unit in $(systemctl list-units --all 'web-panel-proxy-awg@*.service' --no-legend 2>/dev/null | awk '{print $1}'); do systemctl stop "$unit" 2>/dev/null || true; done
     for unit in $(systemctl list-units --all 'web-panel-proxy-mieru@*.service' --no-legend 2>/dev/null | awk '{print $1}'); do systemctl stop "$unit" 2>/dev/null || true; done
     tar --numeric-owner -xpf "$BACKUP/state.tar" -C / 2>/dev/null || true
+    if [[ "$HAD_TLS_MUX_UNIT" == 0 ]]; then
+        rm -f /etc/systemd/system/web-panel-proxy-tls-mux.service
+        rm -f /etc/web-proxy-panel/tls-mux.cfg
+    fi
     if [[ "$HAD_FIREWALL_SERVICE" == 0 ]]; then
         rm -f /etc/systemd/system/web-proxy-panel-firewall.service
         rm -f /usr/local/sbin/web-proxy-panel-user-firewall
@@ -349,6 +358,10 @@ rollback_update() {
     [[ -e /etc/web-proxy-panel/openflux/enabled ]] && systemctl restart web-panel-proxy-openflux.service 2>/dev/null || true
     [[ "$HAD_FIREWALL_SERVICE" == 1 ]] && systemctl restart web-proxy-panel-firewall.service 2>/dev/null || true
     [[ "$HAD_XRAY_STATE" == 1 ]] && systemctl restart web-panel-proxy-xray.service 2>/dev/null || true
+    if [[ "$HAD_TLS_MUX_ACTIVE" == 1 ]]; then
+        systemctl enable --now web-panel-proxy-tls-mux.service 2>/dev/null || \
+            echo "WARNING: TLS router did not recover; check Caddy/443." >&2
+    fi
     if [[ "$HAD_AWG" == 1 ]]; then
         for unit in $(systemctl list-unit-files 'web-panel-proxy-awg@*.service' --no-legend 2>/dev/null | awk '$2=="enabled" {print $1}'); do
             systemctl restart "$unit" 2>/dev/null || true
@@ -412,7 +425,7 @@ if [[ -n "$LOCAL_SOURCE" ]]; then
     for file in mtproxy-download.sh assets/mtproxy-bootstrap/proxy-secret assets/mtproxy-bootstrap/proxy-multi.conf; do
         cp -a "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
     done
-    for file in install-panel.sh update.sh uninstall-web-proxy.sh repair-landing-pages.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
+    for file in install-panel.sh update.sh uninstall-web-proxy.sh repair-landing-pages.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_reality.py wpp_backup.py wpp_routing.py wpp_presets.py; do
         cp -a "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
     done
     if [[ -s "$LOCAL_SOURCE/assets/OpenFlux-linux-amd64" ]]; then
