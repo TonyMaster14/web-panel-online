@@ -16,7 +16,7 @@ assert function.count("read -r -s -p") == 1
 password = "TerminalTest123"
 script = (
     "set -Eeuo pipefail\n"
-    "gray=''\n"
+    "gray=''\ncyan=''\n"
     "reset=''\n"
     "step(){ :; }\n"
     + function
