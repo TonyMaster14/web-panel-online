@@ -1021,7 +1021,7 @@ def sync_xray(d):
         protocol=u.get("protocol","web")
         if protocol=="vless":
             connection=wpp_connections.get(registry,str(u.get("connection_id","")))
-            if wpp_reality.is_reality(connection):
+            if connection and connection.get("config",{}).get("route")=="reality":
                 if not connection.get("enabled",True):
                     continue
                 target=reality_profiles.setdefault(connection["id"],[])
@@ -2955,7 +2955,7 @@ def connections_with_runtime(connections):
         tag=connection_store.inbound_tag(item) if protocol in ("vless","hysteria") else ""
         if tag and tag in by_tag:
             item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
-            if reality.is_reality(item):
+            if protocol=="vless" and cfg.get("route")=="reality":
                 # REALITY private keys are server-only; never serialize them to UI.
                 item["runtime_inbound"].get("streamSettings",{}).get("realitySettings",{}).pop("privateKey",None)
         elif tag:
@@ -3000,7 +3000,7 @@ def proxy_link(protocol,secret,port=443,name="Proxy",username=""):
     label=quote(name or "Proxy",safe="")
     if protocol=="vless":
         connection=proxy_connection(user)
-        if reality.is_reality(connection):
+        if connection and connection.get("config",{}).get("route")=="reality":
             profile=reality.read_profile(connection["id"])
             return reality.client_link(secret,DOMAIN,name,connection,profile)
         route=cdn.vless_route(DOMAIN,user.get("cdn") if user else None)
@@ -3749,7 +3749,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise connection_store.ConnectionError("Измените маршрут и сохраните подключение, затем откройте карандаш заново для редактирования JSON нового маршрута.")
                         raw["advanced"]={"client":existing_advanced.get("client",{})}
                     saved_connection=connection_store.upsert(CONNECTIONS_FILE,raw)
-                    if reality.is_reality(saved_connection):
+                    if saved_connection.get("protocol")=="vless" and saved_connection.get("config",{}).get("route")=="reality":
                         connection_store.claim_reality_port(CONNECTIONS_FILE,saved_connection["id"])
                     if protocol in ("awg20","awg31"):
                         connection_store.claim_awg_port(CONNECTIONS_FILE,saved_connection["id"],users())
