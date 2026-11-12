@@ -50,6 +50,10 @@ jobs:
         shell: bash
         run: |
           python3 tests/test_installer_password_tty.py
+      - name: Real TTY ordered wizard steps from Enter to installation
+        shell: bash
+        run: |
+          python3 tests/test_installer_step_by_step.py
       - name: Verify all 26 embedded stages, exact legacy files
         shell: bash
         run: |
@@ -93,7 +97,7 @@ jobs:
             'core reads wizard credentials': 'WPO_UI_CREDENTIALS_FILE' in core,
             'core reports stages': 'wpo_emit_stage' in core,
             'password and token not logged': '} > "${WPO_UI_RESULT_FILE:-/dev/stdout}"' in panel,
-            'final card contains URL login password': '"Panel URL:"' in panel and '"Administrator login:"' in panel and '"Administrator password:"' in panel,
+            'final card contains Russian labels': all(label in panel for label in ("Ссылка:", "Логин:", "Пароль:")),
             'final card excludes Node API token': 'NODE_API_TOKEN=' not in panel and '"Node API token:"' not in panel,
             'classic result file owned': 'WPO_FINAL_SUMMARY_OWNED=0' in final and 'WPO_FINAL_SUMMARY_OWNED=1' in final,
             'access card printed after completion': final.rfind('cat -- "$WPO_UI_RESULT_FILE"') > final.rfind('wpp_progress 100 "Установка завершена"'),
@@ -105,7 +109,7 @@ jobs:
             'Xray syntax and service checks': 'xray run -test -config' in final and 'web-panel-proxy-xray.service' in final,
             'Happ title without routing': '# wpo-happ-vless-title-v1' in ui and 'happ_url=direct_profile_url' in ui,
             'Happ node separate': 'direct_profile_config' in panel and '"profile-title"' in panel,
-            'exact old access card fields': all(t in panel for t in ('echo "Panel URL:"','echo "Administrator login:"','echo "Administrator password:"')),
+            'exact Russian three-field access card': all(t in panel for t in ("Ссылка:", "Логин:", "Пароль:")) and "Сохраните данные, чтобы не потерять." in panel,
             'no node token in access card': 'echo "Node API token:"' not in panel and 'NODE_API_TOKEN=' not in panel,
           }
           for k,v in checks.items():
