@@ -4,6 +4,8 @@ import stat
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 import wpp_connections as con
@@ -55,12 +57,11 @@ class RealityTests(unittest.TestCase):
         self.assertEqual(user["connection_id"], connection["id"])
 
     def test_secret_storage_and_link(self):
-        xray = self.root / "xray"
-        xray.write_text("#!/bin/sh\\nprintf 'PrivateKey: %s\\\\nPassword: %s\\\\n' \\n  'a'$(printf '%042d' 0) 'b'$(printf '%042d' 0)\\n", encoding="utf-8")
-        xray.chmod(0o700)
-        # No real Xray is needed: only the keypair output format is stubbed.
         profile_path = str(self.root / "reality.json")
-        profile = reality.ensure_profile("vless-reality-primary", str(xray), profile_path)
+        output = "PrivateKey: " + "a"*43 + "\\nPassword: " + "b"*43 + "\\n"
+        fake = SimpleNamespace(returncode=0, stdout=output, stderr="")
+        with patch.object(reality.subprocess, "run", return_value=fake):
+            profile = reality.ensure_profile("vless-reality-primary", "xray", profile_path)
         self.assertEqual(profile, reality.ensure_profile("vless-reality-primary", str(xray), profile_path))
         self.assertEqual(stat.S_IMODE(Path(profile_path).stat().st_mode), 0o600)
         inbound = reality.server_inbound(self.item(), [{"id": "c" * 36, "flow": "xtls-rprx-vision"}], profile)
