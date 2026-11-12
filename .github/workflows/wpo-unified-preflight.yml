@@ -63,6 +63,8 @@ jobs:
             'core reads wizard credentials': 'WPO_UI_CREDENTIALS_FILE' in core,
             'core reports stages': 'wpo_emit_stage' in core,
             'password and token not logged': '} > "${WPO_UI_RESULT_FILE:-/dev/stdout}"' in panel,
+            'final card contains URL login password': '"Panel URL:"' in panel and '"Administrator login:"' in panel and '"Administrator password:"' in panel,
+            'final card excludes Node API token': 'NODE_API_TOKEN=' not in panel and '"Node API token:"' not in panel,
             'wizard only displays result on success': 'if (( code == 0 )); then' in boot and 'cat -- "$RESULT"' in boot,
             'one node install': 'bash "$BASE/node-install.sh"' in final and 'WPO_NODES_BATCH_RESTART=1' in final,
             'node failed start reset': 'systemctl reset-failed "$SERVICE"' in node,
