@@ -30,6 +30,9 @@ wpp_progress() {
         printf '[%s] %3d%%  %s\n' "$bar" "$percent" "$label"
     fi
     WPP_PROGRESS_LAST="$percent"
+    if [[ -n "${WPO_UI_PROGRESS_FILE:-}" && -f "$WPO_UI_PROGRESS_FILE" ]]; then
+        printf '%s\t%s\n' "$percent" "$label" > "$WPO_UI_PROGRESS_FILE"
+    fi
 }
 wpp_progress_finish() {
     local code="$1"
@@ -42,7 +45,7 @@ wpp_progress_finish() {
 }
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-for file in install-panel.sh install-webproxy-core.sh uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpo-nodes-lab-release-v26-install.sh; do
+for file in install-panel.sh install-webproxy-core.sh uninstall-web-proxy.sh update.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py node-install.sh; do
     [[ -s "$BASE/$file" ]] || die "Package is incomplete: missing $file. Extract the complete archive."
 done
 for file in mtproxy-download.sh assets/mtproxy-bootstrap/proxy-secret assets/mtproxy-bootstrap/proxy-multi.conf; do
@@ -149,7 +152,23 @@ fi
 # random site templates and the final compact node cards, including pending installs.
 wpp_progress 98 "Установка Nodes Lab v26"
 echo "Installing Nodes Lab v26 into the panel..."
-bash "$BASE/wpo-nodes-lab-release-v26-install.sh" || die "Не удалось подключить Nodes Lab v26; базовая панель установлена, изучите ошибку выше."
+# All 26 source patches are embedded in one locally validated installer.
+# Defer intermediate tproxy-panel restarts to avoid systemd start-rate failures.
+NODE_LOG="/var/log/web-panel-online/nodes-setup.log"
+install -d -o root -g root -m 0700 /var/log/web-panel-online
+: > "$NODE_LOG"
+chmod 0600 "$NODE_LOG"
+if ! WPO_NODES_LOCAL_SOURCE=1 WPO_NODES_BATCH_RESTART=1 bash "$BASE/node-install.sh" >"$NODE_LOG" 2>&1; then
+    tail -n 80 "$NODE_LOG" >&2 || true
+    die "Nodes Lab v26 завершился ошибкой; журнал: $NODE_LOG"
+fi
+echo "Nodes Lab v26: 26 встроенных этапов, один финальный запуск панели."
+wpp_progress 99 "Проверка подключения Xray"
+[[ -s /etc/web-panel-proxy-xray/config.json ]] || die 'Xray config отсутствует.'
+systemctl is-active --quiet web-panel-proxy-xray.service || die 'Xray service не активен.'
+/opt/web-panel-proxy/xray/xray run -test -config /etc/web-panel-proxy-xray/config.json >/dev/null 2>&1 || die 'Xray config не прошёл проверку.'
+systemctl is-active --quiet tproxy-panel.service || die 'Панель неактивна после установки нод.'
+
 
 echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
 wpp_progress 100 "Установка завершена"
