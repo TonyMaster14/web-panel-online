@@ -977,6 +977,8 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None, tls_
     replaced=False
     runtime_touched=False
     router_file_changed=False
+    router_service_touched=False
+    caddy_runtime_touched=False
     try:
         candidate=copy.deepcopy(config)
         candidate["inbounds"]=candidate.get("inbounds",[])+list(validation_inbounds or [])
@@ -1024,17 +1026,20 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None, tls_
         # A transition from Caddy's 443 to HAProxy's 443 must release the
         # listening socket. Regular Caddyfile edits can still use reload.
         if not wanted_mux and (router_active or old_mux):
+            router_service_touched=True
             run("systemctl","disable","--now",router_service,check=True,timeout=30)
         if caddy_changed:
             caddy_action="restart" if wanted_mux!=old_mux else "reload-or-restart"
+            caddy_runtime_touched=True
             run("systemctl",caddy_action,"caddy.service",check=True,timeout=45)
         if wanted_mux and (not router_active or old_router!=wanted_router or caddy_changed):
+            router_service_touched=True
             run("systemctl","enable",router_service,check=True)
             run("systemctl","restart",router_service,check=True,timeout=45)
         if wanted_mux and run("systemctl","is-active","--quiet",router_service).returncode:
             raise RuntimeError("TLS-маршрутизатор не запущен; переключение на TCP/443 отменено.")
     except Exception:
-        if runtime_touched:
+        if runtime_touched and router_service_touched:
             # Release 443 before restoring Caddy; re-enable the old router
             # after restoring the previous Caddy and Xray configurations.
             run("systemctl","disable","--now",router_service,timeout=30)
@@ -1056,12 +1061,13 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None, tls_
                 except FileNotFoundError: pass
             if caddy_changed:
                 wpp_cdn_doctor.restore_caddyfile(CADDYFILE,old_caddy)
-                run("systemctl","restart","caddy.service",timeout=45)
+                if caddy_runtime_touched:
+                    run("systemctl","restart","caddy.service",timeout=45)
             run("systemctl","enable" if enabled else "disable",XRAY_SERVICE)
             result=run("systemctl","restart" if active and previous is not None else "stop",XRAY_SERVICE,timeout=45)
             if result.returncode:
                 raise RuntimeError("Конфигурация восстановлена, но службу Xray необходимо проверить через SSH.")
-        if runtime_touched and router_active:
+        if runtime_touched and router_service_touched and router_active:
             run("systemctl","enable" if router_enabled else "disable",router_service)
             if run("systemctl","restart",router_service,timeout=30).returncode:
                 raise RuntimeError("Предыдущий TLS-маршрутизатор не восстановлен; проверьте HTTPS через SSH.")
