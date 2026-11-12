@@ -51,6 +51,7 @@ cleanup(){
                 rm -f "$APP/$name" || true
             fi
         done
+        systemctl reset-failed "$SERVICE" 2>/dev/null || true
         systemctl restart "$SERVICE" || true
         echo "Код восстановлен из $BACKUP. Данные пользователей и нод не удалены." >&2
     fi
@@ -3317,9 +3318,23 @@ python3 -m py_compile "$PANEL" "$UI" "$GEO" "$AUTO"
 bash -n "$AGENT"
 if (( BATCH_RESTART && TOUCHED )); then
     echo '→ Перезапускаю панель один раз после всех правок Nodes Lab'
+    systemctl reset-failed "$SERVICE" 2>/dev/null || true
     systemctl restart "$SERVICE" || die 'Не удалось запустить панель после установки Nodes Lab.'
 fi
-systemctl is-active --quiet "$SERVICE" || die "Служба $SERVICE не активна."
+# A service can be reported active before Python has bound the HTTP port.
+# Only accept the finished controller after its real localhost health route responds.
+PANEL_ROUTE="$(sed -n 's/^Environment=WEBPROXY_PANEL_PATH=//p' /etc/systemd/system/tproxy-panel.service | head -n1)"
+[[ "$PANEL_ROUTE" =~ ^/panel-[a-z0-9-]{3,64}$ ]] || die 'Некорректный адрес панели.'
+READY=0
+for attempt in $(seq 1 12); do
+    if systemctl is-active --quiet "$SERVICE" &&
+       curl -fsS --max-time 3 "http://127.0.0.1:8090${PANEL_ROUTE}/__health" >/dev/null 2>&1; then
+        READY=1
+        break
+    fi
+    sleep 1
+done
+(( READY == 1 )) || die 'Панель не отвечает на локальный health-запрос после настройки Nodes Lab.'
 echo
 echo '✓ WPO Nodes Lab v26 установлен/проверен.'
 echo "✓ Фиксированная версия: $REF"
