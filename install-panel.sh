@@ -1289,9 +1289,16 @@ def sync_xray(d):
             inactive[-1].setdefault("settings",{})["clients"]=[]
             active_tags.add(override.get("tag"))
     active_realities={cid for cid,clients in reality_profiles.items() if clients}
+    panel_hostname=os.environ.get("WEBPROXY_DOMAIN","") or os.environ.get("TPROXY_HOSTNAME","")
+    if not panel_hostname:
+        try:
+            with open("/etc/systemd/system/caddy.service.d/tproxy.conf",encoding="utf-8") as domain_file:
+                match=re.search(r"(?m)^Environment=TPROXY_HOSTNAME=([a-z0-9.-]+)\\s*$",domain_file.read())
+                if match: panel_hostname=match.group(1)
+        except OSError:
+            pass
     shared_sni=wpp_reality.shared_443_sni(
-        registry.get("connections",[]),active_realities,
-        os.environ.get("WEBPROXY_DOMAIN","") or os.environ.get("TPROXY_HOSTNAME",""))
+        registry.get("connections",[]),active_realities,panel_hostname)
     activate_xray_config(config,caddy_text,inactive,tls_mux_sni=shared_sni)
 
 def _load_traffic():
