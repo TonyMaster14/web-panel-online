@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 source = Path("install-panel.sh").read_text(encoding="utf-8")
-marker = "# Финальная карточка: три строки в одной сетке, подписи и значения разных цветов."
+marker = "# Финальная карточка: подпись и значение рядом, разные цвета, без выравнивающих отступов."
 assert marker in source
 card = source[source.index(marker):]
 assert card.lstrip().startswith(marker)
@@ -36,16 +36,15 @@ with tempfile.TemporaryDirectory(prefix="wpo-access-card-") as folder:
         assert "\x1b[38;5;51m" in raw, "Contrasting cyan values missing"
         text = re.sub(r"\x1b\[[0-9;]*m", "", raw)
         rows = [line for line in text.splitlines() if line.startswith("  Ссылка на панель:") or line.startswith("  Логин :") or line.startswith("  Пароль :")]
-        assert len(rows) == 3, f"Expected exactly three aligned rows: {rows}"
-        assert "https://panel.example.test/panel-sample-id/login" in rows[0]
-        assert "TestAdmin" in rows[1]
-        value_positions = [row.index("https://") if i == 0 else (row.index("TestAdmin") if i == 1 else row.index("DemoSecret123" if updating == "0" else "сохранён (без изменений)")) for i, row in enumerate(rows)]
-        assert value_positions == [value_positions[0]] * 3, f"Values are not aligned: {value_positions}"
+        assert len(rows) == 3, f"Expected exactly three entries: {rows}"
+        assert rows[0] == "  Ссылка на панель: https://panel.example.test/panel-sample-id/login", rows[0]
+        assert rows[1] == "  Логин : TestAdmin", rows[1]
+        assert rows[2] == ("  Пароль : DemoSecret123" if updating == "0" else "  Пароль : сохранён (без изменений)"), rows[2]
         assert "Сохраните данные,что бы не потерять!" in text
         assert "Node API" not in text and "Token" not in text
         assert all(english not in text for english in ("Panel URL:", "Administrator login:", "Administrator password:"))
         if updating == "0":
-            assert "Пароль : DemoSecret123" in text or "Пароль :" in rows[2] and "DemoSecret123" in rows[2]
+            assert "Пароль : DemoSecret123" in text
         else:
             assert "сохранён (без изменений)" in rows[2]
             assert "DemoSecret123" not in text
@@ -53,4 +52,4 @@ with tempfile.TemporaryDirectory(prefix="wpo-access-card-") as folder:
         assert "\n\n  Логин :" in text and "\n\n  Пароль :" in text, "Expected blank separators"
         assert "\n\n  Сохраните данные,что бы не потерять!" in text
 
-print("PASS: Russian access card, correct order, save reminder, no token, no credential log leak")
+print("PASS: Russian labels followed by exactly one space and values, ANSI colors, no leaked secrets")
