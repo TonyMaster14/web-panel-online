@@ -3332,14 +3332,14 @@ edit_end=panel.index('                elif operation=="rename":\n',edit_start)
 handler=panel[edit_start:edit_end]
 handler=one(
     handler,'                        template_id=str(form.get("site_template","")).strip()',
-    '                        requested_sni=str(form.get("reality_sni",reality.DEFAULT_SNI)).strip().lower()\n'
-    '                        if requested_sni not in {host for host,_ in reality.SNI_CANDIDATES}:\n'
+    '                        requested_sni=str(form.get("reality_sni","")).strip().lower()\n'
+    '                        if requested_sni and requested_sni not in {host for host,_ in reality.SNI_CANDIDATES}:\n'
     '                            raise node_api.NodeError("Выберите SNI из списка REALITY.")\n'
     '                        template_id=str(form.get("site_template","")).strip()',
     "Remote SNI validation")
 handler=one(
     handler,'                        selected["name"]=new_name',
-    '                        selected["reality_sni"]=requested_sni\n'
+    '                        if requested_sni: selected["reality_sni"]=requested_sni\n'
     '                        selected["name"]=new_name',
     "Remote SNI persistence")
 panel=panel[:edit_start]+handler+panel[edit_end:]
@@ -3360,7 +3360,7 @@ part=one(part,
     '''    local=local if isinstance(local,dict) else {}
     # wpo-node-reality-sni-settings: source of truth for the local server is
     # connections.json, not node metadata or the website template.
-    reality_connection=reality_connection if isinstance(reality_connection,dict) else {}
+    reality_connection=reality_connection if isinstance(reality_connection,dict) and reality_connection.get('enabled',True) else {}
     local_cfg=reality_connection.get("config",{})
     local_sni=str(local_cfg.get("sni") or reality_module.DEFAULT_SNI)
     local_edit=(f'<button class="icon-btn wpo-node-icon" type="button" data-wpo-local-sni '
@@ -3369,7 +3369,7 @@ part=one(part,
                 f'data-reality-sni="{esc(local_sni)}" '
                 f'data-reality-port="{esc(local_cfg.get("port",443))}" '
                 f'data-reality-address="{esc(local_cfg.get("address",""))}" '
-                f'data-reality-fingerprint="{esc(local_cfg.get("fingerprint","chrome"))}" '
+                f'data-reality-fingerprint="firefox" '
                 f'title="Изменить SNI основной ноды" aria-label="Изменить SNI основной ноды">'
                 +icon("edit")+'</button>') if reality_connection else '' ''',
     "Live local REALITY SNI")
@@ -3407,7 +3407,7 @@ part=one(part,
     '    js=js.replace(\'__PATH__\',json.dumps(path)).replace(\'__CSRF__\',json.dumps(csrf))',
     '''    css+="\\n.wpo-nodes-page .wpo-main-node-label + .wpo-node-icon{width:28px;height:28px;flex:0 0 28px;margin-left:auto}\\n"
     js=js.replace('__PATH__',json.dumps(path)).replace('__CSRF__',json.dumps(csrf))
-    local_js=r"""(()=>{const b=document.querySelector('[data-wpo-local-sni]'),dlg=document.getElementById('wpoLocalSniDialog'),f=document.getElementById('wpoLocalSniForm');if(!b||!dlg||!f)return;const selection=f.elements.reality_sni;let custom=null;b.addEventListener('click',()=>{if(custom){custom.remove();custom=null}const wanted=b.dataset.realitySni||'www.microsoft.com';if(![...selection.options].some(x=>x.value===wanted)){custom=new Option('Свой · '+wanted,wanted);selection.add(custom)}selection.value=wanted;f.querySelector('[data-sni-error]').hidden=true;dlg.showModal()});f.querySelector('[data-sni-cancel]').addEventListener('click',()=>dlg.close());f.addEventListener('submit',async e=>{e.preventDefault();const button=f.querySelector('[type=submit]'),error=f.querySelector('[data-sni-error]');button.disabled=true;error.hidden=true;try{const body=new URLSearchParams({csrf:__LOCAL_CSRF__,operation:'save',id:b.dataset.realityId,name:b.dataset.realityName,protocol:'vless',route:'reality',reality_sni:selection.value,reality_port:b.dataset.realityPort,reality_address:b.dataset.realityAddress,reality_fingerprint:b.dataset.realityFingerprint});const r=await fetch(__LOCAL_PATH__+'/connection-action',{method:'POST',headers:{'X-WPP-Async':'1'},body});if(r.redirected)throw Error('Сессия истекла. Обновите страницу.');const d=await r.json();if(!r.ok||!d.ok)throw Error(d.message||'Не удалось изменить SNI');dlg.close();location.reload()}catch(ex){error.textContent=ex.message;error.hidden=false}finally{button.disabled=false}})})();"""
+    local_js=r"""(()=>{const b=document.querySelector('[data-wpo-local-sni]'),dlg=document.getElementById('wpoLocalSniDialog'),f=document.getElementById('wpoLocalSniForm');if(!b||!dlg||!f)return;const selection=f.elements.reality_sni;let custom=null;b.addEventListener('click',()=>{if(custom){custom.remove();custom=null}const wanted=b.dataset.realitySni||'www.microsoft.com';if(![...selection.options].some(x=>x.value===wanted)){custom=new Option('Свой · '+wanted,wanted);selection.add(custom)}selection.value=wanted;f.querySelector('[data-sni-error]').hidden=true;dlg.showModal()});f.querySelector('[data-sni-cancel]').addEventListener('click',()=>dlg.close());f.addEventListener('submit',async e=>{e.preventDefault();const button=f.querySelector('[type=submit]'),error=f.querySelector('[data-sni-error]');button.disabled=true;error.hidden=true;try{const body=new URLSearchParams({csrf:__LOCAL_CSRF__,operation:'save',id:b.dataset.realityId,name:b.dataset.realityName,protocol:'vless',route:'reality',reality_sni:selection.value,reality_port:b.dataset.realityPort,reality_address:b.dataset.realityAddress,reality_fingerprint:"firefox"});const r=await fetch(__LOCAL_PATH__+'/connection-action',{method:'POST',headers:{'X-WPP-Async':'1'},body});if(r.redirected)throw Error('Сессия истекла. Обновите страницу.');const d=await r.json();if(!r.ok||!d.ok)throw Error(d.message||'Не удалось изменить SNI');dlg.close();location.reload()}catch(ex){error.textContent=ex.message;error.hidden=false}finally{button.disabled=false}})})();"""
     js+=local_js.replace('__LOCAL_CSRF__',json.dumps(csrf)).replace('__LOCAL_PATH__',json.dumps(path))
     local_dialog=('<dialog class="wpo-node-dialog" id="wpoLocalSniDialog"><div class="dialog-head">'
         '<div><h2>SNI основной ноды</h2><small>VLESS TCP REALITY · XTLS Vision</small></div>'
