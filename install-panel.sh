@@ -5066,14 +5066,16 @@ else
 fi
 printf '  ╰──────────────────────────────────────────────────────────────╯\n'
 echo
-printf '  Ссылка: https://%s%s/login\n' "$DOMAIN" "$PANEL_PATH"
-printf '  Логин:  %s\n' "$ADMIN"
+printf '  Ссылка на панель: https://%s%s/login\n' "$DOMAIN" "$PANEL_PATH"
+echo
+printf '  Логин : %s\n' "$ADMIN"
+echo
 if [[ "$UPDATING" == "1" ]]; then
-    printf '  Пароль: сохранён (без изменений)\n'
+    printf '  Пароль : сохранён (без изменений)\n'
 else
-    printf '  Пароль: %s\n' "$PASS"
+    printf '  Пароль : %s\n' "$PASS"
 fi
 echo
-printf '  Сохраните данные, чтобы не потерять.\n'
+printf '  Сохраните данные,что бы не потерять!\n'
 echo
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
