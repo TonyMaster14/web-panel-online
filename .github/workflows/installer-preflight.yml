@@ -24,8 +24,7 @@ jobs:
           python3 -m py_compile wpp_connections.py wpp_reality.py
           python3 -m unittest discover -s tests -p 'test_reality.py' -v
           python3 -m unittest discover -s tests -p 'test_connection_json.py' -v
-          # Legacy routing suite has three existing expectation mismatches on the main baseline.
-          # REALITY transport tests and shared Xray connection regressions remain required.
+          python3 -m unittest discover -s tests -p 'test_direct_routing.py' -v
       - name: Xray REALITY + Vision — проверка настоящим ядром
         shell: bash
         run: |
