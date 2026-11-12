@@ -48,9 +48,9 @@ banner(){
 }
 step(){
     local num="$1" desc="$2"
-    printf '\n%s  ╭──────╮%s  %s%s%s\n' "$blue" "$reset" "$ice" "$desc" "$reset"
-    printf '%s  │%s %s / 4 %s│%s\n' "$blue" "$cyan" "$num" "$blue" "$reset"
-    printf '%s  ╰──────╯%s\n' "$blue" "$reset"
+    # No separate number tiles: one clear step title followed by its input.
+    printf '\n  %sШАГ %s/4%s  %s%s%s\n' "$cyan" "$num" "$reset" "$ice" "$desc" "$reset"
+    printf '  %s────────────────────────────────────────────────────────%s\n' "$blue" "$reset"
 }
 valid_domain(){
     local d="$1" part
@@ -63,8 +63,8 @@ valid_domain(){
 }
 valid_email(){ [[ "$1" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; }
 ask_domain(){
+    step 1 'Домен панели'
     while true; do
-        step 1 'Домен панели'
         read -r -p '  Домен (например, panel.example.com): ' DOMAIN || exit 130
         DOMAIN="${DOMAIN,,}"
         valid_domain "$DOMAIN" && break
@@ -72,8 +72,8 @@ ask_domain(){
     done
 }
 ask_email(){
+    step 2 'Электронная почта для HTTPS-сертификата'
     while true; do
-        step 2 'Электронная почта для HTTPS-сертификата'
         read -r -p '  Email (латиница): ' EMAIL || exit 130
         valid_email "$EMAIL" && break
         printf '%s  Нужен настоящий адрес формата name@example.com.%s\n' "$gray" "$reset"
@@ -126,9 +126,7 @@ fi
 banner
 printf '\n  %sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
 printf '  %sПанель, прокси-службы и управление нодами в одной системе.%s\n\n' "$ice" "$reset"
-printf '  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-printf '  %s│%s  ›  ENTER — установить     %s│%s     q — выход                  %s│%s\n' "$blue" "$bold$cyan" "$blue" "$ice" "$blue" "$reset"
-printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
+printf '  %s›  ENTER — установить%s     %sq — выход%s\n' "$bold$cyan" "$reset" "$ice" "$reset"
 while true; do
     read -r -p '  Ваш выбор: ' choice || exit 130
     [[ "$choice" != q && "$choice" != Q ]] || exit 0
@@ -167,28 +165,37 @@ printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 # Display a live, accurate stage indicator: numbers come from the actual
 # installer stages. The small spinner moves while a long task is running.
 draw(){
-    local pct="$1" label="$2" frame="$3" elapsed="$4"
-    local cols n filled empty donebar leftbar available shortlabel
+    local pct="$1" label="$2" elapsed="$3"
+    local cols width filled empty donebar leftbar maxlabel
     cols="$(tput cols 2>/dev/null || printf 80)"
     [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
-    n=$((cols-62))
-    (( n > 28 )) && n=28
-    (( n < 10 )) && n=10
-    filled=$((pct*n/100)); empty=$((n-filled))
+    width=$((cols-12))
+    (( width > 46 )) && width=46
+    (( width < 12 )) && width=12
+    (( pct < 0 )) && pct=0
+    (( pct > 100 )) && pct=100
+    filled=$((pct*width/100))
+    empty=$((width-filled))
     printf -v donebar '%*s' "$filled" ''
     printf -v leftbar '%*s' "$empty" ''
-    donebar="${donebar// /━}"; leftbar="${leftbar// /─}"
-    available=$((cols-n-29))
-    (( available < 10 )) && available=10
-    shortlabel="${label:0:available}"
-    # Status, separator and elapsed clock each have their own columns.
-    printf '\r\033[2K  %s%s%s%s%s  %3d%%  %s•%s  %s %s  %s%02d:%02d%s' \
-        "$cyan" "$donebar" "$blue" "$leftbar" "$reset" "$pct" \
-        "$cyan" "$reset" "$frame" "$shortlabel" "$gray" "$((elapsed/60))" "$((elapsed%60))" "$reset"
+    donebar="${donebar// /█}"
+    leftbar="${leftbar// /░}"
+    maxlabel=$((cols-12))
+    (( maxlabel < 16 )) && maxlabel=16
+    # Only completed installer milestones change the bar; real wall-clock time
+    # is measured from the beginning, including package download.
+    printf '\r\033[2K  %s%s%s%s%s  %3d%%\n' "$cyan" "$donebar" "$blue" "$leftbar" "$reset" "$pct"
+    printf '\r\033[2K  %sЭтап: %s%s\n' "$ice" "${label:0:maxlabel}" "$reset"
+    printf '\r\033[2K  %sПрошло: %02d:%02d:%02d%s' "$gray" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
+    printf '\033[2A\r'
 }
 
+# One clock for the entire installation, starting at package preparation.
+started=$SECONDS
 shown=1
-draw 1 'Загрузка GitHub' '◐' 0
+label='Загрузка пакета'
+printf '\n  %sХОД УСТАНОВКИ%s\n' "$cyan" "$reset"
+draw "$shown" "$label" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
     SOURCE="$LOCAL_BASE"
@@ -200,50 +207,57 @@ else
         fi
     fi
     WORK="$(mktemp -d /tmp/web-panel-proxy-install.XXXXXXXX)"
-    if ! git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$WORK/source" >> "$LOG" 2>&1; then
-        printf '\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
+    git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$WORK/source" >> "$LOG" 2>&1 &
+    INSTALL_PID=$!
+    while kill -0 "$INSTALL_PID" 2>/dev/null; do
+        draw "$shown" 'Загрузка GitHub' "$((SECONDS-started))"
+        sleep 0.2
+    done
+    if ! wait "$INSTALL_PID"; then
+        INSTALL_PID=""
+        printf '\033[3B\r\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
     fi
+    INSTALL_PID=""
     SOURCE="$WORK/source"
 fi
 [[ -s "$SOURCE/install-final.sh" && -s "$SOURCE/node-install.sh" ]] || {
-    printf '\n'; error "Неполный пакет установщика. Журнал: $LOG"
+    printf '\033[3B\r\n'; error "Неполный пакет установщика. Журнал: $LOG"
 }
 chmod 0700 "$SOURCE"/*.sh
 printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
+shown=7
+label='Проверка установочного пакета'
+draw "$shown" "$label" "$((SECONDS-started))"
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
     WPO_UI_RESULT_FILE="$RESULT" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
-frames=('◐' '◓' '◑' '◒')
-tick=0
-started=$SECONDS
-label='Проверка пакета'
+label='Проверка установочного пакета'
 while kill -0 "$INSTALL_PID" 2>/dev/null; do
     if IFS=$'\t' read -r target current_label < "$PROGRESS"; then
         if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target <= 100 )); then
-            if (( shown < target )); then shown=$((shown+1)); fi
+            # Jump only to an actual milestone, never a fabricated 1%-per-tick.
+            shown="$target"
             [[ -n "$current_label" ]] && label="$current_label"
         fi
     fi
-    draw "$shown" "$label" "${frames[tick%4]}" "$((SECONDS-started))"
-    tick=$((tick+1))
-    sleep 0.16
+    draw "$shown" "$label" "$((SECONDS-started))"
+    sleep 0.2
 done
 code=0
 wait "$INSTALL_PID" || code=$?
 INSTALL_PID=""
 if (( code == 0 )); then
-    printf '\r\033[2K'
-    draw 100 'Установка завершена' '✓' "$((SECONDS-started))"
-    printf '\n'
+    draw 100 'Установка завершена' "$((SECONDS-started))"
+    printf '\033[3B\r\n'
     printf '\n%s  Проверки завершены. Журнал сохранён на VPS.%s\n' "$gray" "$reset"
     # The URL, login and password remain the very last content on screen.
     [[ -s "$RESULT" ]] || error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     cat -- "$RESULT"
 else
-    printf '\n\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
+    printf '\033[3B\r\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
     [[ -z "$hint" ]] || printf '  %s\n' "$hint"
     printf '  Подробности: %s\n' "$LOG"
