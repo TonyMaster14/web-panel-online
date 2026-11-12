@@ -166,8 +166,8 @@ source,target,domain=sys.argv[1:]
 text=open(source,encoding="utf-8").read()
 text=re.sub(r"\n?[ \t]*# WPP NAIVE GLOBAL BEGIN\n.*?\n[ \t]*# WPP NAIVE GLOBAL END\n?","\n",text,flags=re.S)
 text=re.sub(r"\n?[ \t]*# WPP NAIVE BEGIN\n.*?\n[ \t]*# WPP NAIVE END\n?","\n",text,flags=re.S)
-text=re.sub(r"(?ms)^[ \\t]*# WPP REALITY TLS MUX BEGIN\\n.*?^[ \\t]*# WPP REALITY TLS MUX END\\n?","",text)
-text=re.sub(r"(?m)^\\s*:443,\\s*"+re.escape(domain)+r"\\s*\\{\\s*$",domain+" {",text,count=1)
+text=re.sub(r"(?ms)^[ \t]*# WPP REALITY TLS MUX BEGIN\n.*?^[ \t]*# WPP REALITY TLS MUX END\n?","",text)
+text=re.sub(r"(?m)^\s*:443,\s*"+re.escape(domain)+r"\s*\{\s*$",domain+" {",text,count=1)
 lines=text.splitlines(keepends=True)
 start=None
 pattern=re.compile(r"^\s*"+re.escape(domain)+r"\s*\{\s*$")
