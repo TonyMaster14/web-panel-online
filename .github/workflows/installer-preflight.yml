@@ -26,6 +26,44 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_connection_json.py' -v
           # Legacy routing suite has three existing expectation mismatches on the main baseline.
           # REALITY transport tests and shared Xray connection regressions remain required.
+      - name: Xray REALITY + Vision — проверка настоящим ядром
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/wpo-reality-xray
+          curl --fail --location --retry 2 --connect-timeout 20 \
+            'https://github.com/XTLS/Xray-core/releases/download/v26.7.28/Xray-linux-64.zip' \
+            -o /tmp/wpo-reality-xray/xray.zip
+          echo '8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40  /tmp/wpo-reality-xray/xray.zip' | sha256sum -c -
+          unzip -q /tmp/wpo-reality-xray/xray.zip xray -d /tmp/wpo-reality-xray
+          chmod 0755 /tmp/wpo-reality-xray/xray
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import tempfile
+          import uuid
+          from pathlib import Path
+          import wpp_connections as con
+          import wpp_reality as reality
+          with tempfile.TemporaryDirectory() as directory:
+              entry=con.validate(con.defaults()[-1],existing=con.defaults()[-1])
+              profile=reality.ensure_profile(entry['id'], '/tmp/wpo-reality-xray/xray',
+                                            str(Path(directory)/'reality.json'))
+              inbound=reality.server_inbound(entry,[{
+                  'id':str(uuid.uuid4()),'email':'panel:realitytest:1',
+                  'level':0,'flow':'xtls-rprx-vision'}],profile)
+              config={'log':{'loglevel':'warning'},'inbounds':[inbound],
+                      'outbounds':[{'tag':'direct','protocol':'freedom'}]}
+              path=Path(directory)/'config.json'
+              path.write_text(json.dumps(config),encoding='utf-8')
+              result=subprocess.run(['/tmp/wpo-reality-xray/xray','run','-test',
+                                     '-config',str(path)],text=True,capture_output=True)
+              print(result.stdout)
+              if result.returncode:
+                  print(result.stderr)
+                  raise SystemExit('Xray rejected REALITY + Vision inbound')
+          print('REALITY + Vision inbound accepted by Xray 26.7.28')
+          PY
       - name: Проверка встроенного Python установщика и панели
         shell: bash
         run: |
