@@ -33,8 +33,8 @@ jobs:
           script=Path("install-panel.sh").read_text(encoding="utf-8")
           for marker in ('cat > "$MANAGER" <<\'PY\'', 'cat > "$APP_FILE" <<\'PY\''):
               assert script.count(marker)==1, "Expected exactly one "+marker
-              source=script.split(marker,1)[1].split("\\nPY\\n",1)[0]
-              assert source.startswith("\\n"), "Missing source block after "+marker
+              source=script.split(marker,1)[1].split("\nPY\n",1)[0]
+              assert source.startswith("\n"), "Missing source block after "+marker
               with tempfile.NamedTemporaryFile(mode="w",suffix=".py",encoding="utf-8") as f:
                   f.write(source)
                   f.flush()
