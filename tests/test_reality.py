@@ -80,6 +80,28 @@ class RealityTests(unittest.TestCase):
         self.assertEqual(outbound["streamSettings"]["security"], "reality")
         self.assertEqual(outbound["settings"]["vnext"][0]["users"][0]["flow"], "xtls-rprx-vision")
 
+    def test_xray_26_decorated_password_key(self):
+        profile_path = str(self.root / "reality-26.json")
+        output = ("PrivateKey: " + "a"*43 +
+                  "\\nPassword (PublicKey): " + "b"*43 +
+                  "\\nHash32: " + "c"*43 + "\\n")
+        # This is the label used by the pinned Xray 26.x binary.
+        output = output.replace("\\n", "\n")
+        fake = SimpleNamespace(returncode=0, stdout=output, stderr="")
+        with patch.object(reality.subprocess, "run", return_value=fake):
+            profile = reality.ensure_profile("vless-reality-primary", "xray", profile_path)
+        self.assertEqual(profile["public_key"], "b"*43)
+
+    def test_direct_server_address_override(self):
+        item = self.item()
+        item["config"]["address"] = "203.0.113.42"
+        con.validate(item, existing=item)
+        dummy = {"private_key": "a"*43, "public_key": "b"*43,
+                 "short_id": "0123456789abcdef"}
+        link = reality.client_link("8b888888-8888-4888-8888-888888888888",
+                                   "vpn.example.com", "test", item, dummy)
+        self.assertEqual(urlparse(link).hostname, "203.0.113.42")
+
     def test_invalid_profile_fail_closed(self):
         with self.assertRaises(reality.RealityError):
             reality.read_profile("vless-reality-primary", str(self.root / "missing.json"))
