@@ -43,7 +43,6 @@ def _base(cid, name, protocol, **config):
 def defaults():
     return [
         _base("vless-direct", "VLESS XHTTP · напрямую", "vless", route="direct", fingerprint="chrome", mode="auto", uplink_method="POST"),
-        _base("vless-reality-primary", "VLESS REALITY · TCP Vision", "vless", route="reality", sni="www.microsoft.com", port=20443, fingerprint="chrome"),
         _base("hysteria-primary", "Hysteria2 · основной", "hysteria", port=8443),
         _base("mtproto-primary", "MTProto · отдельный порт", "mtproto", port=0),
         _base("web-primary", "Web Proxy · HTTPS", "web", port=0),
@@ -51,6 +50,7 @@ def defaults():
         _base("awg31-primary", "AmneziaWG 3.1 · отдельный профиль", "awg31", port=0),
         _base("naive-primary", "NaiveProxy · отдельный TLS-порт", "naive", port=53000),
         _base("mieru-primary", "Mieru · TCP", "mieru", port=54000, transport="TCP"),
+        _base("vless-reality-primary", "VLESS REALITY · TCP Vision", "vless", route="reality", sni="www.microsoft.com", port=20443, fingerprint="chrome"),
     ]
 
 
