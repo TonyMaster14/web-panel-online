@@ -5074,11 +5074,17 @@ fi
     fi
     printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$card_blue" "$card_reset"
 
-    # One horizontal baseline per entry; all values begin in the same column.
-    # Pad only the visible label before applying separate ANSI colors.
+    # UTF-8-safe alignment: Bash printf field widths count bytes for Cyrillic
+    # on some terminals. Fixed visible padding is stable in every locale.
     card_row(){
-        local label="$1" value="$2"
-        printf '  %s%-19s%s %s%s%s\n' "$card_label" "$label" "$card_reset" "$card_value" "$value" "$card_reset"
+        local label="$1" value="$2" gap
+        case "$label" in
+            'Ссылка на панель:') gap='  ' ;;
+            'Логин :')          gap='            ' ;;
+            'Пароль :')         gap='           ' ;;
+            *) return 2 ;;
+        esac
+        printf '  %s%s%s%s%s%s%s\n' "$card_label" "$label" "$card_reset" "$gap" "$card_value" "$value" "$card_reset"
     }
     printf '\n'
     card_row 'Ссылка на панель:' "https://${DOMAIN}${PANEL_PATH}/login"
