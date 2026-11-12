@@ -182,6 +182,9 @@ class RealityTests(unittest.TestCase):
         primary["config"]["sni"] = "vpn.example.net"
         with self.assertRaises(reality.RealityError):
             reality.shared_443_sni([primary], {primary["id"]}, "vpn.example.net")
+        with self.assertRaises(reality.RealityError):
+            reality.shared_443_sni([self.item()],
+                                   {"vless-reality-primary"}, "")
         extra = self.item()
         extra["id"] = "second-reality"
         extra["config"]["port"] = 443
