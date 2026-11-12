@@ -16,11 +16,11 @@ assert functions.index("ask_domain(){") < functions.index("ask_email(){") < func
 assert "Повторите пароль" not in functions
 assert functions.count("read -r -s -p") == 1
 assert "ШАГ " not in functions, "No standalone step heading allowed"
-assert all(prompt in functions for prompt in ("'  Домен: '", "'  Email: '", "'  Логин: '", "'  Пароль (не отображается): '"))
+assert all(prompt in functions for prompt in ('Домен:${reset}', 'Email:${reset}', 'Логин:${reset}', 'Пароль (не отображается):${reset}'))
 
 shell = (
     "set -Eeuo pipefail\n"
-    "gray=''\nreset=''\n"
+    "gray=''\nreset=''\ncyan=''\n"
     + functions
     + "\nask_domain\nask_email\nask_admin\nask_password\n"
     + '[[ "$DOMAIN" == "panel.example.com" && "$EMAIL" == "admin@example.com" && "$ADMIN" == "admin" && "$PASS" == "SecretTest123" ]]\n'
