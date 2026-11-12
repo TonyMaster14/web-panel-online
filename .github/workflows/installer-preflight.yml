@@ -138,6 +138,84 @@ jobs:
                   if process.returncode not in (0,-15,-2):
                       print("HAProxy diagnostics:",err)
           PY
+      - name: HTTPS через HAProxy и Caddy — реальный TLS и исходный IP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import os, socket, ssl, subprocess, tempfile, time
+          from pathlib import Path
+          import wpp_reality as reality
+
+          with tempfile.TemporaryDirectory() as folder:
+              base=Path(folder)
+              env=dict(os.environ, XDG_DATA_HOME=str(base/'data'), XDG_CONFIG_HOME=str(base/'config'))
+              site='vpn.example.net'
+              caddy=base/'Caddyfile'
+              caddy.write_text(reality.configure_caddy_mux(
+                  '{\n    auto_https disable_redirects\n}\n\n'
+                  + site + ' {\n    tls internal\n    respond "CLIENT={remote_host}"\n}\n',True))
+              # The local test uses a random public frontend port but keeps
+              # the exact production Caddy listener and PROXY v2 settings.
+              with socket.socket() as probe:
+                  probe.bind(('127.0.0.1',0))
+                  frontend=probe.getsockname()[1]
+              haproxy=base/'haproxy.cfg'
+              config=reality.haproxy_config('www.microsoft.com',ipv6=False)
+              config=config.replace('bind 0.0.0.0:443',f'bind 127.0.0.1:{frontend}')
+              haproxy.write_text(config)
+              services=[]
+              try:
+                  services.append(subprocess.Popen(
+                      ['caddy','run','--config',str(caddy),'--adapter','caddyfile'],
+                      stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,env=env))
+                  services.append(subprocess.Popen(
+                      ['haproxy','-db','-f',str(haproxy)],
+                      stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True))
+                  received=b''
+                  last_error=None
+                  for attempt in range(65):
+                      try:
+                          with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as source:
+                              # 127.0.0.2 is a distinct address in the loopback
+                              # network, to prove that Caddy sees the *client*,
+                              # rather than just HAProxy's 127.0.0.1.
+                              source.bind(('127.0.0.2',0))
+                              source.settimeout(2)
+                              source.connect(('127.0.0.1',frontend))
+                              context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                              context.check_hostname=False
+                              context.verify_mode=ssl.CERT_NONE
+                              with context.wrap_socket(source,server_hostname=site) as stream:
+                                  stream.sendall(('GET / HTTP/1.1\r\nHost: '+site
+                                                  +'\r\nConnection: close\r\n\r\n').encode())
+                                  fragments=[]
+                                  while True:
+                                      part=stream.recv(8192)
+                                      if not part: break
+                                      fragments.append(part)
+                                  received=b''.join(fragments)
+                          if b'CLIENT=127.0.0.2' in received and b'200 OK' in received:
+                              break
+                          last_error=RuntimeError('Unexpected HTTPS reply: '+repr(received[:350]))
+                      except (OSError,ssl.SSLError,TimeoutError) as exc:
+                          last_error=exc
+                      if any(proc.poll() is not None for proc in services):
+                          raise AssertionError('Caddy or HAProxy stopped unexpectedly: '+repr(last_error))
+                      time.sleep(.2)
+                  else:
+                      raise AssertionError('HTTPS and PROXY v2 verification failed: '+repr(last_error))
+                  print('PASS: HTTPS on shared TCP port; site served by Caddy; source IP preserved by PROXY v2')
+              finally:
+                  for proc in reversed(services):
+                      proc.terminate()
+                  for proc in reversed(services):
+                      try: _,err=proc.communicate(timeout=5)
+                      except subprocess.TimeoutExpired:
+                          proc.kill(); _,err=proc.communicate(timeout=5)
+                      if proc.returncode not in (0,-15,-2):
+                          print('Process diagnostics:',err[-1600:])
+          PY
       - name: Xray REALITY + Vision — проверка настоящим ядром
         shell: bash
         run: |
