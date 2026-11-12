@@ -285,6 +285,22 @@ jobs:
                   py_compile.compile(f.name,doraise=True)
           print("PASS: embedded manager and panel Python source syntax")
           PY
+      - name: Синтаксис нового редактора SNI для нод
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("node-install.sh").read_text(encoding="utf-8")
+          mark='python3 - "$UI" "$PANEL" <<\'PY_NODE_REALITY_SNI\'\n'
+          assert src.count(mark)==1, "Expected one node SNI patch"
+          body=src.split(mark,1)[1].split("\nPY_NODE_REALITY_SNI\n",1)[0]
+          compile(body,"embedded-node-sni.py","exec")
+          assert "wpo-node-reality-sni-settings" in body
+          assert "connection_store.ensure(CONNECTIONS_FILE,users())" in body
+          assert "selected[\"reality_sni\"]=requested_sni" in body
+          print("PASS: node SNI patch syntax, primary connection binding, remote storage")
+          PY
       - name: Сверка 26 встроенных Nodes Lab с исходниками
         shell: bash
         run: |
