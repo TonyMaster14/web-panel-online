@@ -216,9 +216,24 @@ def configure_caddy_mux(source, enabled):
         raise RealityError("В Caddy уже настроены https_port/default_bind. Автоматический TLS-маршрутизатор не будет менять чужую конфигурацию.")
     if re.search(r"(?m)^\s*bind\s+", clean):
         raise RealityError("В Caddy есть пользовательские bind: безопасный перенос на внутренний HTTPS-порт требует отдельной проверки.")
+    if re.search(r"(?m)^\s*servers\s+127\.0\.0\.1:18443\s*\{", clean):
+        raise RealityError("Сервер Caddy на 127.0.0.1:18443 уже настроен вручную.")
     directive = ("    " + MUX_BEGIN + "\n"
                  "    https_port " + str(CADDY_BACKEND_PORT) + "\n"
                  "    default_bind 127.0.0.1\n"
+                 # Preserve the source IP of HTTPS/panel visitors. HAProxy
+                 # sends PROXY v2 only to Caddy, not to the REALITY inbound.
+                 "    servers 127.0.0.1:" + str(CADDY_BACKEND_PORT) + " {\n"
+                 "        protocols h1 h2\n"
+                 "        listener_wrappers {\n"
+                 "            proxy_protocol {\n"
+                 "                timeout 2s\n"
+                 "                allow 127.0.0.1/32\n"
+                 "                fallback_policy require\n"
+                 "            }\n"
+                 "            tls\n"
+                 "        }\n"
+                 "    }\n"
                  "    " + MUX_END + "\n")
     # A global options block in Caddy is denoted by a bare opening brace.
     global_block = re.search(r"(?m)^\{[ \t]*\r?\n", clean)
@@ -255,5 +270,5 @@ def haproxy_config(sni, ipv6=True):
         "backend wpo_reality\n"
         "    server xray 127.0.0.1:" + str(REALITY_BACKEND_PORT) + " check\n\n"
         "backend wpo_caddy\n"
-        "    server caddy 127.0.0.1:" + str(CADDY_BACKEND_PORT) + " check\n"
+        "    server caddy 127.0.0.1:" + str(CADDY_BACKEND_PORT) + " check send-proxy-v2\n"
     )
