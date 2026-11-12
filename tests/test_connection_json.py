@@ -260,7 +260,8 @@ class Activation(unittest.TestCase):
         self.assertEqual(self.caddy.read_text(),'previous caddy')
         self.assertEqual(self.runtime.read_text(),'{"previous": true}')
         self.assertTrue(self.running)
-        self.assertIn(('systemctl','reload-or-restart','caddy.service'),self.calls)
+        # Rollback forces a full Caddy restart to release/reclaim TCP/443.
+        self.assertIn(('systemctl','restart','caddy.service'),self.calls)
 
     def test_unchanged_caddy_does_not_reload_or_restart_it(self):
         self.ns['activate_xray_config']({'inbounds':[inbound()]},'previous caddy')
