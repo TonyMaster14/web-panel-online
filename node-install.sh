@@ -3255,8 +3255,19 @@ for name in panel.py wpp_ui.py wpp_nodes.py wpp_subscriptions.py wpp-node-agent-
     fi
 done
 
+# Show progress for the actual source stage being applied, not a timed guess.
+# Versions 10-12 are carried by the final combined Node Agent installer.
+wpo_node_stage(){
+    local version="$1" percent
+    [[ -n "${WPO_UI_PROGRESS_FILE:-}" && -f "$WPO_UI_PROGRESS_FILE" ]] || return 0
+    percent=$((80 + version*18/26))
+    printf '%s\tНоды: этап %s/26\n' "$percent" "$version" > "$WPO_UI_PROGRESS_FILE"
+}
 apply(){
-    local script="$1" file="$2" marker="$3"
+    local script="$1" file="$2" marker="$3" version=1
+    if [[ "$script" =~ -v([0-9]+)-install\.sh$ ]]; then
+        version="${BASH_REMATCH[1]}"
+    fi
     if grep -Fq -- "$marker" "$file" 2>/dev/null; then
         echo "✓ Уже есть: $script"
     else
@@ -3264,6 +3275,7 @@ apply(){
         TOUCHED=1
         bash "$STAGE/$script"
     fi
+    wpo_node_stage "$version"
 }
 apply wpo-nodes-lab-install.sh "$PANEL" "def wpo_pending_load"
 apply wpo-nodes-lab-v2-install.sh "$UI" "wpo-node-card-head"
@@ -3282,6 +3294,7 @@ if ! cmp -s "$STAGE/wpo-node-agent-install-v2.sh" "$AGENT"; then
     TOUCHED=1
     install -m 0700 "$STAGE/wpo-node-agent-install-v2.sh" "$AGENT"
 fi
+wpo_node_stage 12
 
 apply wpo-nodes-lab-v13-install.sh "$PANEL" "# wpo-node-country-v13"
 apply wpo-nodes-lab-v14-install.sh "$UI" "# wpo-node-visual-v14"
