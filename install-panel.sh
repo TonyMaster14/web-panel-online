@@ -5054,33 +5054,26 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
-# Show ONLY the original three fields: panel URL, administrator login and password.
-# The node API token remains internal to node management and is not shown here.
-# In wizard mode, write only to the root-only /run result file; the wrapper
-# prints this card after the entire Nodes Lab installation has succeeded.
+# Финальная карточка: только ссылка, логин и пароль. Токен ноды не показывать.
+# Данные выводятся из защищённого файла лишь ПОСЛЕ успеха всей установки.
 {
 echo
-echo "============================================================"
+printf '  ╭──────────────────────────────────────────────────────────────╮\n'
 if [[ "$UPDATING" == "1" ]]; then
-echo "          WEB PANEL ONLINE V 3.0.0 UPDATED"
+    printf '  │           WEB PANEL ONLINE 3.0 — ОБНОВЛЕНО                  │\n'
 else
-echo "         WEB PANEL ONLINE V 3.0.0 IS READY"
+    printf '  │           WEB PANEL ONLINE 3.0 — УСТАНОВЛЕНО                │\n'
 fi
-echo "============================================================"
+printf '  ╰──────────────────────────────────────────────────────────────╯\n'
 echo
-echo "Panel URL:"
-echo "  https://${DOMAIN}${PANEL_PATH}/login"
-echo
-echo "Administrator login:"
-echo "  ${ADMIN}"
-echo
+printf '  Ссылка: https://%s%s/login\n' "$DOMAIN" "$PANEL_PATH"
+printf '  Логин:  %s\n' "$ADMIN"
 if [[ "$UPDATING" == "1" ]]; then
-echo "Administrator password: retained (unchanged)"
-echo
+    printf '  Пароль: сохранён (без изменений)\n'
 else
-echo "Administrator password:"
-echo "  ${PASS}"
-echo
+    printf '  Пароль: %s\n' "$PASS"
 fi
-echo "============================================================"
+echo
+printf '  Сохраните данные, чтобы не потерять.\n'
+echo
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
