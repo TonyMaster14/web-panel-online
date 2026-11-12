@@ -58,6 +58,10 @@ jobs:
         shell: bash
         run: |
           python3 tests/test_installer_access_card.py
+      - name: Milestone-only thick progress bar and real elapsed timer
+        shell: bash
+        run: |
+          python3 tests/test_installer_progress.py
       - name: Verify all 26 embedded stages, exact legacy files
         shell: bash
         run: |
@@ -95,7 +99,7 @@ jobs:
             'test branch pinned': 'test/wpo-3-unified-blue-v26' in boot,
             'blue wizard': 'МАСТЕР УСТАНОВКИ' in boot and '╭─' in boot,
             'no large button': 'УСТАНОВИТЬ' not in boot and 'ENTER — установить' in boot,
-            'progress clock': 'elapsed/60' in boot and 'elapsed%60' in boot and 'shortlabel' in boot,
+            'progress clock': 'elapsed/3600' in boot and 'elapsed%60' in boot and 'Прошло:' in boot,
             'private wizard credentials': 'mktemp /run/wpo-ui-credentials.' in boot and 'chmod 0600 "$CREDENTIALS"' in boot,
             'legacy VPN core pinned': 'TPROXY_REF="52a5feb7fac38f68da5afef9cedd9b3bfc8473ca"' in core,
             'core reads wizard credentials': 'WPO_UI_CREDENTIALS_FILE' in core,
