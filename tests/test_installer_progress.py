@@ -29,11 +29,11 @@ shell = ("set -Eeuo pipefail\n"
     "blue=''\ncyan=''\nice=''\ngray=''\nreset=''\nsuccess=''\n"
     + draw_function + "\n"
     + "draw 36 'Настройка Telegram Proxy' 114\n"
-    + "printf '\\033[3B\\r\\n'\n"
+    + "printf '\\033[2B\\r\\n'\n"
     + "draw 80 'Настройка компонентов' 263\n"
-    + "printf '\\033[3B\\r\\n'\n"
+    + "printf '\\033[2B\\r\\n'\n"
     + "draw 100 'Проверки завершены' 378\n"
-    + "printf '\\033[3B\\r\\n'\n"
+    + "printf '\\033[2B\\r\\n'\n"
 )
 run = subprocess.run(["bash", "-c", shell], capture_output=True, text=True, timeout=10)
 assert run.returncode == 0, run.stderr
@@ -52,5 +52,9 @@ assert bars[-1].count("░") == 0, "100% must have a completely filled bar"
 assert "✓ Установка..." in plain and "✓ Установка завершена!" in plain, "Both progress states required"
 assert "Этап: Проверки завершены" in plain
 assert "✓ Установка..." not in plain.split("100%", 1)[-1], "Active status must vanish at 100%"
-assert plain.count("✓ Установка завершена!") == 1, "Completion must appear once below stage"
+assert plain.count("✓ Установка завершена!") == 1, "Completion must appear once above bar"
+assert plain.rfind("✓ Установка завершена!") < plain.rfind("100%") < plain.rfind("Этап: Проверки завершены"), "Completion must be above 100% bar and stage below"
+assert plain.find("✓ Установка...") < plain.find("36%") < plain.find("Этап: Настройка Telegram Proxy"), "Active status must be above bar and current stage below"
+assert "\\033[2A" in draw_function, "Three-line UI redraw must go up two rows"
+assert "\\033[3A" not in draw_function, "Old four-line redraw must be removed"
 print("PASS: thick stage-driven bar, actual elapsed clock, no fake percentage or step tiles")
