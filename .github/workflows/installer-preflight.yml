@@ -16,7 +16,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          for script in install.sh install-final.sh install-webproxy-core.sh node-install.sh wpo-node-agent-install-v2.sh; do
+          for script in install.sh install-final.sh install-panel.sh update.sh install-webproxy-core.sh node-install.sh wpo-node-agent-install-v2.sh; do
             echo "Checking $script"
             bash -n "$script"
           done
