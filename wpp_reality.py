@@ -253,7 +253,9 @@ def haproxy_config(sni, ipv6=True):
     return (
         "# Managed by WEB PANEL ONLINE. Do not edit by hand.\n"
         "global\n"
-        "    maxconn 10000\n\n"
+        "    maxconn 10000\n"
+        "    user haproxy\n"
+        "    group haproxy\n\n"
         "defaults\n"
         "    mode tcp\n"
         "    timeout connect 5s\n"
