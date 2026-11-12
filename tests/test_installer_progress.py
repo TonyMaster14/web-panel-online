@@ -50,11 +50,13 @@ assert len(bars) == 3, bars
 assert bars[0].count("█") < bars[1].count("█") < bars[2].count("█"), bars
 assert bars[-1].count("░") == 0, "100% must have a completely filled bar"
 assert "✓ Установка..." in plain and "✓ Установка завершена!" in plain, "Both progress states required"
-assert "Этап: Проверки завершены" in plain
+assert "Этап: Проверки завершены" not in plain, "At 100 percent stage text must disappear"
 assert "✓ Установка..." not in plain.split("100%", 1)[-1], "Active status must vanish at 100%"
 assert plain.count("✓ Установка завершена!") == 1, "Completion must appear once above bar"
-assert plain.rfind("✓ Установка завершена!") < plain.rfind("100%") < plain.rfind("Этап: Проверки завершены"), "Completion must be above 100% bar and stage below"
+assert plain.rfind("✓ Установка завершена!") < plain.rfind("100%"), "Completion must stay above 100% bar"
 assert plain.find("✓ Установка...") < plain.find("36%") < plain.find("Этап: Настройка Telegram Proxy"), "Active status must be above bar and current stage below"
+assert "◈" in draw_function, "Live stage must use the new cyan diamond icon"
+assert 'if (( pct == 100 )); then\n        printf \'\\r\\033[2K\'' in draw_function, "At 100 percent clear the whole live stage line"
 assert "\\033[2A" in draw_function, "Three-line UI redraw must go up two rows"
 assert "\\033[3A" not in draw_function, "Old four-line redraw must be removed"
-print("PASS: thick stage-driven bar, actual elapsed clock, no fake percentage or step tiles")
+print("PASS: blue-icon dynamic operation, cleared at 100, actual elapsed clock, no fake percent")
