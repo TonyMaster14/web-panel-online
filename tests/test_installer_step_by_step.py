@@ -15,11 +15,12 @@ functions = source[begin:end]
 assert functions.index("ask_domain(){") < functions.index("ask_email(){") < functions.index("ask_admin(){") < functions.index("ask_password(){")
 assert "Повторите пароль" not in functions
 assert functions.count("read -r -s -p") == 1
+assert "ШАГ " not in functions, "No standalone step heading allowed"
+assert all(prompt in functions for prompt in ("'  Домен: '", "'  Email: '", "'  Логин: '", "'  Пароль (не отображается): '"))
 
 shell = (
     "set -Eeuo pipefail\n"
     "gray=''\nreset=''\n"
-    "step(){ printf 'ШАГ %s/4 %s\\n' \"$1\" \"$2\"; }\n"
     + functions
     + "\nask_domain\nask_email\nask_admin\nask_password\n"
     + '[[ "$DOMAIN" == "panel.example.com" && "$EMAIL" == "admin@example.com" && "$ADMIN" == "admin" && "$PASS" == "SecretTest123" ]]\n'
@@ -51,15 +52,17 @@ def wait_for(needle: str, seconds: float = 7.0):
 
 try:
     # Prompts must arrive one by one, never before their own step.
-    first = wait_for("Домен (например, panel.example.com): ")
-    assert "Email (латиница)" not in first and "Логин [admin]" not in first
+    first = wait_for("Домен: ")
+    assert "Email:" not in first and "Логин:" not in first
+    assert "ШАГ" not in first
     os.write(master, b"panel.example.com\n")
 
-    second = wait_for("Email (латиница): ")
-    assert "Логин [admin]" not in second and "Пароль (не отображается)" not in second
+    second = wait_for("Email: ")
+    assert "Логин:" not in second and "Пароль (не отображается)" not in second
+    assert "ШАГ" not in second
     os.write(master, b"admin@example.com\n")
 
-    third = wait_for("Логин [admin]: ")
+    third = wait_for("Логин: ")
     assert "Пароль (не отображается)" not in third
     os.write(master, b"admin\n")
 
