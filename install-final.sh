@@ -165,7 +165,7 @@ fi
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
 # with the current Node Agent installer, auto-geolocation, status checks,
 # random site templates and the final compact node cards, including pending installs.
-wpp_progress 80 "Установка Nodes Lab v26"
+wpp_progress 80 "Настройка компонентов"
 echo "Installing Nodes Lab v26 into the panel..."
 # All 26 source patches are embedded in one locally validated installer.
 # Defer intermediate tproxy-panel restarts to avoid systemd start-rate failures.
