@@ -147,6 +147,8 @@ def client_link(uuid, server, name, connection, profile):
         "flow": "xtls-rprx-vision",
         "spx": "/",
     }
+    address = str(cfg.get("address") or server)
+    if ":" in address and not address.startswith("["): address = "[" + address + "]"
     return ("vless://" + quote(str(uuid), safe="-") + "@"
-            + str(server) + ":" + str(int(cfg["port"])) + "?"
+            + address + ":" + str(int(cfg["port"])) + "?"
             + urlencode(options) + "#" + quote(str(name or "VLESS REALITY"), safe=""))
