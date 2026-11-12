@@ -3297,6 +3297,153 @@ apply wpo-nodes-lab-v24-install.sh "$UI" "/* wpo-node-indicator-center-v24 */"
 apply wpo-nodes-lab-v25-install.sh "$PANEL" "# wpo-node-template-save-v25"
 apply wpo-nodes-lab-v26-install.sh "$UI" "/* wpo-node-spinner-center-v26 */"
 
+# REALITY SNI is a per-server setting. The local node edits the ACTIVE
+# connection; remote Node Agent 0.2 stores a pending SNI until VPN is installed.
+# This is a post-patch on top of 26 unchanged, source-equivalent Nodes Lab stages.
+if ! grep -Fq '# wpo-node-reality-sni-settings' "$UI"; then
+    echo '→ Добавляю REALITY SNI в редактор нод'
+    TOUCHED=1
+    python3 - "$UI" "$PANEL" <<'PY_NODE_REALITY_SNI'
+from pathlib import Path
+import sys
+
+ui_path,panel_path=map(Path,sys.argv[1:])
+ui=ui_path.read_text(encoding="utf-8")
+panel=panel_path.read_text(encoding="utf-8")
+if "# wpo-node-reality-sni-settings" in ui:
+    raise SystemExit("REALITY node SNI is already applied")
+
+def one(src,old,new,name):
+    count=src.count(old)
+    if count!=1:
+        raise RuntimeError(f"{name}: ожидалось ровно одно совпадение, найдено {count}. Ничего не меняем.")
+    return src.replace(old,new,1)
+
+# Node Agent 0.2 has no VPN daemon. Remote SNI is a future setting and must
+# never masquerade as an applied Xray configuration.
+panel=one(
+    panel,',pending_rows,all_presets())',
+    ',pending_rows,all_presets(),reality_connection=connection_store.get('
+    'connection_store.ensure(CONNECTIONS_FILE,users()),"vless-reality-primary"))',
+    "Local REALITY connection passed to node UI")
+
+edit_start=panel.index('                elif operation=="edit":\n')
+edit_end=panel.index('                elif operation=="rename":\n',edit_start)
+handler=panel[edit_start:edit_end]
+handler=one(
+    handler,'                        template_id=str(form.get("site_template","")).strip()',
+    '                        requested_sni=str(form.get("reality_sni",reality.DEFAULT_SNI)).strip().lower()\n'
+    '                        if requested_sni not in {host for host,_ in reality.SNI_CANDIDATES}:\n'
+    '                            raise node_api.NodeError("Выберите SNI из списка REALITY.")\n'
+    '                        template_id=str(form.get("site_template","")).strip()',
+    "Remote SNI validation")
+handler=one(
+    handler,'                        selected["name"]=new_name',
+    '                        selected["reality_sni"]=requested_sni\n'
+    '                        selected["name"]=new_name',
+    "Remote SNI persistence")
+panel=panel[:edit_start]+handler+panel[edit_end:]
+
+ui=one(ui,
+    'import wpp_routing as routing_store',
+    'import wpp_routing as routing_store\nimport wpp_reality as reality_module',
+    "Node editor SNI catalog")
+start=ui.index('def nodes_ui(')
+end=ui.index('\n\nCSS +=',start)
+part=ui[start:end]
+part=one(part,
+    'def nodes_ui(nodes, local, connection_token, path, csrf, pending_nodes=None, presets=None):',
+    'def nodes_ui(nodes, local, connection_token, path, csrf, pending_nodes=None, presets=None, reality_connection=None):',
+    "Node editor signature")
+part=one(part,
+    '    local=local if isinstance(local,dict) else {}',
+    '''    local=local if isinstance(local,dict) else {}
+    # wpo-node-reality-sni-settings: source of truth for the local server is
+    # connections.json, not node metadata or the website template.
+    reality_connection=reality_connection if isinstance(reality_connection,dict) else {}
+    local_cfg=reality_connection.get("config",{})
+    local_sni=str(local_cfg.get("sni") or reality_module.DEFAULT_SNI)
+    local_edit=(f'<button class="icon-btn wpo-node-icon" type="button" data-wpo-local-sni '
+                f'data-reality-id="{esc(reality_connection.get("id",""))}" '
+                f'data-reality-name="{esc(reality_connection.get("name",""))}" '
+                f'data-reality-sni="{esc(local_sni)}" '
+                f'data-reality-port="{esc(local_cfg.get("port",443))}" '
+                f'data-reality-address="{esc(local_cfg.get("address",""))}" '
+                f'data-reality-fingerprint="{esc(local_cfg.get("fingerprint","chrome"))}" '
+                f'title="Изменить SNI основной ноды" aria-label="Изменить SNI основной ноды">'
+                +icon("edit")+'</button>') if reality_connection else '' ''',
+    "Live local REALITY SNI")
+# The final Nodes Lab v18 card has a managed "Основная нода" metadata row.
+part=one(part,
+    '<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p></div>',
+    '<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p></div>'
+    '<div class="wpo-node-sni-row"><span>REALITY SNI: <code>{esc(local_sni)}</code></span>{local_edit}</div>',
+    "Local SNI readout and pencil")
+part=one(part,
+    '        site_id=str(n.get(\'site_template_id\',\'\'))',
+    '        node_sni=str(n.get("reality_sni") or reality_module.DEFAULT_SNI)\n'
+    '        site_id=str(n.get(\'site_template_id\',\'\'))',
+    "Per-remote-node SNI")
+part=one(part,
+    'data-node-template="{esc(site_id)}"',
+    'data-node-template="{esc(site_id)}" data-node-sni="{esc(node_sni)}"',
+    "Remote pencil SNI data")
+part=one(part,
+    '<p class="wpo-node-template" title="Шаблон: {esc(site_name)}">{icon("settings")} Шаблон: {esc(site_name)}</p>',
+    '<p class="wpo-node-template" title="Шаблон: {esc(site_name)}">{icon("settings")} Шаблон: {esc(site_name)}</p>'
+    '<p class="wpo-node-sni-pending" title="VPN на этой ноде пока не развёрнут">REALITY SNI: {esc(node_sni)} · запланирован</p>',
+    "Remote SNI information")
+part=one(part,
+    '    options=\'<option value="">Стандартная страница ноды</option>\'+',
+    '    reality_options="".join(f\'<option value="{esc(host)}">{esc(label)} · {esc(host)}</option>\' for host,label in reality_module.SNI_CANDIDATES)\n'
+    '    options=\'<option value="">Стандартная страница ноды</option>\'+',
+    "Reality node SNI dropdown options")
+part=one(part,
+    '<label>Шаблон сайта<select name="site_template">\'+options+\'</select></label>',
+    '<label>Шаблон сайта<select name="site_template">\'+options+\'</select></label>'
+    '<label>SNI для VLESS TCP REALITY<select name="reality_sni">\'+reality_options+\'</select></label>'
+    '<p class="wpo-node-hint">SNI сохраняется для этой ноды. Node Agent 0.2 пока не устанавливает VPN: выбранный SNI начнёт использоваться при интеграции Xray на удалённый сервер.</p>',
+    "Remote SNI node editor")
+part=one(part,
+    'f.elements.site_template.value=b.dataset.nodeTemplate||\'\';',
+    'f.elements.site_template.value=b.dataset.nodeTemplate||\'\';f.elements.reality_sni.value=b.dataset.nodeSni||"www.microsoft.com";',
+    "Restore node-specific SNI on pencil")
+# Only a compact neutral row is added; retain node card dimensions/layout.
+part=one(part,
+    '    js=js.replace(\'__PATH__\',json.dumps(path)).replace(\'__CSRF__\',json.dumps(csrf))',
+    '''    css+="\\n.wpo-node-sni-row{display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:10px;color:var(--muted);min-width:0}.wpo-node-sni-row code{font-size:10px;color:var(--text);overflow:hidden;text-overflow:ellipsis}.wpo-node-sni-pending{font-size:9px;line-height:1.4;color:var(--muted);margin:5px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.wpo-node-sni-row .wpo-node-icon{flex:0 0 auto;width:28px;height:28px}\\n"
+    js=js.replace('__PATH__',json.dumps(path)).replace('__CSRF__',json.dumps(csrf))
+    local_js=r"""(()=>{const b=document.querySelector('[data-wpo-local-sni]'),dlg=document.getElementById('wpoLocalSniDialog'),f=document.getElementById('wpoLocalSniForm');if(!b||!dlg||!f)return;const selection=f.elements.reality_sni;let custom=null;b.addEventListener('click',()=>{if(custom){custom.remove();custom=null}const wanted=b.dataset.realitySni||'www.microsoft.com';if(![...selection.options].some(x=>x.value===wanted)){custom=new Option('Свой · '+wanted,wanted);selection.add(custom)}selection.value=wanted;f.querySelector('[data-sni-error]').hidden=true;dlg.showModal()});f.querySelector('[data-sni-cancel]').addEventListener('click',()=>dlg.close());f.addEventListener('submit',async e=>{e.preventDefault();const button=f.querySelector('[type=submit]'),error=f.querySelector('[data-sni-error]');button.disabled=true;error.hidden=true;try{const body=new URLSearchParams({csrf:__LOCAL_CSRF__,operation:'save',id:b.dataset.realityId,name:b.dataset.realityName,protocol:'vless',route:'reality',reality_sni:selection.value,reality_port:b.dataset.realityPort,reality_address:b.dataset.realityAddress,reality_fingerprint:b.dataset.realityFingerprint});const r=await fetch(__LOCAL_PATH__+'/connection-action',{method:'POST',headers:{'X-WPP-Async':'1'},body});if(r.redirected)throw Error('Сессия истекла. Обновите страницу.');const d=await r.json();if(!r.ok||!d.ok)throw Error(d.message||'Не удалось изменить SNI');dlg.close();location.reload()}catch(ex){error.textContent=ex.message;error.hidden=false}finally{button.disabled=false}})})();"""
+    js+=local_js.replace('__LOCAL_CSRF__',json.dumps(csrf)).replace('__LOCAL_PATH__',json.dumps(path))
+    local_dialog=('<dialog class="wpo-node-dialog" id="wpoLocalSniDialog"><div class="dialog-head">'
+        '<div><h2>SNI основной ноды</h2><small>VLESS TCP REALITY · XTLS Vision</small></div>'
+        '<button type="button" onclick="this.closest(\\'dialog\\').close()">×</button></div>'
+        '<form id="wpoLocalSniForm" class="wpo-node-dialog-body">'
+        '<label>SNI REALITY<select name="reality_sni">'+reality_options+'</select></label>'
+        '<p class="wpo-node-hint">Выбор обновляет Xray и HAProxy на основном VPS. После изменения SNI ранее импортированные подключения нужно обновить по QR или подписке.</p>'
+        '<div class="actions"><button type="button" data-sni-cancel>Отмена</button><button class="primary" type="submit">Сохранить</button></div>'
+        '<p class="create-error" data-sni-error hidden></p></form></dialog>') if reality_connection else '' ''',
+    "Local SNI dialog and live connection edit")
+part=one(part,
+    "+'<style>'+css+'</style><script>'+js+'</script>')",
+    "+local_dialog+'<style>'+css+'</style><script>'+js+'</script>')",
+    "Append local SNI dialog to the nodes page")
+ui=ui[:start]+part+ui[end:]
+
+compile(ui,str(ui_path),"exec")
+compile(panel,str(panel_path),"exec")
+staged=[]
+for path,text in ((ui_path,ui),(panel_path,panel)):
+    temp=path.with_suffix(".py.sni-tmp")
+    temp.write_text(text,encoding="utf-8")
+    temp.chmod(path.stat().st_mode & 0o777)
+    staged.append((temp,path))
+for temp,path in staged:
+    temp.replace(path)
+print("REALITY SNI: основная нода привязана к живому подключению; удалённые — к реестру для будущего VPN.")
+PY_NODE_REALITY_SNI
+fi
+
 for file in "$PANEL" "$UI" "$GEO" "$AUTO"; do [[ -s "$file" ]] || die "Отсутствует файл: $file"; done
 # Validate the final generated-node installer and controller feature set.
 grep -Fq 'node-agent-installer.sh' "$PANEL" || die 'Нет маршрута установщика ноды.'
