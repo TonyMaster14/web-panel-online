@@ -3261,7 +3261,7 @@ wpo_node_stage(){
     local version="$1" percent
     [[ -n "${WPO_UI_PROGRESS_FILE:-}" && -f "$WPO_UI_PROGRESS_FILE" ]] || return 0
     percent=$((80 + version*18/26))
-    printf '%s\tНоды: этап %s/26\n' "$percent" "$version" > "$WPO_UI_PROGRESS_FILE"
+    printf '%s\tНастройка компонентов\n' "$percent" > "$WPO_UI_PROGRESS_FILE"
 }
 apply(){
     local script="$1" file="$2" marker="$3" version=1
