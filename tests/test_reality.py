@@ -112,8 +112,8 @@ class RealityTests(unittest.TestCase):
     def test_sni_preset_choices_and_manual_address(self):
         import wpp_ui as ui
         candidates = (
-            "www.microsoft.com", "www.apple.com", "www.cloudflare.com",
-            "www.mozilla.org", "www.wikipedia.org",
+            "www.microsoft.com", "www.apple.com", "www.google.com",
+            "www.amazon.com", "www.wikipedia.org",
         )
         markup = ui.connections_ui([self.item()], [], "/panel-test", "csrf")
         self.assertIn('name="reality_preset"', markup)
