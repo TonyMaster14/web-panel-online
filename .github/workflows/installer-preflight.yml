@@ -1,7 +1,7 @@
 name: Проверка установщика WPO 3.0
 on:
   push:
-    branches: [main]
+    branches: [main, feature/vless-tcp-reality-vision-20261112]
   pull_request:
     branches: [main]
 permissions:
