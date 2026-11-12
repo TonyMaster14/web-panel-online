@@ -1293,7 +1293,7 @@ def sync_xray(d):
     if not panel_hostname:
         try:
             with open("/etc/systemd/system/caddy.service.d/tproxy.conf",encoding="utf-8") as domain_file:
-                match=re.search(r"(?m)^Environment=TPROXY_HOSTNAME=([a-z0-9.-]+)\\s*$",domain_file.read())
+                match=re.search(r"(?m)^Environment=TPROXY_HOSTNAME=([a-z0-9.-]+)\s*$",domain_file.read())
                 if match: panel_hostname=match.group(1)
         except OSError:
             pass
