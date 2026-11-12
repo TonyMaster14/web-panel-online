@@ -99,7 +99,7 @@ jobs:
             'test branch pinned': 'test/wpo-3-unified-blue-v26' in boot,
             'blue wizard': 'МАСТЕР УСТАНОВКИ' in boot and '╭─' in boot,
             'no large button': 'УСТАНОВИТЬ' not in boot and 'ENTER — установить' in boot,
-            'progress clock': 'elapsed/3600' in boot and 'elapsed%60' in boot and 'Прошло:' in boot,
+            'progress clock': 'elapsed/3600' in boot and 'elapsed%60' in boot and '◷ %02d:%02d:%02d' in boot,
             'private wizard credentials': 'mktemp /run/wpo-ui-credentials.' in boot and 'chmod 0600 "$CREDENTIALS"' in boot,
             'legacy VPN core pinned': 'TPROXY_REF="52a5feb7fac38f68da5afef9cedd9b3bfc8473ca"' in core,
             'core reads wizard credentials': 'WPO_UI_CREDENTIALS_FILE' in core,
