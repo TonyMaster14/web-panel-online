@@ -72,6 +72,8 @@ jobs:
             'Xray syntax and service checks': 'xray run -test -config' in final and 'web-panel-proxy-xray.service' in final,
             'Happ title without routing': '# wpo-happ-vless-title-v1' in ui and 'happ_url=direct_profile_url' in ui,
             'Happ node separate': 'direct_profile_config' in panel and '"profile-title"' in panel,
+            'exact old access card fields': all(t in panel for t in ('echo "Panel URL:"','echo "Administrator login:"','echo "Administrator password:"')),
+            'no node token in access card': 'echo "Node API token:"' not in panel and 'NODE_API_TOKEN=' not in panel,
           }
           for k,v in checks.items():
             print(('PASS' if v else 'FAIL')+' '+k)
