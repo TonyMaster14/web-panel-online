@@ -1,7 +1,7 @@
 name: Проверка установщика WPO 3.0
 on:
   push:
-    branches: [main, feature/vless-tcp-reality-vision-20261112]
+    branches: [main, feature/vless-tcp-reality-vision-20261112, test/reality-addon-firefox-nodes-20261112]
   pull_request:
     branches: [main]
 permissions:
@@ -20,6 +20,7 @@ jobs:
             echo "Checking $script"
             bash -n "$script"
           done
+          sh -n install-reality-addon.sh
           python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py wpo-node-geo-v13.py wpo-node-autotemplate-v20.py wpo-relay-zero-profiles-patch.py
           python3 -m py_compile wpp_connections.py wpp_reality.py
           python3 -m unittest discover -s tests -p 'test_reality.py' -v
