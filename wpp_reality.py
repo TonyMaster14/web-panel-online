@@ -18,6 +18,15 @@ _KEY_RE = re.compile(r"^[A-Za-z0-9_-]{43}$")
 _CID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{2,63}$")
 
 
+# Internal-only TCP backends. Public 443 is reserved for the TLS SNI mux.
+CADDY_BACKEND_PORT = 18443
+REALITY_BACKEND_PORT = 24443
+ROUTER_CONFIG = "/etc/web-proxy-panel/tls-mux.cfg"
+ROUTER_SERVICE = "web-panel-proxy-tls-mux.service"
+MUX_BEGIN = "# WPP REALITY TLS MUX BEGIN"
+MUX_END = "# WPP REALITY TLS MUX END"
+
+
 class RealityError(ValueError):
     pass
 
@@ -112,8 +121,9 @@ def server_inbound(connection, clients, profile):
     sni = cfg["sni"]
     return {
         "tag": "vless-reality-" + _check_id(connection["id"]),
-        "listen": "0.0.0.0",
-        "port": int(cfg["port"]),
+        # TCP/443 is owned by the SNI pass-through router, never Xray.
+        "listen": "127.0.0.1" if int(cfg["port"]) == 443 else "0.0.0.0",
+        "port": REALITY_BACKEND_PORT if int(cfg["port"]) == 443 else int(cfg["port"]),
         "protocol": "vless",
         "settings": {"clients": clients, "decryption": "none"},
         "streamSettings": {
@@ -152,3 +162,96 @@ def client_link(uuid, server, name, connection, profile):
     return ("vless://" + quote(str(uuid), safe="-") + "@"
             + address + ":" + str(int(cfg["port"])) + "?"
             + urlencode(options) + "#" + quote(str(name or "VLESS REALITY"), safe=""))
+
+
+def shared_443_sni(connections, active_connection_ids, panel_domain=""):
+    """Return the sole active REALITY SNI sharing TCP/443, or empty string.
+
+    Many clients can share one connection/inbound. Two different REALITY
+    inbounds cannot share 443 without an explicit additional SNI mapping.
+    """
+    matched = []
+    for item in connections:
+        if (is_reality(item) and item.get("enabled", True)
+                and item.get("id") in active_connection_ids
+                and int(item.get("config", {}).get("port", 0) or 0) == 443):
+            matched.append(item)
+    if len(matched) > 1:
+        raise RealityError("TCP/443 поддерживает только одно активное подключение REALITY. Другим укажите отдельный порт.")
+    if not matched:
+        return ""
+    sni = str(matched[0]["config"]["sni"]).strip().lower().rstrip(".")
+    if not re.fullmatch(r"[a-z0-9.-]{4,253}", sni) or "." not in sni:
+        raise RealityError("Некорректный SNI для общего TCP/443.")
+    if sni == str(panel_domain).strip().lower().rstrip("."):
+        raise RealityError("SNI REALITY на 443 не может совпадать с доменом панели: Caddy должен получать HTTPS и ACME.")
+    return sni
+
+
+def caddy_mux_enabled(source):
+    return MUX_BEGIN in source
+
+
+def configure_caddy_mux(source, enabled):
+    """Toggle managed internal Caddy listener, keeping all site routes intact.
+
+    https_port is explicitly *internal* according to Caddy's documentation;
+    443 remains the public URL and TLS-ALPN-01 challenge port. default_bind
+    prevents accidentally exposing the internal 18443 backend externally.
+    """
+    if not isinstance(source, str):
+        raise RealityError("Caddyfile должен быть текстом.")
+    if source.count(MUX_BEGIN) != source.count(MUX_END) or source.count(MUX_BEGIN) > 1:
+        raise RealityError("Повреждены маркеры маршрутизатора в Caddyfile.")
+    managed = re.compile(
+        r"(?m)^[ \\t]*" + re.escape(MUX_BEGIN)
+        + r"\\n(?:.*\\n)*?^[ \\t]*" + re.escape(MUX_END) + r"\\n?"
+    )
+    clean = managed.sub("", source)
+    if not enabled:
+        return clean
+    if re.search(r"(?m)^\\s*(?:https_port|default_bind)\\s+", clean):
+        raise RealityError("В Caddy уже настроены https_port/default_bind. Автоматический TLS-маршрутизатор не будет менять чужую конфигурацию.")
+    if re.search(r"(?m)^\\s*bind\\s+", clean):
+        raise RealityError("В Caddy есть пользовательские bind: безопасный перенос на внутренний HTTPS-порт требует отдельной проверки.")
+    directive = ("    " + MUX_BEGIN + "\\n"
+                 "    https_port " + str(CADDY_BACKEND_PORT) + "\\n"
+                 "    default_bind 127.0.0.1\\n"
+                 "    " + MUX_END + "\\n")
+    # A global options block in Caddy is denoted by a bare opening brace.
+    global_block = re.search(r"(?m)^\\{[ \\t]*\\r?\\n", clean)
+    if global_block:
+        position = global_block.end()
+        return clean[:position] + directive + clean[position:]
+    return "{\\n" + directive + "}\\n\\n" + clean
+
+
+def haproxy_config(sni, ipv6=True):
+    """Generate a strict, transparent TCP router; no TLS termination."""
+    if not isinstance(sni, str) or not re.fullmatch(r"[a-z0-9.-]{4,253}", sni) or "." not in sni:
+        raise RealityError("Недопустимый SNI для HAProxy.")
+    listeners = "    bind 0.0.0.0:443\\n"
+    if ipv6:
+        listeners += "    bind :::443 v6only\\n"
+    return (
+        "# Managed by WEB PANEL ONLINE. Do not edit by hand.\\n"
+        "global\\n"
+        "    maxconn 10000\\n\\n"
+        "defaults\\n"
+        "    mode tcp\\n"
+        "    timeout connect 5s\\n"
+        "    timeout client 1h\\n"
+        "    timeout server 1h\\n"
+        "    timeout tunnel 24h\\n\\n"
+        "frontend wpo_tls_443\\n"
+        + listeners
+        + "    mode tcp\\n"
+        "    tcp-request inspect-delay 5s\\n"
+        "    tcp-request content accept if { req.ssl_hello_type 1 }\\n"
+        + "    use_backend wpo_reality if { req.ssl_sni -i " + sni + " }\\n"
+        "    default_backend wpo_caddy\\n\\n"
+        "backend wpo_reality\\n"
+        "    server xray 127.0.0.1:" + str(REALITY_BACKEND_PORT) + " check\\n\\n"
+        "backend wpo_caddy\\n"
+        "    server caddy 127.0.0.1:" + str(CADDY_BACKEND_PORT) + " check\\n"
+    )
