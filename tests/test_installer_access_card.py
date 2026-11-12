@@ -1,6 +1,7 @@
 """Smoke test the final access card, without touching any VPS or live secrets."""
 from pathlib import Path
 import os
+import re
 import subprocess
 import tempfile
 
@@ -29,18 +30,27 @@ with tempfile.TemporaryDirectory(prefix="wpo-access-card-") as folder:
         )
         assert completed.returncode == 0, completed.stderr
         assert "DemoSecret123" not in (completed.stdout + completed.stderr), "Secret printed to logs"
-        text = destination.read_text(encoding="utf-8")
-        assert "Ссылка на панель: https://panel.example.test/panel-sample-id/login" in text
-        assert "Логин : TestAdmin" in text
+        raw = destination.read_text(encoding="utf-8")
+        # Test the actual ANSI-colored terminal result and its visible layout.
+        assert "\x1b[38;5;153m" in raw, "Blue labels missing"
+        assert "\x1b[38;5;51m" in raw, "Contrasting cyan values missing"
+        text = re.sub(r"\x1b\[[0-9;]*m", "", raw)
+        rows = [line for line in text.splitlines() if line.startswith("  Ссылка на панель:") or line.startswith("  Логин :") or line.startswith("  Пароль :")]
+        assert len(rows) == 3, f"Expected exactly three aligned rows: {rows}"
+        assert "https://panel.example.test/panel-sample-id/login" in rows[0]
+        assert "TestAdmin" in rows[1]
+        value_positions = [row.index("https://") if i == 0 else (row.index("TestAdmin") if i == 1 else row.index("DemoSecret123" if updating == "0" else "сохранён (без изменений)")) for i, row in enumerate(rows)]
+        assert value_positions == [value_positions[0]] * 3, f"Values are not aligned: {value_positions}"
         assert "Сохраните данные,что бы не потерять!" in text
         assert "Node API" not in text and "Token" not in text
         assert all(english not in text for english in ("Panel URL:", "Administrator login:", "Administrator password:"))
         if updating == "0":
-            assert "Пароль : DemoSecret123" in text
+            assert "Пароль : DemoSecret123" in text or "Пароль :" in rows[2] and "DemoSecret123" in rows[2]
         else:
-            assert "Пароль : сохранён (без изменений)" in text
+            assert "сохранён (без изменений)" in rows[2]
             assert "DemoSecret123" not in text
         assert text.index("Ссылка на панель:") < text.index("Логин :") < text.index("Пароль :") < text.index("Сохраните данные")
-        assert "\n\n  Логин : " in text and "\n\n  Пароль : " in text, "Labels must each be on their own line with a blank spacer"
-        assert "\n\n  Сохраните данные,что бы не потерять!" in text, "Save warning must follow a blank line"
+        assert "\n\n  Логин :" in text and "\n\n  Пароль :" in text, "Expected blank separators"
+        assert "\n\n  Сохраните данные,что бы не потерять!" in text
+
 print("PASS: Russian access card, correct order, save reminder, no token, no credential log leak")
