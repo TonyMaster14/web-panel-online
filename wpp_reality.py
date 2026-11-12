@@ -183,6 +183,8 @@ def shared_443_sni(connections, active_connection_ids, panel_domain=""):
     sni = str(matched[0]["config"]["sni"]).strip().lower().rstrip(".")
     if not re.fullmatch(r"[a-z0-9.-]{4,253}", sni) or "." not in sni:
         raise RealityError("Некорректный SNI для общего TCP/443.")
+    if not str(panel_domain).strip():
+        raise RealityError("Не удалось определить домен панели для безопасного разделения TCP/443.")
     if sni == str(panel_domain).strip().lower().rstrip("."):
         raise RealityError("SNI REALITY на 443 не может совпадать с доменом панели: Caddy должен получать HTTPS и ACME.")
     return sni
