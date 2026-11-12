@@ -185,7 +185,7 @@ class DirectRouting(unittest.TestCase):
         self.assertEqual(status, 200)
         config = json.loads(body)[0]
         self.assert_routed(config)
-        outbound = next(row for row in config['outbounds'] if row['tag'] in ('proxy', 'proxy-1'))
+        outbound = next(row for row in config['outbounds'] if row.get('protocol') == 'vless')
         self.assertEqual(outbound['streamSettings']['xhttpSettings']['path'],
                          '/vless-' + 'a' * 24 + '-timeweb/api/v2/sync/stream/index.json')
         self.assertEqual(outbound['settings']['vnext'][0]['address'], 'edge.example')
@@ -212,7 +212,7 @@ class DirectRouting(unittest.TestCase):
         config = json.loads(body)[0]
         self.assertIn('dns', config)
         self.assertIn('routing', config)
-        outbound = next(value for value in config['outbounds'] if value['tag'] in ('proxy', 'proxy-1'))
+        outbound = next(value for value in config['outbounds'] if value.get('protocol') == 'hysteria')
         self.assertEqual(outbound['protocol'], 'hysteria')
         self.assertEqual(outbound['streamSettings']['hysteriaSettings']['auth'], self.user['secret'])
 
