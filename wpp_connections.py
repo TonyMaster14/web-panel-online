@@ -7,6 +7,7 @@ operator repair a CDN hostname or TLS setting once without rotating UUIDs.
 """
 import copy
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -329,8 +330,12 @@ def validate(raw, existing=None):
             fingerprint = str(config.get("fingerprint", "chrome"))
             if fingerprint not in ("chrome", "firefox", "safari"):
                 raise ConnectionError("REALITY: отпечаток должен быть chrome, firefox или safari.")
+            address = str(config.get("address") or "").strip().lower().rstrip(".")
+            if address:
+                try: ipaddress.ip_address(address.strip("[]"))
+                except ValueError: address = _host(address, "адрес VPS", True)
             result["config"] = {"route": "reality", "sni": sni, "port": port,
-                                "fingerprint": fingerprint}
+                                "address": address, "fingerprint": fingerprint}
         else:
             provider = str(config.get("provider", "custom"))
             if provider not in PROVIDERS: raise ConnectionError("Неизвестный CDN-провайдер.")
@@ -546,7 +551,7 @@ def claim_reality_port(path, cid):
     used = {int(row.get("config", {}).get("port", 0) or 0)
             for row in data["connections"] if row.get("id") != cid}
     # Hysteria2 uses UDP 8443; 443 belongs to Caddy. Reserve a separate range.
-    used.update({443, 8090, 10000, 10001, 10002, 10003, 10004, 10005, 10085})
+    used.update({443, 8090, 2398, 2399, 10000, 10001, 10002, 10003, 10004, 10005, 10085})
     if current >= 1025 and current not in used:
         return item
     port = next((value for value in range(20443, 20543) if value not in used), None)
