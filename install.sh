@@ -46,12 +46,6 @@ banner(){
     printf '%s  │%s                    МАСТЕР УСТАНОВКИ                          %s│%s\n' "$blue" "$bold$cyan" "$blue" "$reset"
     printf '%s  ╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
 }
-step(){
-    local num="$1" desc="$2"
-    # No separate number tiles: one clear step title followed by its input.
-    printf '\n  %sШАГ %s/4%s  %s%s%s\n' "$cyan" "$num" "$reset" "$ice" "$desc" "$reset"
-    printf '  %s────────────────────────────────────────────────────────%s\n' "$blue" "$reset"
-}
 valid_domain(){
     local d="$1" part
     [[ "$d" == *.* && ${#d} -le 253 && "$d" != *..* && "$d" =~ ^[a-z0-9].*[a-z0-9]$ ]] || return 1
@@ -63,33 +57,29 @@ valid_domain(){
 }
 valid_email(){ [[ "$1" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; }
 ask_domain(){
-    step 1 'Домен панели'
     while true; do
-        read -r -p '  Домен (например, panel.example.com): ' DOMAIN || exit 130
+        read -r -p '  Домен: ' DOMAIN || exit 130
         DOMAIN="${DOMAIN,,}"
         valid_domain "$DOMAIN" && break
         printf '%s  Укажите действительный домен без https:// и пробелов.%s\n' "$gray" "$reset"
     done
 }
 ask_email(){
-    step 2 'Электронная почта для HTTPS-сертификата'
     while true; do
-        read -r -p '  Email (латиница): ' EMAIL || exit 130
+        read -r -p '  Email: ' EMAIL || exit 130
         valid_email "$EMAIL" && break
         printf '%s  Нужен настоящий адрес формата name@example.com.%s\n' "$gray" "$reset"
     done
 }
 ask_admin(){
-    step 3 'Логин администратора'
     while true; do
-        read -r -p '  Логин [admin]: ' ADMIN || exit 130
+        read -r -p '  Логин: ' ADMIN || exit 130
         ADMIN="${ADMIN:-admin}"
         [[ ${#ADMIN} -le 64 && "$ADMIN" =~ ^[[:alnum:]_.@-]+$ ]] && break
         printf '%s  Используйте буквы, цифры, _, точку или дефис.%s\n' "$gray" "$reset"
     done
 }
 ask_password(){
-    step 4 'Пароль администратора'
     while true; do
         # Password is entered once, invisibly at the prompt after the colon.
         read -r -s -p '  Пароль (не отображается): ' PASS || exit 130
@@ -125,7 +115,7 @@ fi
 
 banner
 printf '\n  %sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
-printf '  %sПанель, прокси-службы и управление нодами в одной системе.%s\n\n' "$ice" "$reset"
+
 printf '  %s›  ENTER — установить%s     %sq — выход%s\n' "$bold$cyan" "$reset" "$ice" "$reset"
 while true; do
     read -r -p '  Ваш выбор: ' choice || exit 130
@@ -150,8 +140,7 @@ else
     printf '%s\n%s\n' "$ADMIN" "$PASS" > "$CREDENTIALS"
     unset PASS ADMIN
 fi
-printf '\n%s  Подготовка и загрузка компонентов в начале установки.%s\n' "$cyan" "$reset"
-printf '  %sПодробный вывод будет записан в защищённый журнал.%s\n\n' "$gray" "$reset"
+
 
 install -d -o root -g root -m 0700 /var/log/web-panel-online
 LOG="/var/log/web-panel-online/install-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
