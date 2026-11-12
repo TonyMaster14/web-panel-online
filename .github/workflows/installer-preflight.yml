@@ -91,7 +91,12 @@ jobs:
                           conn.settimeout(1)
                           try: data=conn.recv(4096)
                           except (OSError,TimeoutError): data=b""
-                          if data and data[:1]==b"\x16":
+                          # Caddy receives a PROXY v2 header before TLS.
+                          # REALITY must still receive untouched TLS bytes.
+                          proxy_v2=b"\r\n\r\n\x00\r\nQUIT\n"
+                          correct=(data.startswith(proxy_v2) if which=="caddy"
+                                   else data[:1]==b"\x16")
+                          if data and correct:
                               item["received"].set()
               threading.Thread(target=receive,daemon=True).start()
 
