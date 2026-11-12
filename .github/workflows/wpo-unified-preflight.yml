@@ -32,7 +32,7 @@ jobs:
           assert section.count('read -r -s -p')==1, 'Password must be read only once'
           assert section.count('break')==1, 'Valid password must immediately continue'
           assert '$green' not in source, 'Undefined color variable in wizard'
-          prelude="set -Eeuo pipefail\nstep(){ :; }\ngray=''\nreset=''\nask_password(){"
+          prelude="set -Eeuo pipefail\nstep(){ :; }\ngray=''\ncyan=''\nreset=''\nask_password(){"
           # A single newline must be enough for a valid password; a second read
           # would fail the test. The test never installs packages or contacts a VPS.
           script=prelude+section+"\nask_password\n[[ ${PASS} == 'TestPassword123' ]]\n"
