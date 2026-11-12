@@ -122,13 +122,13 @@ WEB_PANEL_PROXY_PACKAGE_VERSION="3.0.0" bash "$BASE/install-webproxy-core.sh"
 wpp_progress 55 "Прокси-службы установлены"
 
 echo "Installing control panel..."
-wpp_progress 60 "Установка панели"
+wpp_progress 58 "Установка панели"
 if [[ "$PANEL_UPDATE" == 1 ]]; then
     WEB_PANEL_PROXY_UPDATE=1 bash "$BASE/install-panel.sh"
 else
     bash "$BASE/install-panel.sh"
 fi
-wpp_progress 92 "Проверка служб"
+wpp_progress 73 "Проверка служб"
 
 for unit in caddy.service mtproxy.service tproxy-server.service tproxy-panel.service web-proxy-panel-firewall.service; do
     systemctl is-active --quiet "$unit" || { echo "Installation failed: $unit did not start."; exit 1; }
@@ -156,7 +156,7 @@ done
 systemctl is-active --quiet web-panel-proxy-sync-tls.timer ||
     die "The Xray TLS synchronization timer did not start."
 echo "Checking the latest Xray and OpenFlux releases..."
-wpp_progress 96 "Обновление Xray и OpenFlux"
+wpp_progress 77 "Проверка Xray и OpenFlux"
 flock -u 9
 if ! systemctl start web-panel-proxy-component-auto-update.service; then
     echo "WARNING: Latest Xray/OpenFlux check failed; the automatic timer will retry." >&2
@@ -165,7 +165,7 @@ fi
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
 # with the current Node Agent installer, auto-geolocation, status checks,
 # random site templates and the final compact node cards, including pending installs.
-wpp_progress 98 "Установка Nodes Lab v26"
+wpp_progress 80 "Установка Nodes Lab v26"
 echo "Installing Nodes Lab v26 into the panel..."
 # All 26 source patches are embedded in one locally validated installer.
 # Defer intermediate tproxy-panel restarts to avoid systemd start-rate failures.
