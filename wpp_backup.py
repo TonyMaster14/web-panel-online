@@ -28,7 +28,7 @@ PANEL_FILES = {
     "nodes.json", "routing.json", "site-draft.html", "site-source.html",
 }
 CONFIG_FILES = {"connections.json", "mtproxy-secrets", "primary-secret",
-                "primary-disabled", "users.json", "xray-path"}
+                "primary-disabled", "users.json", "xray-path", "reality-profiles.json"}
 CONFIG_DIRS = {"openflux", "awg"}
 REQUIRED = {"state/config/primary-secret", "state/config/users.json",
             "state/panel/data.json", "state/site/index.html"}
