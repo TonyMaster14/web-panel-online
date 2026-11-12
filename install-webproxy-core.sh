@@ -140,6 +140,10 @@ on_error() {
 }
 trap on_error ERR
 
+wpo_emit_stage() {
+    [[ -n "${WPO_UI_PROGRESS_FILE:-}" && -f "$WPO_UI_PROGRESS_FILE" ]] || return 0
+    printf '%s\t%s\n' "$1" "$2" > "$WPO_UI_PROGRESS_FILE"
+}
 echo "Configuring WEB PANEL ONLINE V ${VERSION}..."
 
 [[ $EUID -eq 0 ]] || die "Run this installer as root."
@@ -199,6 +203,10 @@ if [[ -s /var/lib/tproxy-panel/data.json ]] &&
     echo "      Existing panel account detected; login and password will be retained."
     rm -f /etc/web-proxy-panel/install-credentials
 else
+    if [[ -n "${WPO_UI_CREDENTIALS_FILE:-}" && -s "${WPO_UI_CREDENTIALS_FILE:-}" ]]; then
+        install -o root -g root -m 0600 "$WPO_UI_CREDENTIALS_FILE" /etc/web-proxy-panel/install-credentials
+        echo "      Credentials securely received from WPO installation wizard."
+    else
     echo
     read -r -p "Panel administrator login [admin]: " PANEL_ADMIN
     PANEL_ADMIN="${PANEL_ADMIN:-admin}"
@@ -214,6 +222,7 @@ else
     printf '%s\n%s\n' "$PANEL_ADMIN" "$PANEL_PASS" > /etc/web-proxy-panel/install-credentials
     chmod 0600 /etc/web-proxy-panel/install-credentials
     unset PANEL_PASS
+    fi
 fi
 
 echo
@@ -243,6 +252,7 @@ fi
 valid_secret "$SECRET" || die "Secret generation failed."
 
 echo
+wpo_emit_stage 11 'Проверка Ubuntu'
 echo "[1/10] Checking system..."
 . /etc/os-release
 case "${ID:-}" in
@@ -262,6 +272,7 @@ case "${ID:-}" in
 esac
 
 echo
+wpo_emit_stage 15 'Подготовка компонентов'
 echo "[2/10] Installing dependencies..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o DPkg::Lock::Timeout=600 update
@@ -281,6 +292,7 @@ printf '%s\n' "$MTPROTO_HOST" > /etc/web-proxy-panel/mtproto-host
 chmod 0600 /etc/web-proxy-panel/mtproto-host
 
 echo
+wpo_emit_stage 24 'Проверка портов'
 echo "[3/10] Checking ports..."
 check_install_port 443 caddy
 if EXISTING_MTPROXY_PORT="$(find_mtproxy_port 2>/dev/null)"; then
@@ -304,6 +316,7 @@ elif [[ "$REUSE_CADDY" == "1" ]]; then
 fi
 
 echo
+wpo_emit_stage 27 'Проверка домена'
 echo "[4/10] Checking DNS..."
 if [[ "$REUSE_EXISTING_HTTPS" == "1" ]]; then
     DNS_IP="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')"
@@ -322,6 +335,7 @@ else
     echo "      $DOMAIN -> $DNS_IP"
 fi
 
+wpo_emit_stage 31 'Настройка сайта'
 echo "[5/10] Creating public site..."
 if [[ -s "$SITE_TARGET/index.html" ]]; then
     PRESERVE_SITE=1
@@ -402,6 +416,7 @@ echo "      OK"
 fi
 
 echo
+wpo_emit_stage 36 'Настройка Telegram Proxy'
 echo "[6/10] Installing Telegram Web Proxy components..."
 
 
@@ -1094,6 +1109,7 @@ else
 fi
 
 echo
+wpo_emit_stage 50 'Проверка прокси-служб'
 echo "[9/10] Running health checks..."
 curl -fsS --max-time 5 http://127.0.0.1:8081/healthz >/dev/null ||
     die "tproxy-server healthz failed."
