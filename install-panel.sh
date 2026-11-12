@@ -5054,7 +5054,8 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
-# Keep access URL/login/password/API token out of the permanent installer log.
+# Show ONLY the original three fields: panel URL, administrator login and password.
+# The node API token remains internal to node management and is not shown here.
 # In wizard mode, write only to the root-only /run result file; the wrapper
 # prints this card after the entire Nodes Lab installation has succeeded.
 {
