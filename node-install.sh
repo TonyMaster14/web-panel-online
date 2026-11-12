@@ -3217,6 +3217,37 @@ for version in (2,10,11,12,13,20,23):
     path.write_text(content.replace(old,new),encoding='utf-8')
 PY_PIN
 
+# The complete installation package already carries the exact helper files.
+# Never download the same Node Agent/geolocation/template files again inside
+# the legacy nested steps: use the checked local snapshot instead.
+python3 - "$STAGE" <<'PY_LOCAL_DEPS'
+from pathlib import Path
+import re, shlex, sys
+root=Path(sys.argv[1])
+assets={
+    2:'wpo-node-agent-install-v2.sh',
+    10:'wpo-node-agent-install-v2.sh',
+    11:'wpo-node-agent-install-v2.sh',
+    12:'wpo-node-agent-install-v2.sh',
+    13:'wpo-node-geo-v13.py',
+    20:'wpo-node-autotemplate-v20.py',
+    23:'wpo-node-agent-install-v2.sh',
+}
+pattern=re.compile(r'''(?m)^curl -4fsSL --retry 3 --connect-timeout \d+ (?:\\\n[ \t]*)?['"]https://raw\.githubusercontent\.com/TonyMaster14/web-panel-online/[^'"\n]+/(?P<asset>wpo-node-agent-install-v2\.sh|wpo-node-geo-v13\.py|wpo-node-autotemplate-v20\.py)['"] -o "\$TMP"$''')
+for version,asset in assets.items():
+    path=root/f'wpo-nodes-lab-v{version}-install.sh'
+    original=path.read_text(encoding='utf-8')
+    packaged=root/asset
+    if not packaged.is_file() or packaged.stat().st_size==0:
+        raise RuntimeError('Нет упакованного файла: '+asset)
+    found=list(pattern.finditer(original))
+    if len(found)!=1 or found[0].group('asset')!=asset:
+        raise RuntimeError('Неожиданная повторная загрузка: '+path.name)
+    replacement='cp -- '+shlex.quote(str(packaged))+' "$TMP"'
+    path.write_text(pattern.sub(lambda m:replacement,original),encoding='utf-8')
+print('Вспомогательные файлы Node Agent берутся из локального пакета.')
+PY_LOCAL_DEPS
+
 # A clean installation already has a healthy running controller. Apply the
 # checked source patches without restarting it after every intermediate edit.
 # The controller is restarted once when the complete final code is ready.
