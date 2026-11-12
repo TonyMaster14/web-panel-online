@@ -62,6 +62,10 @@ jobs:
         shell: bash
         run: |
           python3 tests/test_installer_progress.py
+      - name: Verify bundled Node helpers replace remote downloads
+        shell: bash
+        run: |
+          python3 tests/test_node_bundled_downloads.py
       - name: Verify all 26 embedded stages, exact legacy files
         shell: bash
         run: |
