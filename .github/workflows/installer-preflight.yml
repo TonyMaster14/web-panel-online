@@ -21,6 +21,26 @@ jobs:
             bash -n "$script"
           done
           python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py wpo-node-geo-v13.py wpo-node-autotemplate-v20.py wpo-relay-zero-profiles-patch.py
+          python3 -m py_compile wpp_connections.py wpp_reality.py
+          python3 -m unittest discover -s tests -p 'test_reality.py' -v
+      - name: Проверка встроенного Python установщика и панели
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import py_compile
+          import tempfile
+          script=Path("install-panel.sh").read_text(encoding="utf-8")
+          for marker in ('cat > "$MANAGER" <<\'PY\'', 'cat > "$APP_FILE" <<\'PY\''):
+              assert script.count(marker)==1, "Expected exactly one "+marker
+              source=script.split(marker,1)[1].split("\\nPY\\n",1)[0]
+              assert source.startswith("\\n"), "Missing source block after "+marker
+              with tempfile.NamedTemporaryFile(mode="w",suffix=".py",encoding="utf-8") as f:
+                  f.write(source)
+                  f.flush()
+                  py_compile.compile(f.name,doraise=True)
+          print("PASS: embedded manager and panel Python source syntax")
+          PY
       - name: Сверка 26 встроенных Nodes Lab с исходниками
         shell: bash
         run: |
