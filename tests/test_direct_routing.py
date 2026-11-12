@@ -80,7 +80,7 @@ class DirectRouting(unittest.TestCase):
                          allow_subscription_request=lambda client: True, client_id=lambda handler: 'local',
                          SUB_FETCH_SLOTS=threading.BoundedSemaphore(2),
                          happ_import_link=ui.happ_import_link,
-                         load=lambda: {}, primary=lambda: '',
+                         load=lambda: {}, primary=lambda: '', traffic=lambda: {},
                          awg=SimpleNamespace(PROTOCOLS=('awg20', 'awg31')), AWG_AVAILABLE=True)
         tree = ast.parse(PANEL)
         functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
@@ -285,7 +285,8 @@ class DirectRouting(unittest.TestCase):
         self.profile['enabled'] = False
         records = ui.client_records([], self.profiles, {}, 'vpn.example', self.proxy,
                                     self.state['profiles'], self.namespace['direct_profile_url'])
-        self.assertTrue(records[0]['link'].startswith('vless://'))
+        self.assertTrue(records[0]['raw_link'].startswith('vless://'))
+        self.assertEqual(records[0]['link'], ui.happ_import_link(self.profile_url()))
         self.assertEqual(records[0]['routing_url'], '')
 
 
