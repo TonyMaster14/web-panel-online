@@ -20,6 +20,32 @@ jobs:
             bash -n "$script"
           done
           python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py
+      - name: Test one masked password entry and immediate continuation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          source=Path('install.sh').read_text(encoding='utf-8')
+          section=source.split('ask_password(){',1)[1].split('\n# Classic mode remains',1)[0]
+          assert 'Повторите пароль' not in section, 'Second password prompt must be absent'
+          assert section.count('read -r -s -p')==1, 'Password must be read only once'
+          assert section.count('break')==1, 'Valid password must immediately continue'
+          assert '$green' not in source, 'Undefined color variable in wizard'
+          prelude="set -Eeuo pipefail\nstep(){ :; }\ngray=''\nreset=''\nask_password(){"
+          # A single newline must be enough for a valid password; a second read
+          # would fail the test. The test never installs packages or contacts a VPS.
+          script=prelude+section+"\nask_password\n[[ ${PASS} == 'TestPassword123' ]]\n"
+          good=subprocess.run(['bash','-c',script],input='TestPassword123\n',text=True,capture_output=True,timeout=8)
+          assert good.returncode==0, f'Single-password input unexpectedly failed: {good.stderr}'
+          assert 'TestPassword123' not in good.stdout+good.stderr, 'Masked password leaked to terminal output'
+          assert 'Повторите' not in good.stdout+good.stderr, 'Unexpected second input prompt'
+          # A too-short password may be re-entered, but never confirmed twice.
+          retry=subprocess.run(['bash','-c',script],input='ab\nTestPassword123\n',text=True,capture_output=True,timeout=8)
+          assert retry.returncode==0 and 'минимум 3' in retry.stdout, 'Length guard or retry did not work'
+          assert 'TestPassword123' not in retry.stdout+retry.stderr
+          print('PASS: one hidden password accepted, no confirmation, short input retried, secret never echoed')
+          PY
       - name: Verify all 26 embedded stages, exact legacy files
         shell: bash
         run: |
