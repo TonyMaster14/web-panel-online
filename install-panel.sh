@@ -3837,10 +3837,10 @@ class Handler(BaseHTTPRequestHandler):
                     if not raw["id"]: raw.pop("id")
                     if protocol=="vless" and form.get("route","direct")=="reality":
                         raw["config"]={"route":"reality",
-                            "sni":form.get("reality_sni","www.microsoft.com"),
+                            "sni":form.get("reality_sni",existing_config.get("sni","www.microsoft.com")),
                             "address":form.get("reality_address",existing_config.get("address","")),
                             "port":form.get("reality_port",existing_config.get("port",0)),
-                            "fingerprint":form.get("reality_fingerprint","chrome")}
+                            "fingerprint":"firefox"}
                     elif protocol=="vless":
                         provider=form.get("provider","custom")
                         transport=cdn.transport_defaults(provider) if form.get("route","direct")=="cdn" else {"mode":"auto","uplink_method":"post"}
