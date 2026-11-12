@@ -93,7 +93,13 @@ class NodeSniPatchTests(unittest.TestCase):
             page=scope["nodes_ui"]([item],{"country_name":"Finland"},
                 "panel.example.net","/panel-test","csrf",
                 [],[],reality_connection=real)
-            self.assertIn("REALITY SNI:",page)
+            # Node cards stay clean: SNI lives in pencil dialogs, not
+            # visible card text. The local pencil keeps the entrypoint.
+            cards=page.split("</section>",1)[0]
+            self.assertNotIn("REALITY SNI:",cards)
+            self.assertNotIn("запланирован",cards)
+            self.assertIn("Основная нода</p>",cards)
+            self.assertIn("data-wpo-local-sni",cards)
             self.assertIn("www.microsoft.com",page)
             self.assertIn("data-wpo-local-sni",page)
             self.assertIn("data-node-sni=",page)
