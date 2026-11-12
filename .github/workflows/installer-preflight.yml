@@ -23,6 +23,8 @@ jobs:
           python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py wpo-node-geo-v13.py wpo-node-autotemplate-v20.py wpo-relay-zero-profiles-patch.py
           python3 -m py_compile wpp_connections.py wpp_reality.py
           python3 -m unittest discover -s tests -p 'test_reality.py' -v
+          python3 -m unittest discover -s tests -p 'test_connection_json.py' -v
+          python3 -m unittest discover -s tests -p 'test_direct_routing.py' -v
       - name: Проверка встроенного Python установщика и панели
         shell: bash
         run: |
