@@ -1,0 +1,77 @@
+name: WPO unified blue v26 preflight
+on:
+  push:
+    branches:
+      - test/wpo-3-unified-blue-v26
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell syntax and Python sources
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for script in install.sh install-final.sh install-webproxy-core.sh install-panel.sh node-install.sh wpo-happ-vless-title-v1.sh; do
+            bash -n "$script"
+          done
+          python3 -m py_compile wpp_ui.py wpp_nodes.py wpp_routing.py wpp_subscriptions.py wpp_panel_extras.py
+      - name: Verify all 26 embedded stages, exact legacy files
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re,subprocess,tempfile
+          from pathlib import Path
+          src=Path('node-install.sh').read_text(encoding='utf-8')
+          pattern=re.compile(r'^cat > "\$STAGE/(?P<name>wpo-nodes-lab(?:-v\d+)?-install\.sh)" <<\x27(?P<mark>__WPO_EMBED_V\d+_END_736a4b__)\x27\n(?P<body>[\s\S]*?)\n(?P=mark)$', re.M)
+          matches=list(pattern.finditer(src))
+          assert len(matches)==26, f"Expected 26 embedded stages, got {len(matches)}"
+          with tempfile.TemporaryDirectory() as td:
+            for index,item in enumerate(matches,1):
+              name='wpo-nodes-lab-install.sh' if index==1 else f'wpo-nodes-lab-v{index}-install.sh'
+              assert item['name']==name, f'Order mismatch: {name}'
+              actual=item['body'].rstrip('\n')+'\n'
+              expected=Path(name).read_text(encoding='utf-8').rstrip('\n')+'\n'
+              assert actual==expected, f'Embedded source mismatch: {name}'
+              path=Path(td)/name
+              path.write_text(actual,encoding='utf-8')
+              subprocess.run(['bash','-n',str(path)],check=True)
+          print('PASS: all 26 embedded sources are byte-equivalent and shell-valid')
+          PY
+      - name: Verify installer safety, credentials, visual layout, restart and Happ title
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          boot=Path('install.sh').read_text()
+          core=Path('install-webproxy-core.sh').read_text()
+          final=Path('install-final.sh').read_text()
+          panel=Path('install-panel.sh').read_text()
+          node=Path('node-install.sh').read_text()
+          ui=Path('wpp_ui.py').read_text()
+          checks={
+            'test branch pinned': 'test/wpo-3-unified-blue-v26' in boot,
+            'blue wizard': 'МАСТЕР УСТАНОВКИ' in boot and '╭─' in boot,
+            'no large button': 'УСТАНОВИТЬ' not in boot and 'ENTER — установить' in boot,
+            'progress clock': 'elapsed/60' in boot and 'elapsed%60' in boot and 'shortlabel' in boot,
+            'private wizard credentials': 'mktemp /run/wpo-ui-credentials.' in boot and 'chmod 0600 "$CREDENTIALS"' in boot,
+            'legacy VPN core pinned': 'TPROXY_REF="52a5feb7fac38f68da5afef9cedd9b3bfc8473ca"' in core,
+            'core reads wizard credentials': 'WPO_UI_CREDENTIALS_FILE' in core,
+            'core reports stages': 'wpo_emit_stage' in core,
+            'password and token not logged': '} > "${WPO_UI_RESULT_FILE:-/dev/stdout}"' in panel,
+            'wizard only displays result on success': 'if (( code == 0 )); then' in boot and 'cat -- "$RESULT"' in boot,
+            'one node install': 'bash "$BASE/node-install.sh"' in final and 'WPO_NODES_BATCH_RESTART=1' in final,
+            'node failed start reset': 'systemctl reset-failed "$SERVICE"' in node,
+            'node localhost health': '127.0.0.1:8090' in node,
+            'Xray syntax and service checks': 'xray run -test -config' in final and 'web-panel-proxy-xray.service' in final,
+            'Happ title without routing': '# wpo-happ-vless-title-v1' in ui and 'happ_url=direct_profile_url' in ui,
+            'Happ node separate': 'direct_profile_config' in panel and '"profile-title"' in panel,
+          }
+          for k,v in checks.items():
+            print(('PASS' if v else 'FAIL')+' '+k)
+          assert all(checks.values()), 'preflight invariants failed'
+          PY
