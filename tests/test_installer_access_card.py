@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 source = Path("install-panel.sh").read_text(encoding="utf-8")
-marker = "# Финальная карточка: только ссылка, логин и пароль."
+marker = "# Финальная карточка: три строки в одной сетке, подписи и значения разных цветов."
 assert marker in source
 card = source[source.index(marker):]
 assert card.lstrip().startswith(marker)
