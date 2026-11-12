@@ -5070,22 +5070,6 @@ echo
 echo "Panel URL:"
 echo "  https://${DOMAIN}${PANEL_PATH}/login"
 echo
-NODE_API_TOKEN="$(python3 - "$DOMAIN" <<'PY'
-import sys
-sys.path.insert(0,"/opt/tproxy-panel")
-import wpp_nodes
-try:
-    key=open("/var/lib/tproxy-panel/api.key",encoding="ascii").read().strip()
-    print(wpp_nodes.make_connection_token(sys.argv[1],key))
-except (OSError,ValueError):
-    pass
-PY
-)"
-if [[ "$UPDATING" != "1" && "$NODE_API_TOKEN" == wppnode1_* ]]; then
-echo "Node API token:"
-echo "  ${NODE_API_TOKEN}"
-echo
-fi
 echo "Administrator login:"
 echo "  ${ADMIN}"
 echo
