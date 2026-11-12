@@ -109,5 +109,37 @@ class RealityTests(unittest.TestCase):
             reality.server_inbound(self.item(), [], {"private_key": "x"})
 
 
+    def test_sni_preset_choices_and_manual_address(self):
+        import wpp_ui as ui
+        candidates = (
+            "www.microsoft.com", "www.apple.com", "www.cloudflare.com",
+            "www.mozilla.org", "www.wikipedia.org",
+        )
+        markup = ui.connections_ui([self.item()], [], "/panel-test", "csrf")
+        self.assertIn('name="reality_preset"', markup)
+        self.assertIn('name="reality_sni"', markup)
+        self.assertIn('value="custom"', markup)
+        for hostname in candidates:
+            self.assertIn('<option value="' + hostname + '">', markup)
+            raw = self.item()
+            raw["config"]["sni"] = hostname
+            normalized = con.validate(raw, existing=raw)
+            self.assertEqual(normalized["config"]["sni"], hostname)
+        raw = self.item()
+        raw["config"]["sni"] = "example.org"
+        raw["config"]["address"] = "203.0.113.10"
+        normalized = con.validate(raw, existing=raw)
+        self.assertEqual(normalized["config"]["address"], "203.0.113.10")
+        profile = {
+            "private_key": "a" * 43,
+            "public_key": "b" * 43,
+            "short_id": "0123456789abcdef",
+        }
+        link = reality.client_link("8b888888-8888-4888-8888-888888888888",
+                                   "panel.example.net", "test", normalized, profile)
+        self.assertEqual(urlparse(link).hostname, "203.0.113.10")
+        self.assertEqual(parse_qs(urlparse(link).query)["sni"][0], "example.org")
+
+
 if __name__ == "__main__":
     unittest.main()
