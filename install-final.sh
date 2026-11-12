@@ -69,11 +69,26 @@ echo "434198ea0558bc440379e9a0a97f6904ba8dd6b213dd6fb9d578388eba7d2f12  $BASE/as
 command -v flock >/dev/null 2>&1 || die "flock is required (package: util-linux)."
 exec 9>/run/lock/web-panel-proxy.lock
 flock -n 9 || die "Another WEB PANEL ONLINE install, update or removal is already running."
+# Keep the installer access card in root-only RAM until every service and
+# Nodes Lab check has passed. The wizard owns its own result file; classic
+# installs use a temporary file owned by this process instead.
+WPO_FINAL_SUMMARY_OWNED=0
+if [[ -z "${WPO_UI_RESULT_FILE:-}" ]]; then
+    WPO_UI_RESULT_FILE="$(mktemp /run/wpo-install-result.XXXXXXXX)"
+    chmod 0600 "$WPO_UI_RESULT_FILE"
+    export WPO_UI_RESULT_FILE
+    WPO_FINAL_SUMMARY_OWNED=1
+fi
 cleanup_credentials() {
     if [[ -f /etc/web-proxy-panel/install-credentials ]]; then
         command -v shred >/dev/null 2>&1 && shred -u /etc/web-proxy-panel/install-credentials 2>/dev/null || \
             rm -f /etc/web-proxy-panel/install-credentials
     fi
+    if [[ "$WPO_FINAL_SUMMARY_OWNED" == 1 && -f "$WPO_UI_RESULT_FILE" ]]; then
+        command -v shred >/dev/null 2>&1 && shred -u -- "$WPO_UI_RESULT_FILE" 2>/dev/null || \
+            rm -f -- "$WPO_UI_RESULT_FILE"
+    fi
+    return 0
 }
 finish_install() { local code=$?; cleanup_credentials; wpp_progress_finish "$code"; }
 trap finish_install EXIT
@@ -176,3 +191,10 @@ echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
 wpp_progress 100 "Установка завершена"
 printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
 chmod 0600 /etc/web-proxy-panel/version
+# Print credentials only after the full installation succeeds.
+# In wizard mode, install.sh displays this same card as its final screen.
+[[ -s "$WPO_UI_RESULT_FILE" ]] || die "Access card was not created by panel installer."
+if [[ "$WPO_FINAL_SUMMARY_OWNED" == 1 ]]; then
+    printf '\n'
+    cat -- "$WPO_UI_RESULT_FILE"
+fi
