@@ -25,6 +25,32 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_reality.py' -v
           python3 -m unittest discover -s tests -p 'test_connection_json.py' -v
           python3 -m unittest discover -s tests -p 'test_direct_routing.py' -v
+      - name: Реальный HAProxy и Caddy — конфигурация общего TCP/443
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends haproxy caddy
+          python3 - <<'PY'
+          import subprocess, tempfile
+          from pathlib import Path
+          import wpp_reality as reality
+          with tempfile.TemporaryDirectory() as folder:
+              root=Path(folder)
+              caddy=root/'Caddyfile'
+              caddy.write_text(reality.configure_caddy_mux(
+                  '{\n    auto_https disable_redirects\n}\n\nvpn.example.net {\n    respond "READY"\n}\n',True))
+              result=subprocess.run(['caddy','validate','--config',str(caddy),'--adapter','caddyfile'],
+                                    capture_output=True,text=True)
+              print(result.stdout,result.stderr)
+              assert result.returncode==0,'Caddy rejected internal HTTPS/18443'
+              haproxy=root/'haproxy.cfg'
+              haproxy.write_text(reality.haproxy_config('www.microsoft.com',ipv6=False))
+              result=subprocess.run(['haproxy','-c','-f',str(haproxy)],capture_output=True,text=True)
+              print(result.stdout,result.stderr)
+              assert result.returncode==0,'HAProxy rejected TLS SNI mux'
+          print('PASS: real Caddy + HAProxy accept shared-443 configuration')
+          PY
       - name: Xray REALITY + Vision — проверка настоящим ядром
         shell: bash
         run: |
