@@ -119,13 +119,15 @@ class RealityTests(unittest.TestCase):
         candidates = (
             "www.microsoft.com", "www.apple.com", "www.google.com",
             "www.amazon.com", "www.wikipedia.org",
+            "www.yahoo.com", "www.nvidia.com",
         )
         markup = ui.connections_ui([self.item()], [], "/panel-test", "csrf")
-        self.assertIn('name="reality_preset"', markup)
-        self.assertIn('name="reality_sni"', markup)
-        self.assertIn('value="custom"', markup)
+        self.assertNotIn('name="reality_preset"', markup)
+        self.assertIn('type="hidden" name="reality_sni"', markup)
+        self.assertIn('Mozilla Firefox', markup)
+        self.assertIn('name="reality_port"', markup)
+        self.assertTrue(set(candidates).issubset({name for name, _ in reality.SNI_CANDIDATES}))
         for hostname in candidates:
-            self.assertIn('<option value="' + hostname + '">', markup)
             raw = self.item()
             raw["config"]["sni"] = hostname
             normalized = con.validate(raw, existing=raw)
