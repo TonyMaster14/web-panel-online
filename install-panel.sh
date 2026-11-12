@@ -2953,7 +2953,11 @@ def connections_with_runtime(connections):
         protocol=item.get("protocol")
         cfg=item.get("config") if isinstance(item.get("config"),dict) else {}
         tag=connection_store.inbound_tag(item) if protocol in ("vless","hysteria") else ""
-        if tag and tag in by_tag: item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
+        if tag and tag in by_tag:
+            item["runtime_inbound"]=copy.deepcopy(by_tag[tag])
+            if reality.is_reality(item):
+                # REALITY private keys are server-only; never serialize them to UI.
+                item["runtime_inbound"].get("streamSettings",{}).get("realitySettings",{}).pop("privateKey",None)
         elif tag:
             bucket=connection_store._xray_bucket(item)
             if protocol=="vless" and cfg.get("route")=="reality":
