@@ -204,54 +204,54 @@ def configure_caddy_mux(source, enabled):
     if source.count(MUX_BEGIN) != source.count(MUX_END) or source.count(MUX_BEGIN) > 1:
         raise RealityError("Повреждены маркеры маршрутизатора в Caddyfile.")
     managed = re.compile(
-        r"(?m)^[ \\t]*" + re.escape(MUX_BEGIN)
-        + r"\\n(?:.*\\n)*?^[ \\t]*" + re.escape(MUX_END) + r"\\n?"
+        r"(?m)^[ \t]*" + re.escape(MUX_BEGIN)
+        + r"\n(?:.*\n)*?^[ \t]*" + re.escape(MUX_END) + r"\n?"
     )
     clean = managed.sub("", source)
     if not enabled:
         return clean
-    if re.search(r"(?m)^\\s*(?:https_port|default_bind)\\s+", clean):
+    if re.search(r"(?m)^\s*(?:https_port|default_bind)\s+", clean):
         raise RealityError("В Caddy уже настроены https_port/default_bind. Автоматический TLS-маршрутизатор не будет менять чужую конфигурацию.")
-    if re.search(r"(?m)^\\s*bind\\s+", clean):
+    if re.search(r"(?m)^\s*bind\s+", clean):
         raise RealityError("В Caddy есть пользовательские bind: безопасный перенос на внутренний HTTPS-порт требует отдельной проверки.")
-    directive = ("    " + MUX_BEGIN + "\\n"
-                 "    https_port " + str(CADDY_BACKEND_PORT) + "\\n"
-                 "    default_bind 127.0.0.1\\n"
-                 "    " + MUX_END + "\\n")
+    directive = ("    " + MUX_BEGIN + "\n"
+                 "    https_port " + str(CADDY_BACKEND_PORT) + "\n"
+                 "    default_bind 127.0.0.1\n"
+                 "    " + MUX_END + "\n")
     # A global options block in Caddy is denoted by a bare opening brace.
-    global_block = re.search(r"(?m)^\\{[ \\t]*\\r?\\n", clean)
+    global_block = re.search(r"(?m)^\{[ \t]*\r?\n", clean)
     if global_block:
         position = global_block.end()
         return clean[:position] + directive + clean[position:]
-    return "{\\n" + directive + "}\\n\\n" + clean
+    return "{\n" + directive + "}\n\n" + clean
 
 
 def haproxy_config(sni, ipv6=True):
     """Generate a strict, transparent TCP router; no TLS termination."""
     if not isinstance(sni, str) or not re.fullmatch(r"[a-z0-9.-]{4,253}", sni) or "." not in sni:
         raise RealityError("Недопустимый SNI для HAProxy.")
-    listeners = "    bind 0.0.0.0:443\\n"
+    listeners = "    bind 0.0.0.0:443\n"
     if ipv6:
-        listeners += "    bind :::443 v6only\\n"
+        listeners += "    bind :::443 v6only\n"
     return (
-        "# Managed by WEB PANEL ONLINE. Do not edit by hand.\\n"
-        "global\\n"
-        "    maxconn 10000\\n\\n"
-        "defaults\\n"
-        "    mode tcp\\n"
-        "    timeout connect 5s\\n"
-        "    timeout client 1h\\n"
-        "    timeout server 1h\\n"
-        "    timeout tunnel 24h\\n\\n"
-        "frontend wpo_tls_443\\n"
+        "# Managed by WEB PANEL ONLINE. Do not edit by hand.\n"
+        "global\n"
+        "    maxconn 10000\n\n"
+        "defaults\n"
+        "    mode tcp\n"
+        "    timeout connect 5s\n"
+        "    timeout client 1h\n"
+        "    timeout server 1h\n"
+        "    timeout tunnel 24h\n\n"
+        "frontend wpo_tls_443\n"
         + listeners
-        + "    mode tcp\\n"
-        "    tcp-request inspect-delay 5s\\n"
-        "    tcp-request content accept if { req.ssl_hello_type 1 }\\n"
-        + "    use_backend wpo_reality if { req.ssl_sni -i " + sni + " }\\n"
-        "    default_backend wpo_caddy\\n\\n"
-        "backend wpo_reality\\n"
-        "    server xray 127.0.0.1:" + str(REALITY_BACKEND_PORT) + " check\\n\\n"
-        "backend wpo_caddy\\n"
-        "    server caddy 127.0.0.1:" + str(CADDY_BACKEND_PORT) + " check\\n"
+        + "    mode tcp\n"
+        "    tcp-request inspect-delay 5s\n"
+        "    tcp-request content accept if { req.ssl_hello_type 1 }\n"
+        + "    use_backend wpo_reality if { req.ssl_sni -i " + sni + " }\n"
+        "    default_backend wpo_caddy\n\n"
+        "backend wpo_reality\n"
+        "    server xray 127.0.0.1:" + str(REALITY_BACKEND_PORT) + " check\n\n"
+        "backend wpo_caddy\n"
+        "    server caddy 127.0.0.1:" + str(CADDY_BACKEND_PORT) + " check\n"
     )
