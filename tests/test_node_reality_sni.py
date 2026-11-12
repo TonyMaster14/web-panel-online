@@ -82,7 +82,7 @@ class NodeSniPatchTests(unittest.TestCase):
             compile(patched_panel,str(panel),"exec")
             self.assertIn('selected["reality_sni"]=requested_sni',patched_panel)
             self.assertIn("reality_connection=connection_store.get(",patched_panel)
-            self.assertIn("reality.DEFAULT_SNI",patched_panel)
+            self.assertIn('form.get("reality_sni","")',patched_panel)
             scope={"__name__":"node_sni_fixture"}
             exec(compile(patched_ui,str(ui),"exec"),scope)
             item={"id":"node-test","name":"Test node","country_name":"Czechia",
