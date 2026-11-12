@@ -383,6 +383,34 @@ if ! command -v qrencode >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 |
     apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends qrencode unzip xz-utils
 fi
 
+# The default HAProxy unit and its config are never modified. WPO owns a
+# separate, dormant systemd unit which becomes active only for REALITY/443.
+if ! command -v haproxy >/dev/null 2>&1; then
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends haproxy
+fi
+command -v haproxy >/dev/null 2>&1 || die "HAProxy is required for REALITY sharing TCP/443."
+cat > /etc/systemd/system/web-panel-proxy-tls-mux.service <<'WPO_TLS_MUX_UNIT'
+[Unit]
+Description=WEB PANEL ONLINE TCP/443 TLS SNI passthrough (Caddy + REALITY)
+After=network-online.target caddy.service web-panel-proxy-xray.service
+Wants=network-online.target caddy.service web-panel-proxy-xray.service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/haproxy -db -f /etc/web-proxy-panel/tls-mux.cfg
+ExecStartPre=/usr/sbin/haproxy -c -f /etc/web-proxy-panel/tls-mux.cfg
+Restart=on-failure
+RestartSec=2
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+WPO_TLS_MUX_UNIT
+chmod 0644 /etc/systemd/system/web-panel-proxy-tls-mux.service
+
 install -d -m 0755 "$APP_DIR" /etc/web-proxy-panel
 install -d -m 0700 "$DATA_DIR"
 install -o root -g root -m 0644 "$LOGO_SOURCE" "$LOGO_FILE"
