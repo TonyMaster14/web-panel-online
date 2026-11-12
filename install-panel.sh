@@ -5054,28 +5054,41 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
-# Финальная карточка: только ссылка, логин и пароль. Токен ноды не показывать.
-# Данные выводятся из защищённого файла лишь ПОСЛЕ успеха всей установки.
+# Финальная карточка: три строки в одной сетке, подписи и значения разных цветов.
+# Не включать Node API токен. Карточка выводится только после успешной установки.
 {
-echo
-printf '  ╭──────────────────────────────────────────────────────────────╮\n'
-if [[ "$UPDATING" == "1" ]]; then
-    printf '  │           WEB PANEL ONLINE 3.0 — ОБНОВЛЕНО                  │\n'
-else
-    printf '  │           WEB PANEL ONLINE 3.0 — УСТАНОВЛЕНО                │\n'
-fi
-printf '  ╰──────────────────────────────────────────────────────────────╯\n'
-echo
-printf '  Ссылка на панель: https://%s%s/login\n' "$DOMAIN" "$PANEL_PATH"
-echo
-printf '  Логин : %s\n' "$ADMIN"
-echo
-if [[ "$UPDATING" == "1" ]]; then
-    printf '  Пароль : сохранён (без изменений)\n'
-else
-    printf '  Пароль : %s\n' "$PASS"
-fi
-echo
-printf '  Сохраните данные,что бы не потерять!\n'
-echo
+    card_blue=$'\033[38;5;75m'
+    card_label=$'\033[38;5;153m'
+    card_value=$'\033[38;5;51m'
+    card_bold=$'\033[1m'
+    card_reset=$'\033[0m'
+    if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
+        card_blue='' card_label='' card_value='' card_bold='' card_reset=''
+    fi
+
+    printf '\n  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$card_blue" "$card_reset"
+    if [[ "$UPDATING" == 1 ]]; then
+        printf '  %s│%s           WEB PANEL ONLINE 3.0 — ОБНОВЛЕНО                  %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
+    else
+        printf '  %s│%s           WEB PANEL ONLINE 3.0 — УСТАНОВЛЕНО                %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
+    fi
+    printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$card_blue" "$card_reset"
+
+    # One horizontal baseline per entry; all values begin in the same column.
+    # Pad only the visible label before applying separate ANSI colors.
+    card_row(){
+        local label="$1" value="$2"
+        printf '  %s%-19s%s %s%s%s\n' "$card_label" "$label" "$card_reset" "$card_value" "$value" "$card_reset"
+    }
+    printf '\n'
+    card_row 'Ссылка на панель:' "https://${DOMAIN}${PANEL_PATH}/login"
+    printf '\n'
+    card_row 'Логин :' "$ADMIN"
+    printf '\n'
+    if [[ "$UPDATING" == 1 ]]; then
+        card_row 'Пароль :' 'сохранён (без изменений)'
+    else
+        card_row 'Пароль :' "$PASS"
+    fi
+    printf '\n  %sСохраните данные,что бы не потерять!%s\n\n' "$card_label" "$card_reset"
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
