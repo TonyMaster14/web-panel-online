@@ -51,6 +51,84 @@ jobs:
               assert result.returncode==0,'HAProxy rejected TLS SNI mux'
           print('PASS: real Caddy + HAProxy accept shared-443 configuration')
           PY
+      - name: TCP SNI — живой тест маршрутизации HTTPS и REALITY
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import socket, ssl, subprocess, tempfile, threading, time
+          from pathlib import Path
+          import wpp_reality as reality
+
+          def listener():
+              sock=socket.socket()
+              sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+              sock.bind(("127.0.0.1",0)); sock.listen(8)
+              sock.settimeout(0.5)
+              return sock,sock.getsockname()[1]
+
+          backends={}
+          for name in ("caddy","reality"):
+              server,port=listener()
+              received=threading.Event()
+              backends[name]={"socket":server,"port":port,"received":received}
+              def receive(which=name):
+                  item=backends[which]
+                  deadline=time.monotonic()+12
+                  while time.monotonic()<deadline and not item["received"].is_set():
+                      try: conn,_=item["socket"].accept()
+                      except socket.timeout: continue
+                      except OSError: break
+                      with conn:
+                          conn.settimeout(1)
+                          try: data=conn.recv(4096)
+                          except (OSError,TimeoutError): data=b""
+                          if data and data[:1]==b"\x16":
+                              item["received"].set()
+              threading.Thread(target=receive,daemon=True).start()
+
+          probe,front_port=listener()
+          probe.close()
+          with tempfile.TemporaryDirectory() as folder:
+              cfg=reality.haproxy_config("www.microsoft.com",ipv6=False)
+              cfg=cfg.replace("bind 0.0.0.0:443",f"bind 127.0.0.1:{front_port}")
+              cfg=cfg.replace(f"127.0.0.1:{reality.CADDY_BACKEND_PORT}",f"127.0.0.1:{backends['caddy']['port']}")
+              cfg=cfg.replace(f"127.0.0.1:{reality.REALITY_BACKEND_PORT}",f"127.0.0.1:{backends['reality']['port']}")
+              path=Path(folder)/"haproxy.cfg"; path.write_text(cfg)
+              process=subprocess.Popen(["haproxy","-db","-f",str(path)],
+                                       stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+              try:
+                  # Send genuine TLS ClientHello bytes with their actual SNI,
+                  # not a hand-coded fake header.
+                  for hostname,backend in (("www.microsoft.com","reality"),
+                                           ("vpn.example.net","caddy")):
+                      context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                      context.check_hostname=False
+                      context.verify_mode=ssl.CERT_NONE
+                      inbound,outbound=ssl.MemoryBIO(),ssl.MemoryBIO()
+                      handshake=context.wrap_bio(inbound,outbound,server_side=False,server_hostname=hostname)
+                      try: handshake.do_handshake()
+                      except ssl.SSLWantReadError: pass
+                      hello=outbound.read()
+                      assert hello.startswith(b"\x16") and len(hello)>100,hostname
+                      for attempt in range(30):
+                          try:
+                              with socket.create_connection(("127.0.0.1",front_port),timeout=2) as conn:
+                                  conn.sendall(hello)
+                                  assert backends[backend]["received"].wait(3),f"Wrong backend for {hostname}"
+                              break
+                          except ConnectionRefusedError:
+                              time.sleep(0.1)
+                      else: raise AssertionError("HAProxy frontend not ready")
+                  print("PASS: Microsoft SNI -> REALITY; panel domain SNI -> Caddy")
+              finally:
+                  process.terminate()
+                  try: _,err=process.communicate(timeout=4)
+                  except subprocess.TimeoutExpired:
+                      process.kill(); _,err=process.communicate()
+                  for item in backends.values(): item["socket"].close()
+                  if process.returncode not in (0,-15,-2):
+                      print("HAProxy diagnostics:",err)
+          PY
       - name: Xray REALITY + Vision — проверка настоящим ядром
         shell: bash
         run: |
