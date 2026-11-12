@@ -18,12 +18,12 @@ assert boot.index('started=$SECONDS') < boot.rindex('git clone --depth 1'), "Ela
 assert boot.count('╭──────╮') == 0, "Old separate number tiles must be removed"
 assert 'ШАГ %s/4' not in boot and 'step(){' not in boot, "No extra step headings"
 assert all(p in boot for p in ('Домен:${reset}', 'Email:${reset}', 'Логин:${reset}', 'Пароль (не отображается):${reset}')), "Prompts must be only label + colon"
-assert 'wpp_progress 80 "Установка единого пакета WPO"' in final
+assert 'wpp_progress 80 "Установка нод"' in final
 assert 'wpp_progress 100 "Установка завершена"' in final
 assert final.rindex('[[ -s "$WPO_UI_RESULT_FILE" ]]') < final.rindex('wpp_progress 100 "Установка завершена"'), "100 percent must follow the actual final access-card check"
 assert 'wpo_node_stage "$version"' in nodes
 assert "Ноды: этап" not in nodes, "Internal node stages must not appear in wizard"
-assert "Установка единого пакета WPO" in nodes, "All embedded modules must share one visible stage label"
+assert "Установка нод" in nodes, "All 26 embedded modules must use the single Nodes installation label"
 assert 'wpo_node_stage 12' in nodes
 
 shell = ("set -Eeuo pipefail\n"
@@ -31,7 +31,7 @@ shell = ("set -Eeuo pipefail\n"
     + draw_function + "\n"
     + "draw 36 'Настройка Telegram Proxy' 114\n"
     + "printf '\\033[2B\\r\\n'\n"
-    + "draw 80 'Установка единого пакета WPO' 263\n"
+    + "draw 80 'Установка нод' 263\n"
     + "printf '\\033[2B\\r\\n'\n"
     + "draw 100 'Проверки завершены' 378\n"
     + "printf '\\033[2B\\r\\n'\n"
@@ -41,7 +41,7 @@ assert run.returncode == 0, run.stderr
 plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", run.stdout)
 assert "36%" in plain and "80%" in plain and "100%" in plain, plain
 assert "Этап: Настройка Telegram Proxy" in plain
-assert "Этап: Установка единого пакета WPO" in plain
+assert "Этап: Установка нод" in plain
 assert "◷ 00:01:54" in plain
 assert "◷ 00:04:23" in plain
 assert "◷ 00:06:18" in plain
