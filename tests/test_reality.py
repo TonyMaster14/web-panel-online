@@ -58,11 +58,11 @@ class RealityTests(unittest.TestCase):
 
     def test_secret_storage_and_link(self):
         profile_path = str(self.root / "reality.json")
-        output = "PrivateKey: " + "a"*43 + "\\nPassword: " + "b"*43 + "\\n"
+        output = "PrivateKey: " + "a"*43 + "\nPassword: " + "b"*43 + "\n"
         fake = SimpleNamespace(returncode=0, stdout=output, stderr="")
         with patch.object(reality.subprocess, "run", return_value=fake):
             profile = reality.ensure_profile("vless-reality-primary", "xray", profile_path)
-        self.assertEqual(profile, reality.ensure_profile("vless-reality-primary", str(xray), profile_path))
+        self.assertEqual(profile, reality.ensure_profile("vless-reality-primary", "xray", profile_path))
         self.assertEqual(stat.S_IMODE(Path(profile_path).stat().st_mode), 0o600)
         inbound = reality.server_inbound(self.item(), [{"id": "c" * 36, "flow": "xtls-rprx-vision"}], profile)
         self.assertEqual(inbound["streamSettings"]["security"], "reality")
