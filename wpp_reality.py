@@ -30,6 +30,8 @@ SNI_CANDIDATES = (
     ("www.google.com", "Google"),
     ("www.amazon.com", "Amazon"),
     ("www.wikipedia.org", "Wikipedia"),
+    ("www.yahoo.com", "Yahoo"),
+    ("www.nvidia.com", "NVIDIA"),
 )
 DEFAULT_SNI = SNI_CANDIDATES[0][0]
 
@@ -161,7 +163,7 @@ def client_link(uuid, server, name, connection, profile):
     options = {
         "encryption": "none", "security": "reality",
         "type": "tcp", "sni": cfg["sni"],
-        "fp": cfg.get("fingerprint", "chrome"),
+        "fp": "firefox",
         "pbk": profile["public_key"],
         "sid": profile["short_id"],
         "flow": "xtls-rprx-vision",
