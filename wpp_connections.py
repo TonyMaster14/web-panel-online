@@ -327,6 +327,8 @@ def validate(raw, existing=None):
             port = _integer(config.get("port"), "Порт REALITY", 0, 65535)
             if port and port < 1025 and port != 443:
                 raise ConnectionError("Для REALITY разрешён общий TCP/443 либо отдельный TCP-порт от 1025 до 65535.")
+            if port in {8090, 2398, 2399, 10000, 10001, 10002, 10003, 10004, 10005, 10085, 18443, 24443}:
+                raise ConnectionError("Выбранный TCP-порт занят внутренней службой WPO.")
             fingerprint = str(config.get("fingerprint", "chrome"))
             if fingerprint not in ("chrome", "firefox", "safari"):
                 raise ConnectionError("REALITY: отпечаток должен быть chrome, firefox или safari.")
