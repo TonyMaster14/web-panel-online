@@ -51,7 +51,7 @@ def defaults():
         _base("awg31-primary", "AmneziaWG 3.1 · отдельный профиль", "awg31", port=0),
         _base("naive-primary", "NaiveProxy · отдельный TLS-порт", "naive", port=53000),
         _base("mieru-primary", "Mieru · TCP", "mieru", port=54000, transport="TCP"),
-        _base("vless-reality-primary", "VLESS REALITY · TCP Vision", "vless", route="reality", sni="www.microsoft.com", port=20443, fingerprint="chrome"),
+        _base("vless-reality-primary", "VLESS REALITY · TCP Vision", "vless", route="reality", sni="www.microsoft.com", port=443, fingerprint="chrome"),
     ]
 
 
@@ -325,8 +325,8 @@ def validate(raw, existing=None):
         if route == "reality":
             sni = _host(config.get("sni") or "www.microsoft.com", "SNI REALITY", True)
             port = _integer(config.get("port"), "Порт REALITY", 0, 65535)
-            if port and port < 1025:
-                raise ConnectionError("Для REALITY используйте TCP-порт от 1025 до 65535.")
+            if port and port < 1025 and port != 443:
+                raise ConnectionError("Для REALITY разрешён общий TCP/443 либо отдельный TCP-порт от 1025 до 65535.")
             fingerprint = str(config.get("fingerprint", "chrome"))
             if fingerprint not in ("chrome", "firefox", "safari"):
                 raise ConnectionError("REALITY: отпечаток должен быть chrome, firefox или safari.")
@@ -550,11 +550,13 @@ def claim_reality_port(path, cid):
     current = int(config.get("port", 0) or 0)
     used = {int(row.get("config", {}).get("port", 0) or 0)
             for row in data["connections"] if row.get("id") != cid}
-    # Hysteria2 uses UDP 8443; 443 belongs to Caddy. Reserve a separate range.
-    used.update({443, 8090, 2398, 2399, 10000, 10001, 10002, 10003, 10004, 10005, 10085})
-    if current >= 1025 and current not in used:
+    # HAProxy shares TCP/443 with Caddy using SNI. One REALITY inbound can
+    # claim it; other inbounds keep their independent high ports.
+    used.update({8090, 2398, 2399, 10000, 10001, 10002, 10003, 10004, 10005, 10085, 18443, 24443})
+    if (current == 443 or current >= 1025) and current not in used:
         return item
-    port = next((value for value in range(20443, 20543) if value not in used), None)
+    port = 443 if 443 not in used else next(
+        (value for value in range(20443, 20543) if value not in used), None)
     if port is None:
         raise ConnectionError("Нет свободных портов REALITY.")
     item["config"] = {**config, "port": port}
