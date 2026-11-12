@@ -165,7 +165,9 @@ fi
 echo "Nodes Lab v26: 26 встроенных этапов, один финальный запуск панели."
 wpp_progress 99 "Проверка подключения Xray"
 [[ -s /etc/web-panel-proxy-xray/config.json ]] || die 'Xray config отсутствует.'
-systemctl is-active --quiet web-panel-proxy-xray.service || die 'Xray service не активен.'
+[[ -s /etc/systemd/system/web-panel-proxy-xray.service ]] || die 'Xray service не установлен.'
+# Xray is started on demand when the first VLESS client is created.
+# A fresh panel with zero clients must not fail this installation check.
 /opt/web-panel-proxy/xray/xray run -test -config /etc/web-panel-proxy-xray/config.json >/dev/null 2>&1 || die 'Xray config не прошёл проверку.'
 systemctl is-active --quiet tproxy-panel.service || die 'Панель неактивна после установки нод.'
 
