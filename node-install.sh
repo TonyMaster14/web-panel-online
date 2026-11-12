@@ -3438,6 +3438,44 @@ print("REALITY SNI: основная нода привязана к живому
 PY_NODE_REALITY_SNI
 fi
 
+# Upgrade test VPSs that previously installed the SNI labels on the card.
+# Do not touch the 26 base Nodes Lab patches or change the stored SNI.
+if grep -Fq '# wpo-node-reality-sni-settings' "$UI" &&
+   ! grep -Fq '# wpo-node-sni-editor-only-v2' "$UI"; then
+    echo '→ Убираю подпись SNI с карточек; оставляю в настройках'
+    TOUCHED=1
+    python3 - "$UI" <<'PY_NODE_SNI_CLEAN_CARD'
+from pathlib import Path
+import sys
+path=Path(sys.argv[1])
+source=path.read_text(encoding="utf-8")
+old_local=(
+    '<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">'
+    'Основная нода</p></div><div class="wpo-node-sni-row">'
+    '<span>REALITY SNI: <code>{esc(local_sni)}</code></span>{local_edit}</div>'
+)
+new_local=(
+    '<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">'
+    'Основная нода</p>{local_edit}</div>'
+)
+old_remote=(
+    '<p class="wpo-node-sni-pending" title="VPN на этой ноде пока не развёрнут">'
+    'REALITY SNI: {esc(node_sni)} · запланирован</p>'
+)
+if source.count(old_local)>1 or source.count(old_remote)>1:
+    raise RuntimeError("Неожиданная разметка нод. Исходный интерфейс сохранён.")
+source=source.replace(old_local,new_local).replace(old_remote,"")
+if "REALITY SNI:" in source:
+    raise RuntimeError("Обнаружена другая подпись SNI на карточках. Ничего не изменено.")
+source+="\n# wpo-node-sni-editor-only-v2\n"
+compile(source,str(path),"exec")
+tmp=path.with_suffix(".py.sni-card-tmp")
+tmp.write_text(source,encoding="utf-8")
+tmp.chmod(path.stat().st_mode & 0o777)
+tmp.replace(path)
+PY_NODE_SNI_CLEAN_CARD
+fi
+
 for file in "$PANEL" "$UI" "$GEO" "$AUTO"; do [[ -s "$file" ]] || die "Отсутствует файл: $file"; done
 # Validate the final generated-node installer and controller feature set.
 grep -Fq 'node-agent-installer.sh' "$PANEL" || die 'Нет маршрута установщика ноды.'
