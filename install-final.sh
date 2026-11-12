@@ -187,13 +187,15 @@ wpp_progress 99 "Проверка подключения Xray"
 systemctl is-active --quiet tproxy-panel.service || die 'Панель неактивна после установки нод.'
 
 
-echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
-wpp_progress 100 "Установка завершена"
+# Do not report 100% until all checks, version writing and the private
+# access card have completed successfully.
 printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
 chmod 0600 /etc/web-proxy-panel/version
+[[ -s "$WPO_UI_RESULT_FILE" ]] || die "Access card was not created by panel installer."
+echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
+wpp_progress 100 "Установка завершена"
 # Print credentials only after the full installation succeeds.
 # In wizard mode, install.sh displays this same card as its final screen.
-[[ -s "$WPO_UI_RESULT_FILE" ]] || die "Access card was not created by panel installer."
 if [[ "$WPO_FINAL_SUMMARY_OWNED" == 1 ]]; then
     printf '\n'
     cat -- "$WPO_UI_RESULT_FILE"
