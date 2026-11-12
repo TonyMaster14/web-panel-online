@@ -41,13 +41,16 @@ class RealityTests(unittest.TestCase):
                 con.validate(value, existing=value)
         value = self.item()
         value["config"]["port"] = 443
-        with self.assertRaises(con.ConnectionError):
-            con.validate(value, existing=value)
+        self.assertEqual(con.validate(value, existing=value)["config"]["port"], 443)
+        for port in (1, 80, 442):
+            value["config"]["port"] = port
+            with self.assertRaises(con.ConnectionError):
+                con.validate(value, existing=value)
 
     def test_persistent_port_and_regular_user(self):
         connection = self.item()
         con.claim_reality_port(self.registry, connection["id"])
-        self.assertEqual(self.item()["config"]["port"], 20443)
+        self.assertEqual(self.item()["config"]["port"], 443)
         request = con.request_for_connection(connection)
         self.assertEqual(request["protocol"], "vless")
         self.assertEqual(request["vless_route"], "direct")
@@ -68,6 +71,8 @@ class RealityTests(unittest.TestCase):
         self.assertEqual(inbound["streamSettings"]["security"], "reality")
         self.assertEqual(inbound["streamSettings"]["network"], "raw")
         self.assertEqual(inbound["streamSettings"]["realitySettings"]["privateKey"], profile["private_key"])
+        self.assertEqual(inbound["listen"], "127.0.0.1")
+        self.assertEqual(inbound["port"], reality.REALITY_BACKEND_PORT)
         link = reality.client_link("8b888888-8888-4888-8888-888888888888",
                                    "vpn.example.com", "test", self.item(), profile)
         uri = urlparse(link)
@@ -139,6 +144,53 @@ class RealityTests(unittest.TestCase):
                                    "panel.example.net", "test", normalized, profile)
         self.assertEqual(urlparse(link).hostname, "203.0.113.10")
         self.assertEqual(parse_qs(urlparse(link).query)["sni"][0], "example.org")
+
+
+    def test_shared_443_routing_and_caddy_restore(self):
+        rows = con.defaults()
+        cid = rows[-1]["id"]
+        self.assertEqual(reality.shared_443_sni(rows, {cid}, "vpn.example.net"), "www.microsoft.com")
+        self.assertEqual(reality.shared_443_sni(rows, set(), "vpn.example.net"), "")
+        self.assertEqual(reality.shared_443_sni(rows, {"vless-direct"}, "vpn.example.net"), "")
+        original = "{\n    auto_https disable_redirects\n}\n\nvpn.example.net {\n    respond \"OK\"\n}\n"
+        switched = reality.configure_caddy_mux(original, True)
+        self.assertIn("https_port 18443", switched)
+        self.assertIn("default_bind 127.0.0.1", switched)
+        self.assertIn("auto_https disable_redirects", switched)
+        self.assertEqual(reality.configure_caddy_mux(switched, True), switched)
+        self.assertEqual(reality.configure_caddy_mux(switched, False), original)
+        # Global block creation also works when the input has none.
+        plain = 'vpn.example.net {\n    respond "OK"\n}\n'
+        generated = reality.configure_caddy_mux(plain, True)
+        self.assertTrue(generated.startswith("{\n"))
+        self.assertNotIn(reality.MUX_BEGIN, reality.configure_caddy_mux(generated, False))
+        self.assertIn("vpn.example.net {", generated)
+
+    def test_haproxy_is_tcp_passthrough_and_ipv6_safe(self):
+        cfg = reality.haproxy_config("www.microsoft.com", ipv6=True)
+        self.assertIn("bind 0.0.0.0:443", cfg)
+        self.assertIn("bind :::443 v6only", cfg)
+        self.assertIn("req.ssl_sni -i www.microsoft.com", cfg)
+        self.assertIn("default_backend wpo_caddy", cfg)
+        self.assertIn("127.0.0.1:18443", cfg)
+        self.assertIn("127.0.0.1:24443", cfg)
+        self.assertNotIn("ssl crt", cfg)
+        self.assertNotIn("bind :::443", reality.haproxy_config("www.microsoft.com", ipv6=False))
+
+    def test_shared_443_rejects_duplicate_inbounds_and_own_domain(self):
+        primary = self.item()
+        primary["config"]["sni"] = "vpn.example.net"
+        with self.assertRaises(reality.RealityError):
+            reality.shared_443_sni([primary], {primary["id"]}, "vpn.example.net")
+        extra = self.item()
+        extra["id"] = "second-reality"
+        extra["config"]["port"] = 443
+        with self.assertRaises(reality.RealityError):
+            reality.shared_443_sni([self.item(), extra],
+                                   {"vless-reality-primary", "second-reality"},
+                                   "vpn.example.net")
+        with self.assertRaises(reality.RealityError):
+            reality.configure_caddy_mux("{\n    https_port 9000\n}\n", True)
 
 
 if __name__ == "__main__":
