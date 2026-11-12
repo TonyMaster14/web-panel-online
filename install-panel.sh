@@ -951,18 +951,32 @@ def sync_profiles(d):
         raise RuntimeError("tproxy-server config check failed: "+(c.stderr or c.stdout)[-2000:])
     os.replace(tmp,PROFILES)
 
-def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
-    """Validate both candidates, activate together, restore both on failure."""
+def activate_xray_config(config, caddy_text=None, validation_inbounds=None, tls_mux_sni=""):
+    """Validate Xray/Caddy/HAProxy, activate and roll back the owned services."""
     previous=None
     if os.path.exists(XRAY_CONFIG):
         with open(XRAY_CONFIG,"rb") as stream: previous=stream.read()
     with open(CADDYFILE,encoding="utf-8") as stream: old_caddy=stream.read()
-    caddy_changed=caddy_text is not None and caddy_text!=old_caddy
+    old_mux=wpp_reality.caddy_mux_enabled(old_caddy)
+    wanted_mux=bool(tls_mux_sni)
+    proposed_caddy=caddy_text if caddy_text is not None else old_caddy
+    proposed_caddy=wpp_reality.configure_caddy_mux(proposed_caddy,wanted_mux)
+    caddy_changed=proposed_caddy!=old_caddy
     active=run("systemctl","is-active","--quiet",XRAY_SERVICE).returncode==0
     enabled=run("systemctl","is-enabled","--quiet",XRAY_SERVICE).returncode==0
+    router_service=wpp_reality.ROUTER_SERVICE
+    router_file=wpp_reality.ROUTER_CONFIG
+    router_active=run("systemctl","is-active","--quiet",router_service).returncode==0
+    router_enabled=run("systemctl","is-enabled","--quiet",router_service).returncode==0
+    old_router=None
+    if os.path.exists(router_file):
+        with open(router_file,"rb") as stream: old_router=stream.read()
     tmp=os.path.splitext(XRAY_CONFIG)[0]+".tmp.json"
     caddy_tmp=CADDYFILE+".xray-tmp"
+    router_tmp=router_file+".candidate"
     replaced=False
+    runtime_touched=False
+    router_file_changed=False
     try:
         candidate=copy.deepcopy(config)
         candidate["inbounds"]=candidate.get("inbounds",[])+list(validation_inbounds or [])
@@ -973,13 +987,31 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
         if validation_inbounds:
             with open(tmp,"w",encoding="utf-8") as stream: json.dump(config,stream,indent=2,allow_nan=False)
         if caddy_changed:
-            with open(caddy_tmp,"w",encoding="utf-8") as stream: stream.write(caddy_text)
+            with open(caddy_tmp,"w",encoding="utf-8") as stream: stream.write(proposed_caddy)
             shutil.copystat(CADDYFILE,caddy_tmp)
             shutil.chown(caddy_tmp,user="root",group="caddy")
             result=run("caddy","validate","--config",caddy_tmp,"--adapter","caddyfile",timeout=30)
             if result.returncode: raise ValueError("Caddy не принял настройки: "+(result.stderr or result.stdout)[-2000:])
+        if wanted_mux:
+            if not shutil.which("haproxy"):
+                raise RuntimeError("HAProxy не установлен; повторите установщик тестовой ветки.")
+            if not os.path.isfile("/etc/systemd/system/"+router_service):
+                raise RuntimeError("Не установлена служба TLS-маршрутизатора.")
+            ipv6=os.path.isfile("/proc/net/if_inet6") and bool(open("/proc/net/if_inet6",encoding="ascii").read().strip())
+            wanted_router=wpp_reality.haproxy_config(tls_mux_sni,ipv6=ipv6).encode("ascii")
+            if wanted_router!=old_router:
+                with open(router_tmp,"wb") as stream: stream.write(wanted_router)
+                os.chown(router_tmp,0,0); os.chmod(router_tmp,0o600)
+                result=run("haproxy","-c","-f",router_tmp,timeout=30)
+                if result.returncode: raise ValueError("HAProxy не принял TCP/443: "+(result.stderr or result.stdout)[-2000:])
+        else:
+            wanted_router=None
+        # Commit only after every candidate passed syntax/config validation.
         os.replace(tmp,XRAY_CONFIG); replaced=True
         if caddy_changed: os.replace(caddy_tmp,CADDYFILE)
+        if wanted_mux and wanted_router!=old_router:
+            os.replace(router_tmp,router_file); router_file_changed=True
+        runtime_touched=True
         if config.get("inbounds"):
             run("systemctl","enable",XRAY_SERVICE,check=True)
             run("systemctl","restart",XRAY_SERVICE,check=True,timeout=45)
@@ -987,11 +1019,33 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
                 if run("systemctl","is-active","--quiet",XRAY_SERVICE).returncode:
                     raise RuntimeError("Xray не запустился. Возвращена предыдущая конфигурация.")
                 if attempt<2: time.sleep(0.5)
-        else: run("systemctl","disable","--now",XRAY_SERVICE,check=True)
-        # Some supported Caddy units do not define ExecReload. Let systemd
-        # restart those units instead of failing an otherwise valid update.
-        if caddy_changed: run("systemctl","reload-or-restart","caddy.service",check=True,timeout=30)
+        else:
+            run("systemctl","disable","--now",XRAY_SERVICE,check=True)
+        # A transition from Caddy's 443 to HAProxy's 443 must release the
+        # listening socket. Regular Caddyfile edits can still use reload.
+        if not wanted_mux and (router_active or old_mux):
+            run("systemctl","disable","--now",router_service,check=True,timeout=30)
+        if caddy_changed:
+            caddy_action="restart" if wanted_mux!=old_mux else "reload-or-restart"
+            run("systemctl",caddy_action,"caddy.service",check=True,timeout=45)
+        if wanted_mux and (not router_active or old_router!=wanted_router or caddy_changed):
+            run("systemctl","enable",router_service,check=True)
+            run("systemctl","restart",router_service,check=True,timeout=45)
+        if wanted_mux and run("systemctl","is-active","--quiet",router_service).returncode:
+            raise RuntimeError("TLS-маршрутизатор не запущен; переключение на TCP/443 отменено.")
     except Exception:
+        if runtime_touched:
+            # Release 443 before restoring Caddy; re-enable the old router
+            # after restoring the previous Caddy and Xray configurations.
+            run("systemctl","disable","--now",router_service,timeout=30)
+        if router_file_changed:
+            if old_router is not None:
+                with open(router_tmp,"wb") as stream: stream.write(old_router)
+                os.chown(router_tmp,0,0); os.chmod(router_tmp,0o600)
+                os.replace(router_tmp,router_file)
+            else:
+                try: os.unlink(router_file)
+                except FileNotFoundError: pass
         if replaced:
             if previous is not None:
                 with open(tmp,"wb") as stream: stream.write(previous)
@@ -1002,13 +1056,18 @@ def activate_xray_config(config, caddy_text=None, validation_inbounds=None):
                 except FileNotFoundError: pass
             if caddy_changed:
                 wpp_cdn_doctor.restore_caddyfile(CADDYFILE,old_caddy)
-                run("systemctl","reload-or-restart","caddy.service",timeout=30)
+                run("systemctl","restart","caddy.service",timeout=45)
             run("systemctl","enable" if enabled else "disable",XRAY_SERVICE)
             result=run("systemctl","restart" if active and previous is not None else "stop",XRAY_SERVICE,timeout=45)
-            if result.returncode: raise RuntimeError("Конфигурация восстановлена, но службу Xray необходимо проверить через SSH.")
+            if result.returncode:
+                raise RuntimeError("Конфигурация восстановлена, но службу Xray необходимо проверить через SSH.")
+        if runtime_touched and router_active:
+            run("systemctl","enable" if router_enabled else "disable",router_service)
+            if run("systemctl","restart",router_service,timeout=30).returncode:
+                raise RuntimeError("Предыдущий TLS-маршрутизатор не восстановлен; проверьте HTTPS через SSH.")
         raise
     finally:
-        for temporary in (tmp,caddy_tmp):
+        for temporary in (tmp,caddy_tmp,router_tmp):
             try: os.unlink(temporary)
             except FileNotFoundError: pass
 
@@ -1223,7 +1282,11 @@ def sync_xray(d):
             inactive.append(copy.deepcopy(override))
             inactive[-1].setdefault("settings",{})["clients"]=[]
             active_tags.add(override.get("tag"))
-    activate_xray_config(config,caddy_text,inactive)
+    active_realities={cid for cid,clients in reality_profiles.items() if clients}
+    shared_sni=wpp_reality.shared_443_sni(
+        registry.get("connections",[]),active_realities,
+        os.environ.get("WEBPROXY_DOMAIN","") or os.environ.get("TPROXY_HOSTNAME",""))
+    activate_xray_config(config,caddy_text,inactive,tls_mux_sni=shared_sni)
 
 def _load_traffic():
     try:
