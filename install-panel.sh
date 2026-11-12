@@ -884,7 +884,7 @@ def sync_firewall(d):
     match=re.search(r"\bdev\s+([A-Za-z0-9_.:-]+)",route)
     external_if=match.group(1) if match else ""
     wpp_firewall.reconcile(
-        tcp={443,*mtproto_ports} | {int(u["backend_port"]) for u in extra_users if u.get("protocol")=="naive" or str(u.get("transport","TCP")).upper()=="TCP"},
+        tcp={443,*mtproto_ports,*reality_ports} | {int(u["backend_port"]) for u in extra_users if u.get("protocol")=="naive" or str(u.get("transport","TCP")).upper()=="TCP"},
         udp=({hysteria_port} if hysteria_enabled else set()) | {int(u["backend_port"]) for u in awg_users} | {int(u["backend_port"]) for u in extra_users if str(u.get("transport","TCP")).upper()=="UDP"},
         routes={(u["awg_interface"],external_if) for u in awg_users if external_if},
     )
@@ -903,6 +903,11 @@ def maintain_firewall(d):
         if item.get("enabled",True) and item.get("protocol") in wpp_extra_protocols.PROTOCOLS}
     extra_users=[u for u in d["users"] if u.get("enabled",True) and u.get("protocol") in wpp_extra_protocols.PROTOCOLS
         and str(u.get("connection_id","")) in enabled_extra_connections]
+    reality_ports={int(item.get("config",{}).get("port",0) or 0)
+        for item in connection_registry.get("connections",[])
+        if wpp_reality.is_reality(item) and item.get("enabled",True)
+        and any(u.get("enabled",True) and u.get("connection_id")==item.get("id")
+                for u in d["users"])}
     inet=run("nft","list","table","inet","web_proxy_panel")
     awg_table=run("nft","list","table","ip","web_proxy_awg")
     healthy=inet.returncode==0 and awg_table.returncode==0
