@@ -104,6 +104,19 @@ class NodeSniPatchTests(unittest.TestCase):
             self.assertIn("/connection-action",page)
             self.assertIn("/node-action",page)
 
+    def test_registered_node_gets_persistent_microsoft_sni(self):
+        import wpp_nodes as nodes
+        with tempfile.TemporaryDirectory() as directory:
+            registry=str(Path(directory)/"nodes.json")
+            agent_reply={"domain":"node.example.net","location":{"country_code":"CZ"},
+                         "version":"0.2","capabilities":["site-template"]}
+            with patch.object(nodes,"request",return_value=agent_reply):
+                created=nodes.add_node(registry,{"url":"https://node.example.net",
+                                                 "token":"x"*43})
+            self.assertEqual(created["reality_sni"],"www.microsoft.com")
+            self.assertEqual(nodes.load_nodes(registry)[0]["reality_sni"],
+                             "www.microsoft.com")
+
     def test_sni_defaults_are_shared(self):
         import wpp_reality as reality
         import wpp_connections as connections
