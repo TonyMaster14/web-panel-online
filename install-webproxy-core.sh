@@ -114,6 +114,16 @@ check_install_port() {
         echo "      :${port} already used by ${process}; continuing."
         return 0
     fi
+    # A previous WPO installation may already route TCP/443 through its own
+    # HAProxy service while Caddy listens on 127.0.0.1:18443.
+    if [[ "$port" == 443 && "$process" == caddy ]] &&
+       [[ -s /etc/web-proxy-panel/tls-mux.cfg ]] &&
+       grep -Fq '# WPP REALITY TLS MUX BEGIN' /etc/caddy/Caddyfile 2>/dev/null &&
+       systemctl is-active --quiet web-panel-proxy-tls-mux.service &&
+       port_has_expected_process "$port" haproxy; then
+        echo "      :443 already shared by WPO HAProxy and Caddy; continuing."
+        return 0
+    fi
 
     ss -lntp | grep -E ":${port}\b" || true
     die "Port ${port} is occupied by an unexpected process."
