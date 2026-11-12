@@ -19,7 +19,7 @@ assert boot.count('╭──────╮') == 0, "Old separate number tiles m
 assert 'ШАГ %s/4' in boot, "A single heading is required per form step"
 assert 'wpp_progress 80 "Установка Nodes Lab v26"' in final
 assert 'wpp_progress 100 "Установка завершена"' in final
-assert final.index('[[ -s "$WPO_UI_RESULT_FILE" ]]') < final.index('wpp_progress 100 "Установка завершена"')
+assert final.rindex('[[ -s "$WPO_UI_RESULT_FILE" ]]') < final.rindex('wpp_progress 100 "Установка завершена"'), "100 percent must follow the actual final access-card check"
 assert 'wpo_node_stage "$version"' in nodes
 assert 'wpo_node_stage 12' in nodes
 
