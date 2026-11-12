@@ -5054,7 +5054,7 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
-# Финальная карточка: три строки в одной сетке, подписи и значения разных цветов.
+# Финальная карточка: подпись и значение рядом, разные цвета, без выравнивающих отступов.
 # Не включать Node API токен. Карточка выводится только после успешной установки.
 {
     card_blue=$'\033[38;5;75m'
@@ -5074,17 +5074,11 @@ fi
     fi
     printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$card_blue" "$card_reset"
 
-    # UTF-8-safe alignment: Bash printf field widths count bytes for Cyrillic
-    # on some terminals. Fixed visible padding is stable in every locale.
+    # Each value follows its label immediately, separated by one space.
+    # Colors are applied separately without altering visible spacing.
     card_row(){
-        local label="$1" value="$2" gap
-        case "$label" in
-            'Ссылка на панель:') gap='  ' ;;
-            'Логин :')          gap='            ' ;;
-            'Пароль :')         gap='           ' ;;
-            *) return 2 ;;
-        esac
-        printf '  %s%s%s%s%s%s%s\n' "$card_label" "$label" "$card_reset" "$gap" "$card_value" "$value" "$card_reset"
+        local label="$1" value="$2"
+        printf '  %s%s%s %s%s%s\n' "$card_label" "$label" "$card_reset" "$card_value" "$value" "$card_reset"
     }
     printf '\n'
     card_row 'Ссылка на панель:' "https://${DOMAIN}${PANEL_PATH}/login"
