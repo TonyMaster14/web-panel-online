@@ -85,8 +85,8 @@ def ensure_profile(connection_id, xray_bin=XRAY_BIN, path=STATE):
     if result.returncode:
         raise RealityError("Xray не смог создать ключи REALITY.")
     output = result.stdout + "\n" + result.stderr
-    private = re.search(r"(?im)^\s*PrivateKey\s*:\s*([A-Za-z0-9_-]+)\s*$", output)
-    public = re.search(r"(?im)^\s*(?:Password|PublicKey|Public Key)\s*:\s*([A-Za-z0-9_-]+)\s*$", output)
+    private = re.search(r"(?im)^\s*Private\s*Key\s*:\s*([A-Za-z0-9_-]+)\s*$", output)
+    public = re.search(r"(?im)^\s*(?:Password(?:\s*\(\s*Public\s*Key\s*\))?|Public\s*Key)\s*:\s*([A-Za-z0-9_-]+)\s*$", output)
     if not private or not public:
         raise RealityError("Не удалось распознать ключи Xray x25519.")
     profile = {"private_key": private.group(1), "public_key": public.group(1),
