@@ -7,7 +7,7 @@ umask 077
 
 REPOSITORY='TonyMaster14/web-panel-online'
 BASE_REF='e43b4941a0ef28c202952cc4b890b7afce13aeb1'
-FEATURE_REF='test/reality-addon-firefox-nodes-20261112'
+FEATURE_REF='e81d81a98262ae0e1998694c570ab6043374a41d'
 APP='/opt/tproxy-panel'
 STATE='/var/lib/tproxy-panel'
 SVC='tproxy-panel.service'
@@ -170,7 +170,7 @@ do
 done
 tar -C / -cpf "$BACKUP/state.tar" -T "$BACKUP/files"
 chmod 0600 "$BACKUP/state.tar"
-printf 'Branch: %s\nBase: %s\nCreated UTC: %s\n' "$FEATURE_REF" "$BASE_REF" "$(date -u +%FT%TZ)" > "$BACKUP/INFO.txt"
+printf 'Test source SHA: %s\nBase SHA: %s\nCreated UTC: %s\n' "$FEATURE_REF" "$BASE_REF" "$(date -u +%FT%TZ)" > "$BACKUP/INFO.txt"
 
 log '5/6 · Устанавливаю дополнение без полного обновления WPO'
 CHANGED=1
