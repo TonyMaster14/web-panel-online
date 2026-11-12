@@ -11,6 +11,7 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+import wpp_reality as reality_settings
 
 API_PREFIX = '/wpp-api/v1'
 CONNECTION_TOKEN_PREFIX = 'wppnode1_'
@@ -400,7 +401,8 @@ def add_node(path, request_data):
     if reported_url != url:
         raise NodeError('Домен в токене не совпадает с доменом, который сообщила нода.')
     loc = location(status.get('location'))
-    node = {'id': secrets.token_hex(8), 'url': url, 'token': token, **loc, 'enabled': True}
+    node = {'id': secrets.token_hex(8), 'url': url, 'token': token, **loc, 'enabled': True,
+            'reality_sni': reality_settings.DEFAULT_SNI}
     node['version'] = str(status.get('version', ''))[:32]
     nodes.append(node)
     save_nodes(path, nodes)
