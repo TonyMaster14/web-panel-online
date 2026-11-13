@@ -261,9 +261,16 @@ if (( code == 0 )); then
         error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     fi
     draw 100 'Проверки завершены' "$((SECONDS-started))"
-    printf '\033[2B\r\n'
-    printf '\n%s  Проверки завершены. Журнал сохранён на VPS.%s\n' "$gray" "$reset"
-    # The URL, login and password remain the very last content on screen.
+    printf '\033[2B\r'
+    # Let the user see the real 100% completion for one second.
+    sleep 1
+    # Replace the wizard's fields and progress in place. Do NOT wipe the
+    # whole SSH terminal: keep the WPO header and draw access details where
+    # the domain/email/login/password fields were previously displayed.
+    printf '\033[H'
+    banner
+    printf '\033[J'
+    # The existing access card is now the only content below that header.
     cat -- "$RESULT"
 else
     printf '\033[2B\r\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
