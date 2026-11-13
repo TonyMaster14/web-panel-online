@@ -190,7 +190,7 @@ draw(){
     if (( pct == 100 )); then
         printf '\r\033[2K'
     else
-        printf '\r\033[2K  %s◈ %sЭтап: %s%s' "$cyan" "$blue" "$ice" "${label:0:maxlabel}" "$reset"
+        printf '\r\033[2K  %s◈ %sЭтап: %s%s%s' "$cyan" "$blue" "$ice" "${label:0:maxlabel}" "$reset"
     fi
     printf '\033[2A\r'
 }
