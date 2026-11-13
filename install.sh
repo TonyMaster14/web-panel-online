@@ -51,10 +51,17 @@ fi
 outer_frame(){
     (( USE_WIZARD )) || return 0
     local cols rows row rule
-    cols="$(tput cols 2>/dev/null || printf 80)"
-    rows="$(tput lines 2>/dev/null || printf 24)"
-    [[ "$cols" =~ ^[0-9]+$ && "$rows" =~ ^[0-9]+$ ]] || return 0
-    (( cols >= 20 && rows >= 10 )) || return 0
+    # Read the actual SSH terminal size, including when TERM is incomplete.
+    rows="" cols=""
+    read -r rows cols < <(stty size </dev/tty 2>/dev/null) || true
+    if [[ ! "$cols" =~ ^[0-9]+$ ]] || (( cols < 20 )); then
+        cols="$(tput cols 2>/dev/null || true)"
+        [[ "$cols" =~ ^[0-9]+$ ]] && (( cols >= 20 )) || cols=80
+    fi
+    if [[ ! "$rows" =~ ^[0-9]+$ ]] || (( rows < 10 )); then
+        rows="$(tput lines 2>/dev/null || true)"
+        [[ "$rows" =~ ^[0-9]+$ ]] && (( rows >= 10 )) || rows=24
+    fi
     cols=$((cols-1))
     printf -v rule '%*s' "$((cols-2))" ''
     rule="${rule// /─}"
