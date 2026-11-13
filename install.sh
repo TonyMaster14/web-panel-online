@@ -19,6 +19,7 @@ error(){ printf '\n\033[1;31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
 # documented unattended workflow and all existing port/security checks.
 USE_WIZARD=0
 if [[ -t 0 && -t 1 && "${WPO_CLASSIC_INSTALL:-0}" != 1 ]]; then USE_WIZARD=1; fi
+FINAL_SCREEN=0
 WORK="" CREDENTIALS="" PROGRESS="" RESULT="" INSTALL_PID="" LOG=""
 cleanup(){
     if [[ -n "$INSTALL_PID" ]] && kill -0 "$INSTALL_PID" 2>/dev/null; then
@@ -31,7 +32,14 @@ cleanup(){
     [[ -n "$RESULT" && -f "$RESULT" ]] && { shred -u "$RESULT" 2>/dev/null || rm -f -- "$RESULT"; }
     [[ -n "$PROGRESS" && -f "$PROGRESS" ]] && rm -f -- "$PROGRESS"
     [[ -n "$WORK" && -d "$WORK" ]] && rm -rf -- "$WORK"
-    (( USE_WIZARD )) && printf '\033[0m\033[?25h' || true
+    if (( USE_WIZARD )); then
+        if (( FINAL_SCREEN )); then
+            # Leave the shell below the frame, outside the blue wizard.
+            printf '\033[%d;1H\033[0m\033[?25h\n' "$UI_ROWS"
+        else
+            printf '\033[0m\033[?25h'
+        fi
+    fi
     # EXIT traps must not turn a successful installation into exit code 1
     # just because the final optional cleanup condition was false.
     return 0
@@ -327,6 +335,7 @@ if (( code == 0 )); then
     # The existing access card is now the only content below that header.
     cat -- "$RESULT"
     outer_frame
+    FINAL_SCREEN=1
 else
     printf '\033[4B\r\n\033['"$WPO_LEFT"'G%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
