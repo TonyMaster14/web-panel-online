@@ -177,38 +177,49 @@ RESULT="$(mktemp /run/wpo-ui-result.XXXXXXXX)"
 chmod 0600 "$PROGRESS" "$RESULT"
 printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 
-# A single bounded progress line follows normal terminal scrolling.
-# Resizing starts a fresh line instead of restoring stale screen coordinates.
-DRAW_LAST="" DRAW_STAGE="" DRAW_RESIZED=0
+# Keep one five-row progress block: status, gap, bar, gap, current stage.
+# Reserve its rows once. Resize events rebuild the layout once on the new screen.
+DRAW_LAST="" DRAW_READY=0 DRAW_RESIZED=0
 trap 'DRAW_RESIZED=1' WINCH
 draw(){
     local pct="$1" label="$2" elapsed="$3" width filled empty bar rest key
+    local status stage packet prefix="" maxtext
     key="$pct|$label|$elapsed"
     [[ "$key" != "$DRAW_LAST" || "$DRAW_RESIZED" == 1 ]] || return 0
     DRAW_LAST="$key"
     terminal_size
     if (( DRAW_RESIZED )); then
-        printf '\r\n'
+        printf '\033[0m\033[2J\033[H'
+        banner
+        DRAW_READY=0
         DRAW_RESIZED=0
     fi
-    if [[ "$label" != "$DRAW_STAGE" && "$pct" != 100 ]]; then
-        printf '\r\033[2K\n  %sЭтап: %s%s\n\n' "$ice" "$label" "$reset"
-        DRAW_STAGE="$label"
+    if (( ! DRAW_READY )); then
+        # Ensure all rows exist even when the previous prompt was near the bottom.
+        printf '\n\n\n\n\n'
+        DRAW_READY=1
     fi
-    width=$((UI_COLS-28))
+    prefix=$'\033[4A\r'
+    width=$((UI_COLS-24))
     (( width > 40 )) && width=40
-    (( width < 4 )) && width=4
+    (( width < 1 )) && width=1
     filled=$((pct*width/100)); empty=$((width-filled))
     printf -v bar '%*s' "$filled" ''; bar="${bar// /█}"
     printf -v rest '%*s' "$empty" ''; rest="${rest// /░}"
-    printf '\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s' \
-        "$cyan" "$bar" "$blue" "$rest" "$reset" "$pct" \
-        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
+    maxtext=$((UI_COLS-3))
+    status='УСТАНОВКА …'
+    stage="Этап: $label"
     if (( pct == 100 )); then
-        printf '\n\n  %sУСТАНОВКА ЗАВЕРШЕНА!%s\n' "$bold$success" "$reset"
+        status='УСТАНОВКА ЗАВЕРШЕНА!'
+        stage=''
     fi
+    printf -v packet '%s\033[2K  %s%s%s\n\r\033[2K\n\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s\n\r\033[2K\n\r\033[2K  %s%s%s' \
+        "$prefix" "$bold$success" "${status:0:maxtext}" "$reset" \
+        "$cyan" "$bar" "$blue" "$rest" "$reset" "$pct" \
+        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset" \
+        "$ice" "${stage:0:maxtext}" "$reset"
+    printf '%s' "$packet"
 }
-printf '\n  %sУСТАНОВКА …%s\n' "$bold$success" "$reset"
 printf '\033[?25l'
 started=$SECONDS
 shown=1
@@ -284,7 +295,6 @@ if (( code == 0 )); then
         draw "$shown" 'Проверки завершены' "$((SECONDS-started))"
         if (( shown < 100 )); then sleep 1; fi
     done
-    printf ''
     # Keep verified completion visible before replacing it with access details.
     sleep 4
     # Append results in normal terminal flow; resizing cannot invalidate their position.
