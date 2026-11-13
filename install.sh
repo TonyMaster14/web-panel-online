@@ -39,13 +39,31 @@ cleanup(){
 trap cleanup EXIT
 trap 'printf "\n"; exit 130' INT TERM
 
+inset=$'\033[3G'
 blue=$'\033[38;5;75m' cyan=$'\033[38;5;51m' ice=$'\033[38;5;153m'
 gray=$'\033[38;5;245m' bold=$'\033[1m' reset=$'\033[0m' red=$'\033[38;5;203m' success=$'\033[38;5;83m'
 # Original midnight-blue neon canvas, only in an interactive SSH wizard.
 if (( USE_WIZARD )); then
     reset=$'\033[0m\033[48;5;17m'
-    printf '%s\033[2J\033[H' "$reset"
+    printf '%s\033[2J\033[2;1H' "$reset"
 fi
+# Redraw only the outside border; preserve the active prompt/progress cursor.
+outer_frame(){
+    (( USE_WIZARD )) || return 0
+    local cols rows row rule
+    cols="$(tput cols 2>/dev/null || printf 80)"
+    rows="$(tput lines 2>/dev/null || printf 24)"
+    [[ "$cols" =~ ^[0-9]+$ && "$rows" =~ ^[0-9]+$ ]] || return 0
+    (( cols >= 20 && rows >= 10 )) || return 0
+    cols=$((cols-1))
+    printf -v rule '%*s' "$((cols-2))" ''
+    rule="${rule// /─}"
+    printf '\0337%s\033[1;1H╭%s╮' "$blue" "$rule"
+    for ((row=2; row<rows; row++)); do
+        printf '\033[%d;1H│\033[%d;%dH│' "$row" "$row" "$cols"
+    done
+    printf '\033[%d;1H╰%s╯%s\0338' "$rows" "$rule" "$reset"
+}
 banner(){
     printf '\n%s  ╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
     printf '%s  │%s                 WEB PANEL ONLINE 3.0                         %s│%s\n' "$blue" "$bold$ice" "$blue" "$reset"
@@ -64,7 +82,8 @@ valid_domain(){
 valid_email(){ [[ "$1" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; }
 ask_domain(){
     while true; do
-        read -r -p "  ${cyan}Домен:${reset} " DOMAIN || exit 130
+        outer_frame
+        read -r -p "${inset}${cyan}Домен:${reset} " DOMAIN || exit 130
         DOMAIN="${DOMAIN,,}"
         valid_domain "$DOMAIN" && break
         printf '%s  Укажите действительный домен без https:// и пробелов.%s\n' "$gray" "$reset"
@@ -72,14 +91,16 @@ ask_domain(){
 }
 ask_email(){
     while true; do
-        read -r -p "  ${cyan}Email:${reset} " EMAIL || exit 130
+        outer_frame
+        read -r -p "${inset}${cyan}Email:${reset} " EMAIL || exit 130
         valid_email "$EMAIL" && break
         printf '%s  Нужен настоящий адрес формата name@example.com.%s\n' "$gray" "$reset"
     done
 }
 ask_admin(){
     while true; do
-        read -r -p "  ${cyan}Логин:${reset} " ADMIN || exit 130
+        outer_frame
+        read -r -p "${inset}${cyan}Логин:${reset} " ADMIN || exit 130
         ADMIN="${ADMIN:-admin}"
         [[ ${#ADMIN} -le 64 && "$ADMIN" =~ ^[[:alnum:]_.@-]+$ ]] && break
         printf '%s  Используйте буквы, цифры, _, точку или дефис.%s\n' "$gray" "$reset"
@@ -88,7 +109,8 @@ ask_admin(){
 ask_password(){
     while true; do
         # Password is entered once, invisibly at the prompt after the colon.
-        read -r -s -p "  ${cyan}Пароль (не отображается):${reset} " PASS || exit 130
+        outer_frame
+        read -r -s -p "${inset}${cyan}Пароль (не отображается):${reset} " PASS || exit 130
         printf '\n'
         if (( ${#PASS} < 3 )); then
             printf '%s  Пароль должен содержать минимум 3 символа.%s\n' "$gray" "$reset"
@@ -126,6 +148,8 @@ printf '  %s╭─────────────────────�
 printf '  %s│%s  ›  ENTER — установить     %s│%s     q — выход                  %s│%s\n' "$blue" "$bold$cyan" "$blue" "$ice" "$blue" "$reset"
 printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
 while true; do
+    outer_frame
+    printf '\033[3G'
     read -r choice || exit 130
     [[ "$choice" != q && "$choice" != Q ]] || exit 0
     [[ -z "$choice" ]] && break
@@ -193,6 +217,7 @@ draw(){
         printf '\r\033[2K  %s◈ %sЭтап: %s%s%s' "$cyan" "$blue" "$ice" "${label:0:maxlabel}" "$reset"
     fi
     printf '\033[2A\r'
+    outer_frame
 }
 
 # One clock for the entire installation, starting at package preparation.
@@ -278,11 +303,12 @@ if (( code == 0 )); then
     # Replace the wizard's fields and progress in place. Do NOT wipe the
     # whole SSH terminal: keep the WPO header and draw access details where
     # the domain/email/login/password fields were previously displayed.
-    printf '\033[H'
+    printf '\033[2;1H'
     banner
     printf '\033[J'
     # The existing access card is now the only content below that header.
     cat -- "$RESULT"
+    outer_frame
 else
     printf '\033[2B\r\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
