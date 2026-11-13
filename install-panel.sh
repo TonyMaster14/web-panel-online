@@ -5058,39 +5058,58 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
-# Финальная карточка: утверждённый синий стиль WPO 3.0, три поля в одной области.
-# Не включать Node API токен. Карточка выводится только после успешной установки.
+# Final access card: one frame, consistent background and spaced fields.
+# Secrets go only to the private result file, never to the installation log.
 {
     card_blue=$'\033[38;5;51m'
     card_label=$'\033[38;5;153m'
-    card_value=$'\033[38;5;51m'
     card_warning=$'\033[38;5;226m'
     card_bold=$'\033[1m\033[38;5;51m'
     card_reset=$'\033[0m'
+    if [[ "${WPO_CARD_WIZARD:-0}" == 1 ]]; then
+        card_reset=$'\033[0m\033[48;5;17m'
+    fi
     if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
-        card_blue='' card_label='' card_value='' card_warning='' card_bold='' card_reset=''
+        card_blue='' card_label='' card_warning='' card_bold='' card_reset=''
     fi
-
-    printf '\n  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$card_blue" "$card_reset"
-    if [[ "$UPDATING" == 1 ]]; then
-        printf '  %s│%s                     WPO 3.0 — ОБНОВЛЕНО                      %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
-    else
-        printf '  %s│%s                    WPO 3.0 — УСТАНОВЛЕНО                     %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
-    fi
-    printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$card_blue" "$card_reset"
-
-    # Labels and values remain adjacent: one space, no alignment columns.
-    card_row(){
-        local label="$1" value="$2"
-        printf '  %s%s%s %s%s%s\n' "$card_label" "$label" "$card_reset" "$card_value" "$value" "$card_reset"
+    card_cols="${WPO_CARD_COLUMNS:-80}"
+    [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
+    (( card_cols > 114 )) && card_cols=114
+    (( card_cols < 28 )) && card_cols=28
+    card_width=$((card_cols-8))
+    printf -v card_rule '%*s' "$((card_width+2))" ''
+    card_rule="${card_rule// /─}"
+    card_line(){
+        local text="$1" color="${2:-$card_label}" chunk padding
+        while (( ${#text} > card_width )); do
+            chunk="${text:0:card_width}"
+            printf '  %s│ %s%s%s %s│%s\n' "$card_blue" "$color" "$chunk" "$card_reset" "$card_blue" "$card_reset"
+            text="${text:card_width}"
+        done
+        printf -v padding '%*s' "$((card_width-${#text}))" ''
+        printf '  %s│ %s%s%s%s %s│%s\n' "$card_blue" "$color" "$text" "$card_reset" "$padding" "$card_blue" "$card_reset"
     }
-    printf '\n'
-    card_row 'Ссылка на панель:' "https://${DOMAIN}${PANEL_PATH}/login"
-    card_row 'Логин :' "$ADMIN"
+    printf '%s\n  %s╭%s╮%s\n' "$card_reset" "$card_blue" "$card_rule" "$card_reset"
+    card_line ''
     if [[ "$UPDATING" == 1 ]]; then
-        card_row 'Пароль :' 'сохранён (без изменений)'
+        card_line 'WPO 3.0 — ОБНОВЛЕНО' "$card_bold"
     else
-        card_row 'Пароль :' "$PASS"
+        card_line 'WPO 3.0 — УСТАНОВЛЕНО' "$card_bold"
     fi
-    printf '\n  %s⚠ Сохраните данные, что бы не потерять!%s\n\n' "$card_warning" "$card_reset"
+    card_line ''
+    card_line 'Ссылка на панель:'
+    card_line "https://${DOMAIN}${PANEL_PATH}/login" "$card_blue"
+    card_line ''
+    card_line "Логин: $ADMIN"
+    card_line ''
+    if [[ "$UPDATING" == 1 ]]; then
+        card_line 'Пароль: сохранён (без изменений)'
+    else
+        card_line "Пароль: $PASS"
+    fi
+    card_line ''
+    card_line ''
+    card_line 'Сохраните данные, чтобы не потерять!' "$card_warning"
+    card_line ''
+    printf '  %s╰%s╯%s\n\n' "$card_blue" "$card_rule" "$card_reset"
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
