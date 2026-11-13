@@ -86,6 +86,9 @@ class HappSubscription(unittest.TestCase):
         exec(compile(module,"subscription-http-test.py","exec"),namespace)
         cls=namespace["Handler"]
         cls.log_message=lambda *args: None
+        # The HTTP test mounts only the public subscription route; do_GET in
+        # production dispatches to this exact method after path parsing.
+        cls.do_GET=lambda handler: handler.serve_subscription(handler.path.split("/wpp-sub/",1)[-1].split("?",1)[0])
         self.server=ThreadingHTTPServer(("127.0.0.1",0),cls)
         self.thread=threading.Thread(target=self.server.serve_forever,daemon=True)
         self.thread.start()
