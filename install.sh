@@ -39,6 +39,7 @@ cleanup(){
 trap cleanup EXIT
 trap 'printf "\n"; exit 130' INT TERM
 
+WPO_LEFT=1
 inset=$'\033[3G'
 blue=$'\033[38;5;75m' cyan=$'\033[38;5;51m' ice=$'\033[38;5;153m'
 gray=$'\033[38;5;245m' bold=$'\033[1m' reset=$'\033[0m' red=$'\033[38;5;203m' success=$'\033[38;5;83m'
@@ -63,8 +64,10 @@ outer_frame(){
         [[ "$rows" =~ ^[0-9]+$ ]] && (( rows >= 10 )) || rows=24
     fi
     cols=$((cols-1))
-    # Blocks occupy columns 3–66: one blank cell on either side.
-    (( cols > 68 )) && cols=68
+    # Keep the outer frame full-width; center the unchanged 64-column blocks.
+    WPO_LEFT=$(((cols-68)/2+1))
+    (( WPO_LEFT < 1 )) && WPO_LEFT=1
+    printf -v inset '\033[%dG' "$((WPO_LEFT+2))"
     printf -v rule '%*s' "$((cols-2))" ''
     rule="${rule// /─}"
     printf '\0337%s\033[1;1H╭%s╮' "$blue" "$rule"
@@ -74,10 +77,10 @@ outer_frame(){
     printf '\033[%d;1H╰%s╯%s\0338' "$rows" "$rule" "$reset"
 }
 banner(){
-    printf '\n%s  ╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-    printf '%s  │%s                 WEB PANEL ONLINE 3.0                         %s│%s\n' "$blue" "$bold$ice" "$reset$blue" "$reset"
-    printf '%s  │%s                    МАСТЕР УСТАНОВКИ                          %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$reset"
-    printf '%s  ╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
+    printf '\n\033['"$WPO_LEFT"'G%s  ╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
+    printf '\033['"$WPO_LEFT"'G%s  │%s                 WEB PANEL ONLINE 3.0                         %s│%s\n' "$blue" "$bold$ice" "$reset$blue" "$reset"
+    printf '\033['"$WPO_LEFT"'G%s  │%s                    МАСТЕР УСТАНОВКИ                          %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$reset"
+    printf '\033['"$WPO_LEFT"'G%s  ╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
 }
 valid_domain(){
     local d="$1" part
@@ -95,7 +98,7 @@ ask_domain(){
         read -r -p "${inset}${cyan}Домен:${reset} " DOMAIN || exit 130
         DOMAIN="${DOMAIN,,}"
         valid_domain "$DOMAIN" && break
-        printf '%s  Укажите действительный домен без https:// и пробелов.%s\n' "$gray" "$reset"
+        printf '\033['"$WPO_LEFT"'G%s  Укажите действительный домен без https:// и пробелов.%s\n' "$gray" "$reset"
     done
 }
 ask_email(){
@@ -103,7 +106,7 @@ ask_email(){
         outer_frame
         read -r -p "${inset}${cyan}Email:${reset} " EMAIL || exit 130
         valid_email "$EMAIL" && break
-        printf '%s  Нужен настоящий адрес формата name@example.com.%s\n' "$gray" "$reset"
+        printf '\033['"$WPO_LEFT"'G%s  Нужен настоящий адрес формата name@example.com.%s\n' "$gray" "$reset"
     done
 }
 ask_admin(){
@@ -112,7 +115,7 @@ ask_admin(){
         read -r -p "${inset}${cyan}Логин:${reset} " ADMIN || exit 130
         ADMIN="${ADMIN:-admin}"
         [[ ${#ADMIN} -le 64 && "$ADMIN" =~ ^[[:alnum:]_.@-]+$ ]] && break
-        printf '%s  Используйте буквы, цифры, _, точку или дефис.%s\n' "$gray" "$reset"
+        printf '\033['"$WPO_LEFT"'G%s  Используйте буквы, цифры, _, точку или дефис.%s\n' "$gray" "$reset"
     done
 }
 ask_password(){
@@ -122,7 +125,7 @@ ask_password(){
         read -r -s -p "${inset}${cyan}Пароль (не отображается):${reset} " PASS || exit 130
         printf '\n'
         if (( ${#PASS} < 3 )); then
-            printf '%s  Пароль должен содержать минимум 3 символа.%s\n' "$gray" "$reset"
+            printf '\033['"$WPO_LEFT"'G%s  Пароль должен содержать минимум 3 символа.%s\n' "$gray" "$reset"
             unset PASS
             continue
         fi
@@ -150,26 +153,27 @@ if (( ! USE_WIZARD )); then
     exit $?
 fi
 
+outer_frame
 banner
-printf '\n  %sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
+printf '\n\033['"$WPO_LEFT"'G  %sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
 
-printf '  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-printf '  %s│%s  ›  ENTER — установить     %s│%s     q — выход                   %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$ice" "$reset$blue" "$reset"
-printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
+printf '\033['"$WPO_LEFT"'G  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
+printf '\033['"$WPO_LEFT"'G  %s│%s  ›  ENTER — установить     %s│%s     q — выход                   %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$ice" "$reset$blue" "$reset"
+printf '\033['"$WPO_LEFT"'G  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
 while true; do
     outer_frame
-    printf '\033[3G'
+    printf '%s' "$inset"
     read -r choice || exit 130
     [[ "$choice" != q && "$choice" != Q ]] || exit 0
     [[ -z "$choice" ]] && break
-    printf '%s  Нажмите Enter или q для выхода.%s\n' "$gray" "$reset"
+    printf '\033['"$WPO_LEFT"'G%s  Нажмите Enter или q для выхода.%s\n' "$gray" "$reset"
 done
 
 UPDATE=0
 if [[ -s /var/lib/tproxy-panel/data.json && -f /etc/systemd/system/tproxy-panel.service ]] &&
    grep -Eq 'Environment=WEBPROXY_PANEL_PATH=/panel-[a-z0-9-]{3,64}' /etc/systemd/system/tproxy-panel.service; then
     UPDATE=1
-    printf '\n%s  Найдена установленная панель: обновляем код, учётные данные сохраняем.%s\n' "$cyan" "$reset"
+    printf '\n\033['"$WPO_LEFT"'G%s  Найдена установленная панель: обновляем код, учётные данные сохраняем.%s\n' "$cyan" "$reset"
     DOMAIN="" EMAIL=""
 else
     ask_domain
@@ -212,11 +216,11 @@ draw(){
     maxlabel=$((cols-17)); (( maxlabel < 16 )) && maxlabel=16
     # Both status messages occupy the same row above the blue bar.
     if (( pct == 100 )); then
-        printf '\r\033[2K  %s✓ Установка завершена!%s\n' "$success" "$reset"
+        printf '\r\033[2K\033['"$WPO_LEFT"'G  %s✓ Установка завершена!%s\n' "$success" "$reset"
     else
-        printf '\r\033[2K  %s✓ Установка...%s\n' "$success" "$reset"
+        printf '\r\033[2K\033['"$WPO_LEFT"'G  %s✓ Установка...%s\n' "$success" "$reset"
     fi
-    printf '\r\033[2K  %s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s\n' \
+    printf '\r\033[2K\033['"$WPO_LEFT"'G  %s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s\n' \
         "$cyan" "$donebar" "$blue" "$leftbar" "$reset" "$pct" \
         "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
     # One blue-highlighted live stage/operation; never a separate "Операция" row.
@@ -224,7 +228,7 @@ draw(){
     if (( pct == 100 )); then
         printf '\r\033[2K'
     else
-        printf '\r\033[2K  %s◈ %sЭтап: %s%s%s' "$cyan" "$blue" "$ice" "${label:0:maxlabel}" "$reset"
+        printf '\r\033[2K\033['"$WPO_LEFT"'G  %s◈ %sЭтап: %s%s%s' "$cyan" "$blue" "$ice" "${label:0:maxlabel}" "$reset"
     fi
     printf '\033[2A\r'
     outer_frame
@@ -235,7 +239,7 @@ printf '\033[?25l'
 started=$SECONDS
 shown=1
 label='Загрузка пакета'
-printf '\n  %sХОД УСТАНОВКИ%s\n' "$cyan" "$reset"
+printf '\n\033['"$WPO_LEFT"'G  %sХОД УСТАНОВКИ%s\n' "$cyan" "$reset"
 draw "$shown" "$label" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
@@ -276,7 +280,7 @@ confirmed=7
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
-    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS=68 \
+    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS=68 WPO_CARD_LEFT="$WPO_LEFT" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
 label='Проверка установочного пакета'
@@ -320,10 +324,10 @@ if (( code == 0 )); then
     cat -- "$RESULT"
     outer_frame
 else
-    printf '\033[2B\r\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
+    printf '\033[2B\r\n\033['"$WPO_LEFT"'G%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
-    [[ -z "$hint" ]] || printf '  %s\n' "$hint"
-    printf '  Подробности: %s\n' "$LOG"
-    printf '  Установку можно повторить, не очищая VPS.\n'
+    [[ -z "$hint" ]] || printf '\033['"$WPO_LEFT"'G  %s\n' "$hint"
+    printf '\033['"$WPO_LEFT"'G  Подробности: %s\n' "$LOG"
+    printf '\033['"$WPO_LEFT"'G  Установку можно повторить, не очищая VPS.\n'
     exit "$code"
 fi
