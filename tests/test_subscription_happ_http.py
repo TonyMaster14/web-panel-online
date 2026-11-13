@@ -139,6 +139,6 @@ class HappSubscription(unittest.TestCase):
         self.manager={"ok":True,"name":"Global VPN","users":[],"limited":False}
         status,headers,body=self.fetch()
         self.assertEqual(status,409)
-        self.assertIn("нет VLESS",body.decode())
+        self.assertIn("нет активных VLESS",body.decode())
 
 if __name__=="__main__": unittest.main()
