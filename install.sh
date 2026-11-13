@@ -214,7 +214,7 @@ draw(){
     printf -v donebar '%*s' "$filled" ''
     printf -v leftbar '%*s' "$empty" ''
     donebar="${donebar// /█}"; leftbar="${leftbar// /░}"
-    status='УСТАНОВКА…'
+    status='УСТАНОВКА …'
     (( pct == 100 )) && status='УСТАНОВКА ЗАВЕРШЕНА!'
     if [[ "$status" != "$DRAW_STATUS" ]]; then
         printf -v padding '%*s' "$((62-${#status}))" ''
