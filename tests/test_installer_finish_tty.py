@@ -25,7 +25,7 @@ printf '80\tУстановка нод\n' > "$WPO_UI_PROGRESS_FILE"
 sleep 0.3
 printf '99\tПроверка подключения Xray\n' > "$WPO_UI_PROGRESS_FILE"
 sleep 0.3
-case "$WPO_TTY_TEST_CASE" in
+case "__WPO_TEST_MODE__" in
     fail) exit 19;;
     empty) exit 0;;
 esac
@@ -48,7 +48,7 @@ def check(mode):
     with tempfile.TemporaryDirectory(prefix="wpo-pty-check-") as folder:
         root=Path(folder)
         shutil.copyfile(ENTRY,root/"install.sh")
-        (root/"install-final.sh").write_text(FAKE)
+        (root/"install-final.sh").write_text(FAKE.replace("__WPO_TEST_MODE__",mode))
         (root/"node-install.sh").write_text("# fake node\n")
         (root/"wpp_subscriptions.py").write_text("# fake subscriptions\n")
         master,slave=pty.openpty()
