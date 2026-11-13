@@ -218,11 +218,11 @@ draw(){
     (( pct == 100 )) && status='✓ Установка завершена!'
     if [[ "$status" != "$DRAW_STATUS" ]]; then
         printf -v padding '%*s' "$((62-${#status}))" ''
-        printf -v part '\033[%d;%dH%s%s%s%s' "$PROGRESS_ROW" "$((WPO_LEFT+2))" "$success" "$status" "$padding" "$reset"
+        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$PROGRESS_ROW" "$((WPO_LEFT+2))" "$success" "$status" "$padding" "$reset"
         packet+="$part"
         DRAW_STATUS="$status"
     fi
-    printf -v part '\033[%d;%dH%s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s  ' \
+    printf -v part '\0338\033[%dB\033[%dG%s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s  ' \
         "$((PROGRESS_ROW+1))" "$((WPO_LEFT+2))" "$cyan" "$donebar" "$blue" "$leftbar" "$reset" \
         "$pct" "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
     packet+="$part"
@@ -230,22 +230,21 @@ draw(){
     (( pct == 100 )) && stage=""
     if [[ "$stage" != "$DRAW_STAGE" ]]; then
         printf -v padding '%*s' "$((62-${#stage}))" ''
-        printf -v part '\033[%d;%dH%s%s%s%s' "$((PROGRESS_ROW+2))" "$((WPO_LEFT+2))" "$ice" "$stage" "$padding" "$reset"
+        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$((PROGRESS_ROW+2))" "$((WPO_LEFT+2))" "$ice" "$stage" "$padding" "$reset"
         packet+="$part"
         DRAW_STAGE="$stage"
     fi
-    printf -v part '\033[%d;%dH' "$PROGRESS_ROW" "$((WPO_LEFT+2))"
+    printf -v part '\0338\033[%dB\033[%dG' "$PROGRESS_ROW" "$((WPO_LEFT+2))"
     printf '%s%s' "$packet" "$part"
 }
 # One clock for the entire installation, starting at package preparation.
-printf '\033[?25l'
+printf '\033[?25l\0337'
 started=$SECONDS
 shown=1
 label='Загрузка пакета'
-# Reserve fixed rows above the bottom border; never scroll during animation.
-PROGRESS_ROW=$((UI_ROWS-4))
-(( PROGRESS_ROW > 27 )) && PROGRESS_ROW=27
-printf '\033[%d;%dH%sХОД УСТАНОВКИ%s' "$((PROGRESS_ROW-1))" "$((WPO_LEFT+2))" "$cyan" "$reset"
+# Anchor to the cursor just below the last input, leaving one blank row.
+PROGRESS_ROW=2
+printf '\0338\033[%dB\033[%dG%sХОД УСТАНОВКИ%s' "$((PROGRESS_ROW-1))" "$((WPO_LEFT+2))" "$cyan" "$reset"
 draw "$shown" "$label" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
@@ -280,7 +279,7 @@ label='Проверка установочного пакета'
 while (( shown < 7 )); do
     shown=$((shown+1))
     draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 0.5
+    sleep 1
 done
 confirmed=7
 
@@ -300,7 +299,7 @@ while kill -0 "$INSTALL_PID" 2>/dev/null; do
     fi
     if (( shown < confirmed )); then shown=$((shown+1)); fi
     draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 0.5
+    sleep 1
 done
 code=0
 wait "$INSTALL_PID" || code=$?
@@ -315,7 +314,7 @@ if (( code == 0 )); then
     while (( shown < 100 )); do
         shown=$((shown+1))
         draw "$shown" 'Проверки завершены' "$((SECONDS-started))"
-        if (( shown < 100 )); then sleep 0.15; fi
+        if (( shown < 100 )); then sleep 1; fi
     done
     printf '\033[2B\r'
     # Keep verified completion visible before replacing it with access details.
