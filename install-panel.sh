@@ -5054,41 +5054,39 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
     rm -f /etc/web-proxy-panel/naive-caddy-owned
 fi
 
-# Финальная карточка: подпись и значение рядом, разные цвета, без выравнивающих отступов.
+# Финальная карточка: утверждённый синий стиль WPO 3.0, три поля в одной области.
 # Не включать Node API токен. Карточка выводится только после успешной установки.
 {
-    card_blue=$'\033[38;5;75m'
+    card_blue=$'\033[38;5;51m'
     card_label=$'\033[38;5;153m'
     card_value=$'\033[38;5;51m'
-    card_bold=$'\033[1m'
+    card_warning=$'\033[38;5;226m'
+    card_bold=$'\033[1m\033[38;5;51m'
     card_reset=$'\033[0m'
     if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
-        card_blue='' card_label='' card_value='' card_bold='' card_reset=''
+        card_blue='' card_label='' card_value='' card_warning='' card_bold='' card_reset=''
     fi
 
     printf '\n  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$card_blue" "$card_reset"
     if [[ "$UPDATING" == 1 ]]; then
-        printf '  %s│%s           WEB PANEL ONLINE 3.0 — ОБНОВЛЕНО                  %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
+        printf '  %s│%s                     WPO 3.0 — ОБНОВЛЕНО                      %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
     else
-        printf '  %s│%s           WEB PANEL ONLINE 3.0 — УСТАНОВЛЕНО                %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
+        printf '  %s│%s                    WPO 3.0 — УСТАНОВЛЕНО                     %s│%s\n' "$card_blue" "$card_bold" "$card_blue" "$card_reset"
     fi
     printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$card_blue" "$card_reset"
 
-    # Each value follows its label immediately, separated by one space.
-    # Colors are applied separately without altering visible spacing.
+    # Labels and values remain adjacent: one space, no alignment columns.
     card_row(){
         local label="$1" value="$2"
         printf '  %s%s%s %s%s%s\n' "$card_label" "$label" "$card_reset" "$card_value" "$value" "$card_reset"
     }
     printf '\n'
     card_row 'Ссылка на панель:' "https://${DOMAIN}${PANEL_PATH}/login"
-    printf '\n'
     card_row 'Логин :' "$ADMIN"
-    printf '\n'
     if [[ "$UPDATING" == 1 ]]; then
         card_row 'Пароль :' 'сохранён (без изменений)'
     else
         card_row 'Пароль :' "$PASS"
     fi
-    printf '\n  %sСохраните данные,что бы не потерять!%s\n\n' "$card_label" "$card_reset"
+    printf '\n  %s⚠ Сохраните данные, что бы не потерять!%s\n\n' "$card_warning" "$card_reset"
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
