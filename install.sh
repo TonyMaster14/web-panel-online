@@ -35,7 +35,7 @@ cleanup(){
     if (( USE_WIZARD )); then
         if (( FINAL_SCREEN )); then
             # Leave the shell below the frame, outside the blue wizard.
-            printf '\033[%d;1H\033[0m\033[?25h\n' "$UI_ROWS"
+            printf '\033[%d;1H\033[0m\033[?25h\n\033[2K\033[32m' "$UI_ROWS"
         else
             printf '\033[0m\033[?25h'
         fi
@@ -72,6 +72,7 @@ outer_frame(){
         [[ "$rows" =~ ^[0-9]+$ ]] && (( rows >= 10 )) || rows=24
     fi
     UI_ROWS="$rows"
+    UI_COLS="$cols"
     cols=$((cols-1))
     # Keep the outer frame full-width; center the unchanged 64-column blocks.
     WPO_LEFT=$(((cols-68)/2+1))
@@ -292,7 +293,7 @@ confirmed=7
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
-    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS=68 WPO_CARD_LEFT="$WPO_LEFT" \
+    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS="$UI_COLS" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
 label='Проверка установочного пакета'
