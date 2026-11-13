@@ -615,7 +615,9 @@ def client_editor(record, profiles, path, domain, csrf, traffic, proxy_link, con
                     import_link=happ_import_link(profile_url)
                     happ_qr=path+'/direct-profile-qr?'+urlencode({'id':uid,'secret':secret,'import':'happ'})
                     if routed:
-                        config=routing_store.xray_config(link,route_profile,source.get('name',label))
+                        # Keep the server remarks aligned with the fetched Happ JSON;
+                        # the client name belongs to the profile-title header.
+                        config=routing_store.xray_config(link,route_profile,node_link_name)
                         key_cards.append(connection_key_card(
                             key_title+' · JSON с маршрутизацией',
                             'Профиль Happ с DNS и правилами маршрутизации.',
