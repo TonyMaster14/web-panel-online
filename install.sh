@@ -96,7 +96,8 @@ valid_email(){ [[ "$1" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; }
 ask_domain(){
     while true; do
         outer_frame
-        read -r -p "${inset}${cyan}Домен:${reset} " DOMAIN || exit 130
+        printf '%s%sДомен:%s ' "$inset" "$cyan" "$reset"
+        read -r DOMAIN || exit 130
         DOMAIN="${DOMAIN,,}"
         valid_domain "$DOMAIN" && break
         printf '\033['"$WPO_LEFT"'G%s  Укажите действительный домен без https:// и пробелов.%s\n' "$gray" "$reset"
@@ -105,7 +106,8 @@ ask_domain(){
 ask_email(){
     while true; do
         outer_frame
-        read -r -p "${inset}${cyan}Email:${reset} " EMAIL || exit 130
+        printf '%s%sEmail:%s ' "$inset" "$cyan" "$reset"
+        read -r EMAIL || exit 130
         valid_email "$EMAIL" && break
         printf '\033['"$WPO_LEFT"'G%s  Нужен настоящий адрес формата name@example.com.%s\n' "$gray" "$reset"
     done
@@ -113,7 +115,8 @@ ask_email(){
 ask_admin(){
     while true; do
         outer_frame
-        read -r -p "${inset}${cyan}Логин:${reset} " ADMIN || exit 130
+        printf '%s%sЛогин:%s ' "$inset" "$cyan" "$reset"
+        read -r ADMIN || exit 130
         ADMIN="${ADMIN:-admin}"
         [[ ${#ADMIN} -le 64 && "$ADMIN" =~ ^[[:alnum:]_.@-]+$ ]] && break
         printf '\033['"$WPO_LEFT"'G%s  Используйте буквы, цифры, _, точку или дефис.%s\n' "$gray" "$reset"
@@ -123,7 +126,8 @@ ask_password(){
     while true; do
         # Password is entered once, invisibly at the prompt after the colon.
         outer_frame
-        read -r -s -p "${inset}${cyan}Пароль (не отображается):${reset} " PASS || exit 130
+        printf '%s%sПароль (не отображается):%s ' "$inset" "$cyan" "$reset"
+        read -r -s PASS || exit 130
         printf '\n'
         if (( ${#PASS} < 3 )); then
             printf '\033['"$WPO_LEFT"'G%s  Пароль должен содержать минимум 3 символа.%s\n' "$gray" "$reset"
