@@ -184,6 +184,8 @@ trap 'DRAW_RESIZED=1' WINCH
 draw(){
     local pct="$1" label="$2" elapsed="$3" width filled empty bar rest key
     local status stage packet prefix="" maxtext
+    [[ "$label" != 'Установка нод' ]] || label='Установка ноды'
+    if (( pct >= 90 && pct < 100 )); then label='Завершение установки'; fi
     key="$pct|$label|$elapsed"
     [[ "$key" != "$DRAW_LAST" || "$DRAW_RESIZED" == 1 ]] || return 0
     DRAW_LAST="$key"
@@ -292,13 +294,15 @@ if (( code == 0 )); then
     # Complete the animation only after a successful exit and a valid access card.
     while (( shown < 100 )); do
         shown=$((shown+1))
-        draw "$shown" 'Проверки завершены' "$((SECONDS-started))"
+        draw "$shown" "$label" "$((SECONDS-started))"
         if (( shown < 100 )); then sleep 1; fi
     done
     # Keep verified completion visible before replacing it with access details.
     sleep 4
-    # Append results in normal terminal flow; resizing cannot invalidate their position.
-    printf '\n'
+    # One final screen transition after the four-second success hold.
+    # Clear the visible screen only; do not erase terminal scrollback.
+    printf '\033[0m\033[2J\033[H'
+    banner
     cat -- "$RESULT"
     FINAL_SCREEN=1
 else
