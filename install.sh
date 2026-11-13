@@ -63,6 +63,8 @@ outer_frame(){
         [[ "$rows" =~ ^[0-9]+$ ]] && (( rows >= 10 )) || rows=24
     fi
     cols=$((cols-1))
+    # Blocks occupy columns 3–66: one blank cell on either side.
+    (( cols > 68 )) && cols=68
     printf -v rule '%*s' "$((cols-2))" ''
     rule="${rule// /─}"
     printf '\0337%s\033[1;1H╭%s╮' "$blue" "$rule"
@@ -73,8 +75,8 @@ outer_frame(){
 }
 banner(){
     printf '\n%s  ╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-    printf '%s  │%s                 WEB PANEL ONLINE 3.0                         %s│%s\n' "$blue" "$bold$ice" "$blue" "$reset"
-    printf '%s  │%s                    МАСТЕР УСТАНОВКИ                          %s│%s\n' "$blue" "$bold$cyan" "$blue" "$reset"
+    printf '%s  │%s                 WEB PANEL ONLINE 3.0                         %s│%s\n' "$blue" "$bold$ice" "$reset$blue" "$reset"
+    printf '%s  │%s                    МАСТЕР УСТАНОВКИ                          %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$reset"
     printf '%s  ╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
 }
 valid_domain(){
@@ -152,7 +154,7 @@ banner
 printf '\n  %sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
 
 printf '  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-printf '  %s│%s  ›  ENTER — установить     %s│%s     q — выход                  %s│%s\n' "$blue" "$bold$cyan" "$blue" "$ice" "$blue" "$reset"
+printf '  %s│%s  ›  ENTER — установить     %s│%s     q — выход                   %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$ice" "$reset$blue" "$reset"
 printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
 while true; do
     outer_frame
@@ -197,6 +199,7 @@ draw(){
     local cols width filled empty donebar leftbar maxlabel
     cols="$(tput cols 2>/dev/null || printf 80)"
     [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
+    (( cols > 68 )) && cols=68
     width=$((cols-28))
     (( width > 42 )) && width=42
     (( width < 10 )) && width=10
@@ -273,7 +276,7 @@ confirmed=7
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
-    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS="$(tput cols 2>/dev/null || printf 80)" \
+    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS=68 \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
 label='Проверка установочного пакета'
