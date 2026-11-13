@@ -31,7 +31,7 @@ cleanup(){
     [[ -n "$RESULT" && -f "$RESULT" ]] && { shred -u "$RESULT" 2>/dev/null || rm -f -- "$RESULT"; }
     [[ -n "$PROGRESS" && -f "$PROGRESS" ]] && rm -f -- "$PROGRESS"
     [[ -n "$WORK" && -d "$WORK" ]] && rm -rf -- "$WORK"
-    (( USE_WIZARD )) && printf '\033[0m' || true
+    (( USE_WIZARD )) && printf '\033[0m\033[?25h' || true
     # EXIT traps must not turn a successful installation into exit code 1
     # just because the final optional cleanup condition was false.
     return 0
@@ -196,6 +196,7 @@ draw(){
 }
 
 # One clock for the entire installation, starting at package preparation.
+printf '\033[?25l'
 started=$SECONDS
 shown=1
 label='Загрузка пакета'
@@ -236,13 +237,13 @@ draw "$shown" "$label" "$((SECONDS-started))"
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
-    WPO_UI_RESULT_FILE="$RESULT" \
+    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS="$(tput cols 2>/dev/null || printf 80)" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
 label='Проверка установочного пакета'
 while kill -0 "$INSTALL_PID" 2>/dev/null; do
     if IFS=$'\t' read -r target current_label < "$PROGRESS"; then
-        if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target <= 100 )); then
+        if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target < 100 )); then
             # Jump only to an actual milestone, never a fabricated 1%-per-tick.
             shown="$target"
             [[ -n "$current_label" ]] && label="$current_label"
@@ -262,8 +263,8 @@ if (( code == 0 )); then
     fi
     draw 100 'Проверки завершены' "$((SECONDS-started))"
     printf '\033[2B\r'
-    # Let the user see the real 100% completion for one second.
-    sleep 1
+    # Keep verified completion visible before replacing it with access details.
+    sleep 6
     # Replace the wizard's fields and progress in place. Do NOT wipe the
     # whole SSH terminal: keep the WPO header and draw access details where
     # the domain/email/login/password fields were previously displayed.
