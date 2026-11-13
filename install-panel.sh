@@ -5073,15 +5073,19 @@ fi
     if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
         card_blue='' card_value='' card_label='' card_warning='' card_bold='' card_reset=''
     fi
-    card_indent=""
-    if [[ "${WPO_CARD_WIZARD:-0}" == 1 && "${WPO_CARD_LEFT:-1}" =~ ^[0-9]+$ ]]; then
-        printf -v card_indent '\033[%dG' "${WPO_CARD_LEFT:-1}"
-    fi
+    card_url="https://${DOMAIN}${PANEL_PATH}/login"
     card_cols="${WPO_CARD_COLUMNS:-80}"
     [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
-    (( card_cols > 114 )) && card_cols=114
     (( card_cols < 28 )) && card_cols=28
-    card_width=$((card_cols-8))
+    # Expand only the final card to fit the complete URL, then center it.
+    card_width=${#card_url}
+    (( card_width < 60 )) && card_width=60
+    (( card_width > card_cols-8 )) && card_width=$((card_cols-8))
+    card_left=$(((card_cols-card_width-8)/2+1))
+    card_indent=""
+    if [[ "${WPO_CARD_WIZARD:-0}" == 1 ]]; then
+        printf -v card_indent '\033[%dG' "$card_left"
+    fi
     printf -v card_rule '%*s' "$((card_width+2))" ''
     card_rule="${card_rule// /─}"
     card_line(){
@@ -5107,7 +5111,15 @@ fi
     fi
     card_line ''
     card_line 'Ссылка на панель:'
-    card_line "https://${DOMAIN}${PANEL_PATH}/login" "$card_value" "https://${DOMAIN}${PANEL_PATH}/login"
+    if (( ${#card_url} <= card_width )); then
+        card_line "$card_url" "$card_value" "$card_url"
+    elif [[ "${WPO_CARD_WIZARD:-0}" == 1 && "${WPO_CARD_COLOR:-1}" != 0 ]]; then
+        # Never split a clickable URL. Small terminals get a short full-target link.
+        card_line 'Вход в панель' "$card_value" "$card_url"
+    else
+        # Plain output keeps a single intact URL for copying.
+        printf '%s\n' "$card_url"
+    fi
     card_line ''
     card_line "Логин: $ADMIN"
     card_line ''
