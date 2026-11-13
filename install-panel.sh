@@ -5061,16 +5061,17 @@ fi
 # Final access card: one frame, consistent background and spaced fields.
 # Secrets go only to the private result file, never to the installation log.
 {
-    card_blue=$'\033[38;5;51m'
+    card_blue=$'\033[38;5;75m'
+    card_value=$'\033[38;5;51m'
     card_label=$'\033[38;5;153m'
     card_warning=$'\033[38;5;226m'
-    card_bold=$'\033[1m\033[38;5;51m'
+    card_bold=$'\033[1m\033[38;5;153m'
     card_reset=$'\033[0m'
     if [[ "${WPO_CARD_WIZARD:-0}" == 1 ]]; then
         card_reset=$'\033[0m\033[48;5;17m'
     fi
     if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
-        card_blue='' card_label='' card_warning='' card_bold='' card_reset=''
+        card_blue='' card_value='' card_label='' card_warning='' card_bold='' card_reset=''
     fi
     card_cols="${WPO_CARD_COLUMNS:-80}"
     [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
@@ -5098,7 +5099,7 @@ fi
     fi
     card_line ''
     card_line 'Ссылка на панель:'
-    card_line "https://${DOMAIN}${PANEL_PATH}/login" "$card_blue"
+    card_line "https://${DOMAIN}${PANEL_PATH}/login" "$card_value"
     card_line ''
     card_line "Логин: $ADMIN"
     card_line ''
