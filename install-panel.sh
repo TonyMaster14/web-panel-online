@@ -5085,14 +5085,18 @@ fi
     printf -v card_rule '%*s' "$((card_width+2))" ''
     card_rule="${card_rule// /─}"
     card_line(){
-        local text="$1" color="${2:-$card_label}" chunk padding
+        local text="$1" color="${2:-$card_label}" link="${3:-}" chunk padding link_open="" link_close=""
+        if [[ -n "$link" && "${WPO_CARD_WIZARD:-0}" == 1 && "${WPO_CARD_COLOR:-1}" != 0 ]]; then
+            printf -v link_open '\033]8;;%s\007' "$link"
+            link_close=$'\033]8;;\007'
+        fi
         while (( ${#text} > card_width )); do
             chunk="${text:0:card_width}"
-            printf "${card_indent}"'  %s│ %s%s%s %s│%s\n' "$card_blue" "$color" "$chunk" "$card_reset" "$card_blue" "$card_reset"
+            printf "${card_indent}"'  %s│ %s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$chunk" "$link_close$card_reset" "$card_blue" "$card_reset"
             text="${text:card_width}"
         done
         printf -v padding '%*s' "$((card_width-${#text}))" ''
-        printf "${card_indent}"'  %s│ %s%s%s%s %s│%s\n' "$card_blue" "$color" "$text" "$card_reset" "$padding" "$card_blue" "$card_reset"
+        printf "${card_indent}"'  %s│ %s%s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$text" "$link_close$card_reset" "$padding" "$card_blue" "$card_reset"
     }
     printf '%s\n'"$card_indent"'  %s╭%s╮%s\n' "$card_reset" "$card_blue" "$card_rule" "$card_reset"
     card_line ''
@@ -5103,7 +5107,7 @@ fi
     fi
     card_line ''
     card_line 'Ссылка на панель:'
-    card_line "https://${DOMAIN}${PANEL_PATH}/login" "$card_value"
+    card_line "https://${DOMAIN}${PANEL_PATH}/login" "$card_value" "https://${DOMAIN}${PANEL_PATH}/login"
     card_line ''
     card_line "Логин: $ADMIN"
     card_line ''
