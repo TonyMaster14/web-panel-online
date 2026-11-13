@@ -63,6 +63,7 @@ outer_frame(){
         rows="$(tput lines 2>/dev/null || true)"
         [[ "$rows" =~ ^[0-9]+$ ]] && (( rows >= 10 )) || rows=24
     fi
+    UI_ROWS="$rows"
     cols=$((cols-1))
     # Keep the outer frame full-width; center the unchanged 64-column blocks.
     WPO_LEFT=$(((cols-68)/2+1))
@@ -201,48 +202,50 @@ printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 
 # Display a live, accurate stage indicator: numbers come from the actual
 # installer stages. The active stage stays below the bar while the timer measures elapsed time.
+# Only repaint changed cells inside the wizard. No line erases, newlines,
+# cursor-relative movement or frame redraws in the animation loop.
+DRAW_LAST="" DRAW_STATUS="" DRAW_STAGE=""
 draw(){
     local pct="$1" label="$2" elapsed="$3"
-    local cols width filled empty donebar leftbar maxlabel
-    cols="$(tput cols 2>/dev/null || printf 80)"
-    [[ "$cols" =~ ^[0-9]+$ ]] || cols=80
-    (( cols > 68 )) && cols=68
-    width=$((cols-28))
-    (( width > 42 )) && width=42
-    (( width < 10 )) && width=10
-    (( pct < 0 )) && pct=0
-    (( pct > 100 )) && pct=100
-    filled=$((pct*width/100)); empty=$((width-filled))
+    local key="$1|$2|$3" filled empty donebar leftbar packet="" part status stage padding
+    [[ "$key" != "$DRAW_LAST" ]] || return 0
+    DRAW_LAST="$key"
+    filled=$((pct*40/100)); empty=$((40-filled))
     printf -v donebar '%*s' "$filled" ''
     printf -v leftbar '%*s' "$empty" ''
     donebar="${donebar// /█}"; leftbar="${leftbar// /░}"
-    maxlabel=$((cols-17)); (( maxlabel < 16 )) && maxlabel=16
-    # Both status messages occupy the same row above the blue bar.
-    if (( pct == 100 )); then
-        printf '\r\033[2K\033['"$WPO_LEFT"'G  %s✓ Установка завершена!%s\n' "$success" "$reset"
-    else
-        printf '\r\033[2K\033['"$WPO_LEFT"'G  %s✓ Установка...%s\n' "$success" "$reset"
+    status='✓ Установка...'
+    (( pct == 100 )) && status='✓ Установка завершена!'
+    if [[ "$status" != "$DRAW_STATUS" ]]; then
+        printf -v padding '%*s' "$((62-${#status}))" ''
+        printf -v part '\033[%d;%dH%s%s%s%s' "$PROGRESS_ROW" "$((WPO_LEFT+2))" "$success" "$status" "$padding" "$reset"
+        packet+="$part"
+        DRAW_STATUS="$status"
     fi
-    printf '\r\033[2K\033['"$WPO_LEFT"'G  %s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s\n' \
-        "$cyan" "$donebar" "$blue" "$leftbar" "$reset" "$pct" \
-        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
-    # One blue-highlighted live stage/operation; never a separate "Операция" row.
-    # At 100%, clear the stage line before showing the completed access card.
-    if (( pct == 100 )); then
-        printf '\r\033[2K'
-    else
-        printf '\r\033[2K\033['"$WPO_LEFT"'G  %s◈ %sЭтап: %s%s%s' "$cyan" "$blue" "$ice" "${label:0:maxlabel}" "$reset"
+    printf -v part '\033[%d;%dH%s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s  ' \
+        "$((PROGRESS_ROW+1))" "$((WPO_LEFT+2))" "$cyan" "$donebar" "$blue" "$leftbar" "$reset" \
+        "$pct" "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
+    packet+="$part"
+    stage="◈ Этап: ${label:0:50}"
+    (( pct == 100 )) && stage=""
+    if [[ "$stage" != "$DRAW_STAGE" ]]; then
+        printf -v padding '%*s' "$((62-${#stage}))" ''
+        printf -v part '\033[%d;%dH%s%s%s%s' "$((PROGRESS_ROW+2))" "$((WPO_LEFT+2))" "$ice" "$stage" "$padding" "$reset"
+        packet+="$part"
+        DRAW_STAGE="$stage"
     fi
-    printf '\033[2A\r'
-    outer_frame
+    printf -v part '\033[%d;%dH' "$PROGRESS_ROW" "$((WPO_LEFT+2))"
+    printf '%s%s' "$packet" "$part"
 }
-
 # One clock for the entire installation, starting at package preparation.
 printf '\033[?25l'
 started=$SECONDS
 shown=1
 label='Загрузка пакета'
-printf '\n\033['"$WPO_LEFT"'G  %sХОД УСТАНОВКИ%s\n' "$cyan" "$reset"
+# Reserve fixed rows above the bottom border; never scroll during animation.
+PROGRESS_ROW=$((UI_ROWS-4))
+(( PROGRESS_ROW > 27 )) && PROGRESS_ROW=27
+printf '\033[%d;%dH%sХОД УСТАНОВКИ%s' "$((PROGRESS_ROW-1))" "$((WPO_LEFT+2))" "$cyan" "$reset"
 draw "$shown" "$label" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
@@ -277,7 +280,7 @@ label='Проверка установочного пакета'
 while (( shown < 7 )); do
     shown=$((shown+1))
     draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 0.08
+    sleep 0.5
 done
 confirmed=7
 
@@ -297,7 +300,7 @@ while kill -0 "$INSTALL_PID" 2>/dev/null; do
     fi
     if (( shown < confirmed )); then shown=$((shown+1)); fi
     draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 0.1
+    sleep 0.5
 done
 code=0
 wait "$INSTALL_PID" || code=$?
@@ -312,11 +315,11 @@ if (( code == 0 )); then
     while (( shown < 100 )); do
         shown=$((shown+1))
         draw "$shown" 'Проверки завершены' "$((SECONDS-started))"
-        if (( shown < 100 )); then sleep 0.05; fi
+        if (( shown < 100 )); then sleep 0.15; fi
     done
     printf '\033[2B\r'
     # Keep verified completion visible before replacing it with access details.
-    sleep 6
+    sleep 4
     # Replace the wizard's fields and progress in place. Do NOT wipe the
     # whole SSH terminal: keep the WPO header and draw access details where
     # the domain/email/login/password fields were previously displayed.
