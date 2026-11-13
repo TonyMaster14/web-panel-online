@@ -124,6 +124,10 @@ jobs:
         shell: bash
         run: |
           python3 -m unittest discover -s tests -p 'test_subscription_happ_http.py' -v
+      - name: Verify Node Agent heartbeat, API authentication and truthful VPN support
+        shell: bash
+        run: |
+          python3 -m unittest discover -s tests -p 'test_node_api_heartbeat.py' -v
       - name: Verify installer safety, credentials, visual layout, restart and Happ title
         shell: bash
         run: |
