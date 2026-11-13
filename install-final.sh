@@ -90,7 +90,7 @@ cleanup_credentials() {
     fi
     return 0
 }
-finish_install() { local code=$?; cleanup_credentials; wpp_progress_finish "$code"; }
+finish_install() { local code=$?; [[ -z "${WPO_LOGIN_PROBE_FILE:-}" ]] || rm -f -- "$WPO_LOGIN_PROBE_FILE"; cleanup_credentials; wpp_progress_finish "$code"; }
 trap finish_install EXIT
 
 wpp_progress_start "Проверка пакета"
@@ -187,6 +187,34 @@ wpp_progress 99 "Проверка подключения Xray"
 systemctl is-active --quiet tproxy-panel.service || die 'Панель неактивна после установки нод.'
 
 
+# Verify that the URL actually opens the WPO sign-in form, not the public
+# cover site. The old /__health check accepted any HTML page returning 200.
+wpp_progress 99 "Проверка страницы входа"
+PANEL_ROUTE="$(sed -n 's/^Environment=WEBPROXY_PANEL_PATH=//p' /etc/systemd/system/tproxy-panel.service | head -n1)"
+PANEL_DOMAIN="$(sed -n 's/^Environment=TPROXY_HOSTNAME=//p' /etc/systemd/system/caddy.service.d/tproxy.conf | head -n1)"
+[[ "$PANEL_ROUTE" =~ ^/panel-[a-z0-9-]{3,64}$ ]] || die "Некорректный приватный путь панели."
+[[ "$PANEL_DOMAIN" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$PANEL_DOMAIN" == *.* ]] || die "Некорректный домен панели."
+WPO_LOGIN_PROBE_FILE="$(mktemp /run/wpo-login-probe.XXXXXXXX)"
+chmod 0600 "$WPO_LOGIN_PROBE_FILE"
+PANEL_LOGIN_URL="https://${PANEL_DOMAIN}${PANEL_ROUTE}/login"
+if ! curl -4kfsS --max-time 15 --resolve "${PANEL_DOMAIN}:443:127.0.0.1" \
+    -o "$WPO_LOGIN_PROBE_FILE" "$PANEL_LOGIN_URL"; then
+    die "Локальный HTTPS-маршрут панели не открывает страницу входа. Проверьте Caddy."
+fi
+if ! grep -Fq 'id="loginForm"' "$WPO_LOGIN_PROBE_FILE" ||
+   ! grep -Fq 'name="password"' "$WPO_LOGIN_PROBE_FILE"; then
+    die "Вместо формы входа локальный HTTPS-маршрут возвращает заглушку или другую страницу."
+fi
+# Check the same public URL, as used by the browser, to catch DNS/CDN mistakes.
+if ! curl -4kfsS --max-time 15 -o "$WPO_LOGIN_PROBE_FILE" "$PANEL_LOGIN_URL"; then
+    die "Публичный адрес панели недоступен. Проверьте DNS, HTTPS и маршруты Caddy."
+fi
+if ! grep -Fq 'id="loginForm"' "$WPO_LOGIN_PROBE_FILE" ||
+   ! grep -Fq 'name="password"' "$WPO_LOGIN_PROBE_FILE"; then
+    die "Публичный адрес открывает заглушку вместо страницы входа: проверьте DNS/CDN и Caddy."
+fi
+rm -f -- "$WPO_LOGIN_PROBE_FILE"
+WPO_LOGIN_PROBE_FILE=""
 # Do not report 100% until all checks, version writing and the private
 # access card have completed successfully.
 printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
