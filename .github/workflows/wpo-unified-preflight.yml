@@ -120,6 +120,10 @@ jobs:
             echo "=== $suite ==="
             python3 -m unittest discover -s tests -p "$suite" -v
           done
+      - name: Test real Happ subscription HTTP handler, status headers, flags and device limits
+        shell: bash
+        run: |
+          python3 -m unittest discover -s tests -p 'test_subscription_happ_http.py' -v
       - name: Verify installer safety, credentials, visual layout, restart and Happ title
         shell: bash
         run: |
