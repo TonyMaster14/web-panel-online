@@ -19,7 +19,7 @@ DOMAIN="${WEB_PANEL_PROXY_DOMAIN:-$(sed -n 's/^Environment=TPROXY_HOSTNAME=//p' 
 ACME_EMAIL="${WEB_PANEL_PROXY_ACME_EMAIL:-$(sed -n 's/^Environment=ACME_EMAIL=//p' /etc/systemd/system/caddy.service.d/tproxy.conf 2>/dev/null | head -n1 || true)}"
 MTPROTO_HOST="$(cat /etc/web-proxy-panel/mtproto-host 2>/dev/null || true)"
 MTPROTO_HOST="${MTPROTO_HOST:-$DOMAIN}"
-PANEL_PATH="/panel-$(openssl rand -hex 16)"
+PANEL_PATH="/panel-$(openssl rand -hex 12)"
 UPDATING="${WEB_PANEL_PROXY_UPDATE:-0}"
 MANIFEST="/etc/web-proxy-panel/manifest"
 PRIMARY_SECRET="/etc/web-proxy-panel/primary-secret"
@@ -5073,15 +5073,23 @@ fi
     if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
         card_blue='' card_value='' card_label='' card_warning='' card_bold='' card_reset=''
     fi
-    card_indent=""
-    if [[ "${WPO_CARD_WIZARD:-0}" == 1 && "${WPO_CARD_LEFT:-1}" =~ ^[0-9]+$ ]]; then
-        printf -v card_indent '\033[%dG' "${WPO_CARD_LEFT:-1}"
-    fi
-    card_cols="${WPO_CARD_COLUMNS:-80}"
+    # Fit the complete private URL on one terminal row when space permits.
+    # Never cut the clickable login address to a fixed 60-column card.
+    card_url="https://${DOMAIN}${PANEL_PATH}/login"
+    card_cols="${WPO_CARD_TERM_COLUMNS:-80}"
     [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
     (( card_cols > 114 )) && card_cols=114
     (( card_cols < 28 )) && card_cols=28
-    card_width=$((card_cols-8))
+    card_width=62
+    (( ${#card_url} > card_width )) && card_width=${#card_url}
+    (( card_width > card_cols-8 )) && card_width=$((card_cols-8))
+    (( card_width < 20 )) && card_width=20
+    card_indent=""
+    if [[ "${WPO_CARD_WIZARD:-0}" == 1 ]]; then
+        card_left=$(((card_cols-card_width-6)/2+1))
+        (( card_left < 2 )) && card_left=2
+        printf -v card_indent '\033[%dG' "$card_left"
+    fi
     printf -v card_rule '%*s' "$((card_width+2))" ''
     card_rule="${card_rule// /─}"
     card_line(){
@@ -5103,7 +5111,7 @@ fi
     fi
     card_line ''
     card_line 'Ссылка на панель:'
-    card_line "https://${DOMAIN}${PANEL_PATH}/login" "$card_value"
+    card_line "$card_url" "$card_value"
     card_line ''
     card_line "Логин: $ADMIN"
     card_line ''
