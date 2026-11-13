@@ -4143,6 +4143,10 @@ class Handler(BaseHTTPRequestHandler):
             selected_routing=[item for item in local_routing if item is not None]
             subscription_agent=self.headers.get("User-Agent","").lower()
             happ="happ" in subscription_agent
+            # Happ expects importable Xray profiles. Never silently return an
+            # empty base64 subscription when no active clients exist.
+            if happ and not lines:
+                self.send_data("В подписке пока нет активных VLESS или Hysteria2.",409,headers=headers); return
             hiddify="hiddify" in subscription_agent
             requested_format=parse_qs(urlparse(self.path).query).get("format",[""])[0].lower()
             local_count=len(result["users"])
