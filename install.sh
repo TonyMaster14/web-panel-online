@@ -214,23 +214,23 @@ draw(){
     printf -v donebar '%*s' "$filled" ''
     printf -v leftbar '%*s' "$empty" ''
     donebar="${donebar// /█}"; leftbar="${leftbar// /░}"
-    status='✓ Установка...'
-    (( pct == 100 )) && status='✓ Установка завершена!'
+    status='УСТАНОВКА…'
+    (( pct == 100 )) && status='УСТАНОВКА ЗАВЕРШЕНА!'
     if [[ "$status" != "$DRAW_STATUS" ]]; then
         printf -v padding '%*s' "$((62-${#status}))" ''
-        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$PROGRESS_ROW" "$((WPO_LEFT+2))" "$success" "$status" "$padding" "$reset"
+        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$PROGRESS_ROW" "$((WPO_LEFT+2))" "$bold$success" "$status" "$padding" "$reset"
         packet+="$part"
         DRAW_STATUS="$status"
     fi
     printf -v part '\0338\033[%dB\033[%dG%s%s%s%s%s  %3d%%  %s◷ %02d:%02d:%02d%s  ' \
-        "$((PROGRESS_ROW+1))" "$((WPO_LEFT+2))" "$cyan" "$donebar" "$blue" "$leftbar" "$reset" \
+        "$((PROGRESS_ROW+2))" "$((WPO_LEFT+2))" "$cyan" "$donebar" "$blue" "$leftbar" "$reset" \
         "$pct" "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
     packet+="$part"
     stage="◈ Этап: ${label:0:50}"
     (( pct == 100 )) && stage=""
     if [[ "$stage" != "$DRAW_STAGE" ]]; then
         printf -v padding '%*s' "$((62-${#stage}))" ''
-        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$((PROGRESS_ROW+2))" "$((WPO_LEFT+2))" "$ice" "$stage" "$padding" "$reset"
+        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$((PROGRESS_ROW+3))" "$((WPO_LEFT+2))" "$ice" "$stage" "$padding" "$reset"
         packet+="$part"
         DRAW_STAGE="$stage"
     fi
@@ -243,8 +243,7 @@ started=$SECONDS
 shown=1
 label='Загрузка пакета'
 # Anchor to the cursor just below the last input, leaving one blank row.
-PROGRESS_ROW=2
-printf '\0338\033[%dB\033[%dG%sХОД УСТАНОВКИ%s' "$((PROGRESS_ROW-1))" "$((WPO_LEFT+2))" "$cyan" "$reset"
+PROGRESS_ROW=1
 draw "$shown" "$label" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
@@ -265,13 +264,13 @@ else
     done
     if ! wait "$INSTALL_PID"; then
         INSTALL_PID=""
-        printf '\033[2B\r\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
+        printf '\033[3B\r\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
     fi
     INSTALL_PID=""
     SOURCE="$WORK/source"
 fi
 [[ -s "$SOURCE/install-final.sh" && -s "$SOURCE/node-install.sh" ]] || {
-    printf '\033[2B\r\n'; error "Неполный пакет установщика. Журнал: $LOG"
+    printf '\033[3B\r\n'; error "Неполный пакет установщика. Журнал: $LOG"
 }
 chmod 0700 "$SOURCE"/*.sh
 printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
@@ -307,7 +306,7 @@ INSTALL_PID=""
 if (( code == 0 )); then
     # Never display 100% or success if the final access card is missing.
     if [[ ! -s "$RESULT" ]]; then
-        printf '\033[2B\r\n'
+        printf '\033[3B\r\n'
         error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     fi
     # Complete the animation only after a successful exit and a valid access card.
@@ -316,7 +315,7 @@ if (( code == 0 )); then
         draw "$shown" 'Проверки завершены' "$((SECONDS-started))"
         if (( shown < 100 )); then sleep 1; fi
     done
-    printf '\033[2B\r'
+    printf '\033[3B\r'
     # Keep verified completion visible before replacing it with access details.
     sleep 4
     # Replace the wizard's fields and progress in place. Do NOT wipe the
@@ -329,7 +328,7 @@ if (( code == 0 )); then
     cat -- "$RESULT"
     outer_frame
 else
-    printf '\033[2B\r\n\033['"$WPO_LEFT"'G%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
+    printf '\033[3B\r\n\033['"$WPO_LEFT"'G%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
     [[ -z "$hint" ]] || printf '\033['"$WPO_LEFT"'G  %s\n' "$hint"
     printf '\033['"$WPO_LEFT"'G  Подробности: %s\n' "$LOG"
