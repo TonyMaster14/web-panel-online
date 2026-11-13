@@ -231,9 +231,13 @@ fi
 }
 chmod 0700 "$SOURCE"/*.sh
 printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
-shown=7
 label='Проверка установочного пакета'
-draw "$shown" "$label" "$((SECONDS-started))"
+while (( shown < 7 )); do
+    shown=$((shown+1))
+    draw "$shown" "$label" "$((SECONDS-started))"
+    sleep 0.08
+done
+confirmed=7
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
@@ -244,13 +248,14 @@ label='Проверка установочного пакета'
 while kill -0 "$INSTALL_PID" 2>/dev/null; do
     if IFS=$'\t' read -r target current_label < "$PROGRESS"; then
         if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target < 100 )); then
-            # Jump only to an actual milestone, never a fabricated 1%-per-tick.
-            shown="$target"
+            # Animate toward confirmed progress without running ahead of the installer.
+            (( target > confirmed )) && confirmed="$target"
             [[ -n "$current_label" ]] && label="$current_label"
         fi
     fi
+    if (( shown < confirmed )); then shown=$((shown+1)); fi
     draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 0.2
+    sleep 0.1
 done
 code=0
 wait "$INSTALL_PID" || code=$?
@@ -261,7 +266,12 @@ if (( code == 0 )); then
         printf '\033[2B\r\n'
         error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     fi
-    draw 100 'Проверки завершены' "$((SECONDS-started))"
+    # Complete the animation only after a successful exit and a valid access card.
+    while (( shown < 100 )); do
+        shown=$((shown+1))
+        draw "$shown" 'Проверки завершены' "$((SECONDS-started))"
+        if (( shown < 100 )); then sleep 0.05; fi
+    done
     printf '\033[2B\r'
     # Keep verified completion visible before replacing it with access details.
     sleep 6
