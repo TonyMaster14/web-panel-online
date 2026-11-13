@@ -129,6 +129,9 @@ if (( ! USE_WIZARD )); then
     exit $?
 fi
 
+# Start the wizard on a clean visible screen; retain terminal scrollback.
+# This runs once, never during input, progress updates or terminal resizing.
+printf '\033[0m\033[2J\033[H'
 terminal_size
 banner
 printf '\n  %sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
