@@ -51,12 +51,55 @@ terminal_size(){
     read -r rows UI_COLS < <(stty size </dev/tty 2>/dev/null) || true
     [[ "$UI_COLS" =~ ^[0-9]+$ ]] || UI_COLS=80
     (( UI_COLS >= 20 )) || UI_COLS=80
+    UI_ROWS="${rows:-24}"
+}
+# Boxes fit the viewport and start in the same column as the shell prompt.
+box_rule(){
+    BOX_WIDTH=$((UI_COLS-3))
+    (( BOX_WIDTH > 62 )) && BOX_WIDTH=62
+    printf -v BOX_RULE '%*s' "$BOX_WIDTH" ''
+    BOX_RULE="${BOX_RULE// /─}"
+}
+box_text(){
+    local text="$1" color="$2" chunk left right padl padr
+    while [[ -n "$text" ]]; do
+        chunk="${text:0:BOX_WIDTH}"; text="${text:BOX_WIDTH}"
+        left=$(((BOX_WIDTH-${#chunk})/2)); right=$((BOX_WIDTH-${#chunk}-left))
+        printf -v padl '%*s' "$left" ''; printf -v padr '%*s' "$right" ''
+        printf '%s│%s%s%s%s%s│%s\n' "$blue" "$color" "$padl" "$chunk" "$padr" "$reset$blue" "$reset"
+    done
 }
 banner(){
-    printf '\n%s  ╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-    printf '%s  │%s                 WEB PANEL ONLINE 3.0                         %s│%s\n' "$blue" "$bold$ice" "$reset$blue" "$reset"
-    printf '%s  │%s                    МАСТЕР УСТАНОВКИ                          %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$reset"
-    printf '%s  ╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
+    box_rule
+    printf '\n%s╭%s╮%s\n' "$blue" "$BOX_RULE" "$reset"
+    box_text 'WEB PANEL ONLINE 3.0' "$bold$ice"
+    box_text 'МАСТЕР УСТАНОВКИ' "$bold$cyan"
+    printf '%s╰%s╯%s\n' "$blue" "$BOX_RULE" "$reset"
+}
+welcome(){
+    printf '\n%sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
+    box_rule
+    printf '%s╭%s╮%s\n' "$blue" "$BOX_RULE" "$reset"
+    box_text 'ENTER — установить   │   q — выход' "$bold$cyan"
+    printf '%s╰%s╯%s\n' "$blue" "$BOX_RULE" "$reset"
+}
+render_context(){
+    banner
+    welcome
+    printf '\n'
+    if [[ "${UPDATE:-0}" == 1 ]]; then
+        printf '%sОбновление панели: данные сохранены.%s\n' "$ice" "$reset"
+    else
+        local gap='\n\n'
+        (( UI_ROWS < 30 )) && gap='\n'
+        printf '%sДомен: %s%s' "$cyan" "${DOMAIN:-}" "$reset"
+        printf '%b' "$gap"
+        printf '%sEmail: %s%s' "$cyan" "${EMAIL:-}" "$reset"
+        printf '%b' "$gap"
+        printf '%sЛогин: %s%s' "$cyan" "${DISPLAY_ADMIN:-}" "$reset"
+        printf '%b' "$gap"
+        printf '%sПароль (не отображается)%s\n' "$cyan" "$reset"
+    fi
 }
 valid_domain(){
     local d="$1" part
@@ -134,11 +177,7 @@ fi
 printf '\033[0m\033[2J\033[H'
 terminal_size
 banner
-printf '\n  %sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
-
-printf '  %s╭──────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-printf '  %s│%s  ›  ENTER — установить     %s│%s     q — выход                   %s│%s\n' "$blue" "$bold$cyan" "$reset$blue" "$ice" "$reset$blue" "$reset"
-printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
+welcome
 while true; do
     printf '%s' "$inset"
     read -r choice || exit 130
@@ -164,6 +203,7 @@ else
     CREDENTIALS="$(mktemp /run/wpo-ui-credentials.XXXXXXXX)"
     chmod 0600 "$CREDENTIALS"
     printf '%s\n%s\n' "$ADMIN" "$PASS" > "$CREDENTIALS"
+    DISPLAY_ADMIN="$ADMIN"
     unset PASS ADMIN
 fi
 
@@ -189,10 +229,12 @@ draw(){
     key="$pct|$label|$elapsed"
     [[ "$key" != "$DRAW_LAST" || "$DRAW_RESIZED" == 1 ]] || return 0
     DRAW_LAST="$key"
+    local previous_cols="$UI_COLS" previous_rows="${UI_ROWS:-24}"
     terminal_size
+    if [[ "$UI_COLS" != "$previous_cols" || "$UI_ROWS" != "$previous_rows" ]]; then DRAW_RESIZED=1; fi
     if (( DRAW_RESIZED )); then
         printf '\033[0m\033[2J\033[H'
-        banner
+        render_context
         DRAW_READY=0
         DRAW_RESIZED=0
     fi
@@ -302,6 +344,7 @@ if (( code == 0 )); then
     # One final screen transition after the four-second success hold.
     # Clear the visible screen only; do not erase terminal scrollback.
     printf '\033[0m\033[2J\033[H'
+    terminal_size
     banner
     cat -- "$RESULT"
     FINAL_SCREEN=1
