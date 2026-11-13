@@ -230,7 +230,7 @@ draw(){
     (( pct == 100 )) && stage=""
     if [[ "$stage" != "$DRAW_STAGE" ]]; then
         printf -v padding '%*s' "$((62-${#stage}))" ''
-        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$((PROGRESS_ROW+3))" "$((WPO_LEFT+2))" "$ice" "$stage" "$padding" "$reset"
+        printf -v part '\0338\033[%dB\033[%dG%s%s%s%s' "$((PROGRESS_ROW+4))" "$((WPO_LEFT+2))" "$ice" "$stage" "$padding" "$reset"
         packet+="$part"
         DRAW_STAGE="$stage"
     fi
@@ -264,13 +264,13 @@ else
     done
     if ! wait "$INSTALL_PID"; then
         INSTALL_PID=""
-        printf '\033[3B\r\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
+        printf '\033[4B\r\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
     fi
     INSTALL_PID=""
     SOURCE="$WORK/source"
 fi
 [[ -s "$SOURCE/install-final.sh" && -s "$SOURCE/node-install.sh" ]] || {
-    printf '\033[3B\r\n'; error "Неполный пакет установщика. Журнал: $LOG"
+    printf '\033[4B\r\n'; error "Неполный пакет установщика. Журнал: $LOG"
 }
 chmod 0700 "$SOURCE"/*.sh
 printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
@@ -306,7 +306,7 @@ INSTALL_PID=""
 if (( code == 0 )); then
     # Never display 100% or success if the final access card is missing.
     if [[ ! -s "$RESULT" ]]; then
-        printf '\033[3B\r\n'
+        printf '\033[4B\r\n'
         error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     fi
     # Complete the animation only after a successful exit and a valid access card.
@@ -315,7 +315,7 @@ if (( code == 0 )); then
         draw "$shown" 'Проверки завершены' "$((SECONDS-started))"
         if (( shown < 100 )); then sleep 1; fi
     done
-    printf '\033[3B\r'
+    printf '\033[4B\r'
     # Keep verified completion visible before replacing it with access details.
     sleep 4
     # Replace the wizard's fields and progress in place. Do NOT wipe the
@@ -328,7 +328,7 @@ if (( code == 0 )); then
     cat -- "$RESULT"
     outer_frame
 else
-    printf '\033[3B\r\n\033['"$WPO_LEFT"'G%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
+    printf '\033[4B\r\n\033['"$WPO_LEFT"'G%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
     [[ -z "$hint" ]] || printf '\033['"$WPO_LEFT"'G  %s\n' "$hint"
     printf '\033['"$WPO_LEFT"'G  Подробности: %s\n' "$LOG"
