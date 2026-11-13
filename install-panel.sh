@@ -5086,13 +5086,13 @@ fi
         local text="$1" color="${2:-$card_label}" link="${3:-}" chunk padding link_open="" link_close=""
         while (( ${#text} > card_width )); do
             chunk="${text:0:card_width}"
-            printf "${card_indent}"'  %s│ %s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$chunk" "$link_close$card_reset" "$card_blue" "$card_reset"
+            printf "${card_indent}"'%s│ %s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$chunk" "$link_close$card_reset" "$card_blue" "$card_reset"
             text="${text:card_width}"
         done
         printf -v padding '%*s' "$((card_width-${#text}))" ''
-        printf "${card_indent}"'  %s│ %s%s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$text" "$link_close$card_reset" "$padding" "$card_blue" "$card_reset"
+        printf "${card_indent}"'%s│ %s%s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$text" "$link_close$card_reset" "$padding" "$card_blue" "$card_reset"
     }
-    printf '%s\n'"$card_indent"'  %s╭%s╮%s\n' "$card_reset" "$card_blue" "$card_rule" "$card_reset"
+    printf '%s\n'"$card_indent"'%s╭%s╮%s\n' "$card_reset" "$card_blue" "$card_rule" "$card_reset"
     card_line ''
     if [[ "$UPDATING" == 1 ]]; then
         card_line 'WPO 3.0 — ОБНОВЛЕНО' "$card_bold"
@@ -5119,5 +5119,5 @@ fi
     card_line ''
     card_line 'Сохраните данные, чтобы не потерять!' "$card_warning"
     card_line ''
-    printf "${card_indent}"'  %s╰%s╯%s\n\n' "$card_blue" "$card_rule" "$card_reset"
+    printf "${card_indent}"'%s╰%s╯%s\n\n' "$card_blue" "$card_rule" "$card_reset"
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
