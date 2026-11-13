@@ -65,6 +65,7 @@ outer_frame(){
     fi
     UI_ROWS="$rows"
     cols=$((cols-1))
+    UI_COLUMNS=$((cols+1))
     # Keep the outer frame full-width; center the unchanged 64-column blocks.
     WPO_LEFT=$(((cols-68)/2+1))
     (( WPO_LEFT < 1 )) && WPO_LEFT=1
@@ -284,7 +285,7 @@ confirmed=7
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
-    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_COLUMNS=68 WPO_CARD_LEFT="$WPO_LEFT" \
+    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=1 WPO_CARD_TERM_COLUMNS="${UI_COLUMNS:-80}" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
 label='Проверка установочного пакета'
@@ -327,6 +328,10 @@ if (( code == 0 )); then
     # The existing access card is now the only content below that header.
     cat -- "$RESULT"
     outer_frame
+    # The calling SSH shell will print its prompt at this cursor position.
+    # Leave it below the finished card, aligned with the wizard rather than
+    # abruptly at the left border of the framed terminal.
+    printf '\033[?25h\033[%dG' "$((WPO_LEFT+2))"
 else
     printf '\033[4B\r\n\033['"$WPO_LEFT"'G%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
