@@ -65,7 +65,7 @@ jobs:
       - name: Run interactive installer TTY success and failure scenarios
         shell: bash
         run: |
-          python3 tests/test_installer_finish_tty.py
+          sudo -E python3 tests/test_installer_finish_tty.py
       - name: Verify bundled Node helpers replace remote downloads
         shell: bash
         run: |
