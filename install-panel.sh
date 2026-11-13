@@ -5067,9 +5067,6 @@ fi
     card_warning=$'\033[38;5;226m'
     card_bold=$'\033[1m\033[38;5;153m'
     card_reset=$'\033[0m'
-    if [[ "${WPO_CARD_WIZARD:-0}" == 1 ]]; then
-        card_reset=$'\033[0m\033[48;5;17m'
-    fi
     if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
         card_blue='' card_value='' card_label='' card_warning='' card_bold='' card_reset=''
     fi
@@ -5083,17 +5080,10 @@ fi
     (( card_width > card_cols-8 )) && card_width=$((card_cols-8))
     card_left=$(((card_cols-card_width-8)/2+1))
     card_indent=""
-    if [[ "${WPO_CARD_WIZARD:-0}" == 1 ]]; then
-        printf -v card_indent '\033[%dG' "$card_left"
-    fi
     printf -v card_rule '%*s' "$((card_width+2))" ''
     card_rule="${card_rule// /─}"
     card_line(){
         local text="$1" color="${2:-$card_label}" link="${3:-}" chunk padding link_open="" link_close=""
-        if [[ -n "$link" && "${WPO_CARD_WIZARD:-0}" == 1 && "${WPO_CARD_COLOR:-1}" != 0 ]]; then
-            printf -v link_open '\033]8;;%s\007' "$link"
-            link_close=$'\033]8;;\007'
-        fi
         while (( ${#text} > card_width )); do
             chunk="${text:0:card_width}"
             printf "${card_indent}"'  %s│ %s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$chunk" "$link_close$card_reset" "$card_blue" "$card_reset"
@@ -5112,13 +5102,10 @@ fi
     card_line ''
     card_line 'Ссылка на панель:'
     if (( ${#card_url} <= card_width )); then
-        card_line "$card_url" "$card_value" "$card_url"
-    elif [[ "${WPO_CARD_WIZARD:-0}" == 1 && "${WPO_CARD_COLOR:-1}" != 0 ]]; then
-        # Never split a clickable URL. Small terminals get a short full-target link.
-        card_line 'Вход в панель' "$card_value" "$card_url"
+        card_line "$card_url" "$card_value"
     else
-        # Plain output keeps a single intact URL for copying.
-        printf '%s\n' "$card_url"
+        # One complete plain URL; the terminal may soft-wrap it, never the script.
+        printf '  %s%s%s\n' "$card_value" "$card_url" "$card_reset"
     fi
     card_line ''
     card_line "Логин: $ADMIN"
