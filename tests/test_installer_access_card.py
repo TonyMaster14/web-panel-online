@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 source = Path("install-panel.sh").read_text(encoding="utf-8")
-marker = "# Финальная карточка: подпись и значение рядом, разные цвета, без выравнивающих отступов."
+marker = "# Финальная карточка: утверждённый синий стиль WPO 3.0, три поля в одной области."
 assert marker in source
 card = source[source.index(marker):]
 assert card.lstrip().startswith(marker)
@@ -34,13 +34,15 @@ with tempfile.TemporaryDirectory(prefix="wpo-access-card-") as folder:
         # Test the actual ANSI-colored terminal result and its visible layout.
         assert "\x1b[38;5;153m" in raw, "Blue labels missing"
         assert "\x1b[38;5;51m" in raw, "Contrasting cyan values missing"
+        assert "\x1b[38;5;226m" in raw, "Approved yellow warning missing"
         text = re.sub(r"\x1b\[[0-9;]*m", "", raw)
         rows = [line for line in text.splitlines() if line.startswith("  Ссылка на панель:") or line.startswith("  Логин :") or line.startswith("  Пароль :")]
         assert len(rows) == 3, f"Expected exactly three entries: {rows}"
         assert rows[0] == "  Ссылка на панель: https://panel.example.test/panel-sample-id/login", rows[0]
         assert rows[1] == "  Логин : TestAdmin", rows[1]
         assert rows[2] == ("  Пароль : DemoSecret123" if updating == "0" else "  Пароль : сохранён (без изменений)"), rows[2]
-        assert "Сохраните данные,что бы не потерять!" in text
+        assert "⚠ Сохраните данные, что бы не потерять!" in text
+        assert ("WPO 3.0 — УСТАНОВЛЕНО" if updating == "0" else "WPO 3.0 — ОБНОВЛЕНО") in text
         assert "Node API" not in text and "Token" not in text
         assert all(english not in text for english in ("Panel URL:", "Administrator login:", "Administrator password:"))
         if updating == "0":
@@ -49,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix="wpo-access-card-") as folder:
             assert "сохранён (без изменений)" in rows[2]
             assert "DemoSecret123" not in text
         assert text.index("Ссылка на панель:") < text.index("Логин :") < text.index("Пароль :") < text.index("Сохраните данные")
-        assert "\n\n  Логин :" in text and "\n\n  Пароль :" in text, "Expected blank separators"
-        assert "\n\n  Сохраните данные,что бы не потерять!" in text
+        assert "\n  Логин :" in text and "\n  Пароль :" in text, "Approved card keeps fields on adjacent lines"
+        assert "\n\n  ⚠ Сохраните данные, что бы не потерять!" in text
 
 print("PASS: Russian labels followed by exactly one space and values, ANSI colors, no leaked secrets")
