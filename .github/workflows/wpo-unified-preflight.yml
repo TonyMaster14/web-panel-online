@@ -96,6 +96,14 @@ jobs:
               subprocess.run(['bash','-n',str(path)],check=True)
           print('PASS: all 26 embedded sources are byte-equivalent and shell-valid')
           PY
+      - name: Exercise VPN protocols, clients, Happ imports, routing and configuration transactions
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for suite in test_connection_json.py test_direct_routing.py test_mieru_creation.py test_mieru_links.py test_mtproxy_download.py test_openflux_links.py test_timeweb_paths.py; do
+            echo "=== $suite ==="
+            python3 -m unittest discover -s tests -p "$suite" -v
+          done
       - name: Verify installer safety, credentials, visual layout, restart and Happ title
         shell: bash
         run: |
