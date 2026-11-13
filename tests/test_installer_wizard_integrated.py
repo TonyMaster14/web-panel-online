@@ -16,7 +16,7 @@ import time
 
 SOURCE = Path("install.sh").read_text(encoding="utf-8")
 CARD_SOURCE = Path("install-panel.sh").read_text(encoding="utf-8")
-CARD_MARK = "# Финальная карточка: подпись и значение рядом, разные цвета, без выравнивающих отступов."
+CARD_MARK = "# Финальная карточка: утверждённый синий стиль WPO 3.0, три поля в одной области."
 assert CARD_SOURCE.count(CARD_MARK) == 1
 
 MOCK_BACKEND = r"""#!/usr/bin/env bash
@@ -131,6 +131,8 @@ def run_case(case):
                 final_plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", final_screen)
                 assert "\x1b[J" in final_screen
                 assert "WEB PANEL ONLINE 3.0" in final_plain
+                assert "WPO 3.0 — УСТАНОВЛЕНО" in final_plain
+                assert "⚠ Сохраните данные, что бы не потерять!" in final_plain
                 assert "Ссылка на панель:" in final_plain
                 assert "https://panel.example.com/panel-test-install/login" in final_plain
                 assert "Логин : WPOAdmin" in final_plain
