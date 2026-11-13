@@ -177,8 +177,11 @@ if [[ -s /var/lib/tproxy-panel/data.json && -f /etc/systemd/system/tproxy-panel.
     DOMAIN="" EMAIL=""
 else
     ask_domain
+    printf '\n'
     ask_email
+    printf '\n'
     ask_admin
+    printf '\n'
     ask_password
     CREDENTIALS="$(mktemp /run/wpo-ui-credentials.XXXXXXXX)"
     chmod 0600 "$CREDENTIALS"
