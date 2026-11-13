@@ -126,7 +126,7 @@ printf '  %s╭─────────────────────�
 printf '  %s│%s  ›  ENTER — установить     %s│%s     q — выход                  %s│%s\n' "$blue" "$bold$cyan" "$blue" "$ice" "$blue" "$reset"
 printf '  %s╰──────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
 while true; do
-    read -r -p '  Ваш выбор: ' choice || exit 130
+    read -r choice || exit 130
     [[ "$choice" != q && "$choice" != Q ]] || exit 0
     [[ -z "$choice" ]] && break
     printf '%s  Нажмите Enter или q для выхода.%s\n' "$gray" "$reset"
