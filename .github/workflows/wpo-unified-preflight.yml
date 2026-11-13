@@ -96,6 +96,22 @@ jobs:
               subprocess.run(['bash','-n',str(path)],check=True)
           print('PASS: all 26 embedded sources are byte-equivalent and shell-valid')
           PY
+      - name: Verify bundled executables, shell payloads, compressed packages and flag archive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(uname -m)" = x86_64
+          for binary in assets/OpenFlux-linux-amd64 assets/amneziawg-go-linux-amd64 assets/awg-linux-amd64; do
+            test -s "$binary"
+            file "$binary" | grep -Eq 'ELF 64-bit.*x86-64'
+          done
+          bash -n assets/awg-quick-linux-amd64
+          for archive in assets/caddy-forwardproxy-naive-v2.11.7-naive2.tar.xz assets/mita-v3.39.0-linux-amd64.tar.gz assets/mieru-v3.39.0-source.tar.gz wpp-panel/flags.tar.gz; do
+            test -s "$archive"
+            tar -tf "$archive" > /dev/null
+          done
+          echo '434198ea0558bc440379e9a0a97f6904ba8dd6b213dd6fb9d578388eba7d2f12  assets/mieru-v3.39.0-source.tar.gz' | sha256sum -c -
+          echo 'PASS: bundled executables and archives are present and readable'
       - name: Exercise VPN protocols, clients, Happ imports, routing and configuration transactions
         shell: bash
         run: |
