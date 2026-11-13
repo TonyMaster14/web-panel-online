@@ -6,6 +6,7 @@ from pathlib import Path
 import fcntl
 import os
 import pty
+import re
 import select
 import struct
 import subprocess
@@ -115,25 +116,27 @@ def run_case(case):
             drain()
             raw = bytes(buffer)
             decoded = raw.decode("utf-8", errors="replace")
+            plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", decoded)
             assert "Secret-6789" not in decoded[:decoded.find("ХОД УСТАНОВКИ")], "Password echoed in input section"
             if case == "success":
                 assert rc == 0, (rc, decoded[-4000:])
                 assert "Установка завершена!" in decoded, decoded[-4000:]
                 assert "100%" in decoded, decoded[-4000:]
-                assert "Этап: Установка нод" in decoded, decoded[-4000:]
+                assert "Этап: Установка нод" in plain, plain[-4000:]
                 # After 1 sec, the cursor returns to the wizard header, then
                 # everything below it is erased, leaving only the real access card.
                 parts = raw.split(b"\x1b[H")
                 assert len(parts) >= 3, "The final same-window cursor-home transition did not run"
                 final_screen = parts[-1].decode("utf-8", errors="replace")
+                final_plain = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", final_screen)
                 assert "\x1b[J" in final_screen
-                assert "WEB PANEL ONLINE 3.0" in final_screen
-                assert "Ссылка на панель:" in final_screen
-                assert "https://panel.example.com/panel-test-install/login" in final_screen
-                assert "Логин : WPOAdmin" in final_screen
-                assert "Пароль : Secret-6789" in final_screen
+                assert "WEB PANEL ONLINE 3.0" in final_plain
+                assert "Ссылка на панель:" in final_plain
+                assert "https://panel.example.com/panel-test-install/login" in final_plain
+                assert "Логин : WPOAdmin" in final_plain
+                assert "Пароль : Secret-6789" in final_plain
                 for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "Установка завершена!", "100%", "◷ 00:"):
-                    assert unwanted not in final_screen, (unwanted, final_screen)
+                    assert unwanted not in final_plain, (unwanted, final_plain)
             elif case == "failed":
                 assert rc == 27, (rc, decoded[-2000:])
                 assert "Установка прервана" in decoded
