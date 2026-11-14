@@ -151,12 +151,22 @@ def run_case(case):
                 assert "Сохраните данные, чтобы не потерять!" in final_plain
                 assert "Ссылка на панель:" in final_plain
                 assert "https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login" in final_plain
+                assert any("Ссылка на панель: https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login" in row
+                           and row.count("│")==2 for row in final_plain.splitlines())
                 # The full link appears INSIDE the frame, before its bottom border.
                 card_tail=final_plain.split('WPO 3.0 — УСТАНОВЛЕНО',1)[1]
                 assert card_tail.index('Ссылка на панель:') < card_tail.index('╰')
                 assert any('https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login' in line and line.count('│') == 2 for line in final_plain.splitlines())
                 assert "Логин: WPOAdmin" in final_plain
                 assert "Пароль: Secret-6789" in final_plain
+                # Equal one-empty-row gaps from title through link, login,
+                # password, warning; link is inline with its label.
+                rows=final_plain.splitlines()
+                markers=("WPO 3.0 — УСТАНОВЛЕНО", "Ссылка на панель: https://",
+                         "Логин: WPOAdmin", "Пароль: Secret-6789",
+                         "Сохраните данные, чтобы не потерять!")
+                positions=[next(i for i,line in enumerate(rows) if marker in line) for marker in markers]
+                assert all(y-x==2 for x,y in zip(positions,positions[1:])), positions
                 # Final title banner and credentials frame have exactly the
                 # same horizontal length; both headings are centered in it.
                 final_rows=final_plain.splitlines()
