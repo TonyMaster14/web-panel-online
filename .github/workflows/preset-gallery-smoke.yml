@@ -51,10 +51,11 @@ jobs:
           assert 'action="/panel-test/apply-preset"' in html
 
           source = '<!doctype html><html><head><style>.car{background:url("/preset-cars.webp")}</style></head><body></body></html>'
-          preview = preview_document(source, lambda x: x)
+          preview = preview_document(source, lambda x: x, "panel.example.test", "/panel-test")
           assert preview.startswith("<!doctype html>")
           assert "http-equiv=\"Content-Security-Policy\"" in preview
-          assert 'data:image/webp;base64,' in preview
+          # New preview streams local photos instead of embedding bulky base64.
+          assert 'https://panel.example.test/panel-test/__preview_asset/preset-cars.webp?v=' in preview
           css = inline_bundled_preset_photos('.car{background:url("/preset-car-white.webp")}')
           assert "data:image/webp;base64," in css
           assert "inline_bundled_preset_photos(css)" in installer
