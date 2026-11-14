@@ -40,7 +40,10 @@ src=Path(sys.argv[1]).read_text(encoding="utf-8")
 ui=Path(sys.argv[2]).read_text(encoding="utf-8")
 required=[
     'placeholder="Например, Home VPN"',
-    "if(expiry.value!=='0')calendar.open=false;",
+    "toggle.addEventListener('click',event=>{",
+    "if(popover.hidden)openCalendar();",
+    "else closeCalendar();",
+    "document.getElementById('wpoV28Until2099')",
     "const calendar=document.getElementById('wpoV28Calendar');",
     'id="wpoV28DayGrid"',
 ]
@@ -64,7 +67,10 @@ html=wpo_user_v28.form('/panel-check','test-csrf',[
 ],[],{'country_code':'NL','country_name':'Нидерланды'})
 assert 'placeholder="Например, Home VPN"' in html
 assert 'Например, Анна · iPhone' not in html
-assert "if(expiry.value!=='0')calendar.open=false;" in html
+assert "toggle.addEventListener('click',event=>{" in html
+assert "if(popover.hidden)openCalendar();" in html
+assert 'data-wpo-2099="1"' in html
+assert 'id="wpoV28Hour"' not in html
 print('✓ Установленный модуль выдаёт Home VPN')
 PY_TEST
 systemctl restart "$SERVICE"
@@ -87,5 +93,5 @@ done
 SAVED=0
 echo '✓ WPO перезапущена, новая форма установлена и проверена.'
 echo '✓ Подсказка: Например, Home VPN'
-echo '✓ Календарь закрывается после выбора дня или быстрого срока.'
+echo '✓ Календарь закрывается по иконке, выбору дня, быстрому сроку и Esc.'
 echo 'Закройте старую вкладку панели, откройте её заново и нажмите «Новый пользователь».'
