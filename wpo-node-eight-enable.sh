@@ -24,11 +24,26 @@ download(){
 }
 echo '[WPO node] Installing all eight protocol engines'
 export DEBIAN_FRONTEND=noninteractive
-apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+# The base Agent and VPN install stages already refreshed apt metadata.
+# Re-running a full apt update and installing GCC/Go here adds minutes on 1GB VPS.
+if ! find /var/lib/apt/lists -maxdepth 1 -type f -name '*Packages*' -print -quit | grep -q .; then
+    apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
+fi
 apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y \
-    --no-install-recommends ca-certificates curl git build-essential libssl-dev \
-    zlib1g-dev util-linux xz-utils tar nftables iproute2 wireguard-tools \
-    python3 openssl procps
+    --no-install-recommends ca-certificates curl util-linux xz-utils tar \
+    nftables iproute2 wireguard-tools python3 openssl procps
+# Immutable amd64 releases from our test-branch CI workflow.
+BINARY_REV=4894c299d538a0283fadf3e4ca73a758dc6fdde6
+BINARY_BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$BINARY_REV"
+download_prebuilt(){
+    local item="$1" target="$2" digest="$3"
+    curl -4fLsS --proto '=https' --proto-redir '=https' --retry 3 \
+        --connect-timeout 12 --max-time 90 -o "$TEMP/$item" "$BINARY_BASE/assets/node-prebuilt/$item"
+    echo "$digest  $TEMP/$item" | sha256sum -c - >/dev/null || {
+        echo "Node prebuilt checksum mismatch: $item" >&2; return 4;
+    }
+    install -o root -g root -m 0755 "$TEMP/$item" "$target"
+}
 install -d -m 0755 /opt/web-panel-proxy
 # NaiveProxy (caddy) and Mieru (mita) must traverse the shared parent.
 # AWG credentials remain locked inside the root-only awg subdirectory.
@@ -37,20 +52,11 @@ install -d -o root -g root -m 0700 /etc/web-proxy-panel/awg
 install -d -o root -g root -m 0755 /etc/web-proxy-panel/extra-protocols
 install -d -m 0755 /opt/wpp-node-agent
 
-# Original Telegram MTProxy at the exact pinned source and archive checksum.
+# MTProto: precompiled and SHA256-verified on GitHub Actions, not built on VPS.
 if [[ ! -x /opt/MTProxy/objs/bin/mtproto-proxy ]]; then
-    curl -4fLsS --proto '=https' --proto-redir '=https' --retry 3 \
-        --connect-timeout 20 --max-time 240 \
-        'https://github.com/TelegramMessenger/MTProxy/archive/f36d8af769ffaeac36978d38c2c0f6d1104c2137.tar.gz' \
-        -o "$TEMP/mtproxy.tar.gz"
-    echo "919795c416b870670841a21d1930ad97a24c7b84b9eb8c6f9e3de32f2fdf4655  $TEMP/mtproxy.tar.gz" |
-        sha256sum -c - >/dev/null
-    install -d -m 0755 "$TEMP/mtproxy-build"
-    tar -xzf "$TEMP/mtproxy.tar.gz" -C "$TEMP/mtproxy-build" --strip-components=1
-    make -C "$TEMP/mtproxy-build" -j"$(nproc)"
-    [[ -x "$TEMP/mtproxy-build/objs/bin/mtproto-proxy" ]] || exit 4
     install -d -m 0755 /opt/MTProxy/objs/bin
-    install -m 0755 "$TEMP/mtproxy-build/objs/bin/mtproto-proxy" /opt/MTProxy/objs/bin/mtproto-proxy
+    download_prebuilt mtproto-proxy-linux-amd64 /opt/MTProxy/objs/bin/mtproto-proxy \
+        7bca7b096b3c1aaa424b5e4e538df9db4b8fc3ebb7a1efb83f0bb24f252bf3ed
 fi
 if ! getent group mtproxy >/dev/null 2>&1; then groupadd --system mtproxy; fi
 if ! id mtproxy >/dev/null 2>&1; then
@@ -68,29 +74,11 @@ grep -q '^proxy_for ' "$TEMP/proxy-multi.conf" || exit 4
 install -o root -g mtproxy -m 0640 "$TEMP/proxy-secret" /etc/mtproxy/proxy-secret
 install -o root -g mtproxy -m 0640 "$TEMP/proxy-multi.conf" /etc/mtproxy/proxy-multi.conf
 
-# Pinned browser HTTPS transport relay for Telegram WEB Proxy and public site.
-GO=/opt/go1.26.5/bin/go
-if [[ ! -x "$GO" ]]; then
-    curl -4fLsS --proto '=https' --proto-redir '=https' --retry 3 \
-        --connect-timeout 20 --max-time 240 \
-        'https://go.dev/dl/go1.26.5.linux-amd64.tar.gz' \
-        -o "$TEMP/go.tar.gz"
-    echo "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053  $TEMP/go.tar.gz" |
-        sha256sum -c - >/dev/null
-    install -d /opt/go1.26.5
-    tar -xzf "$TEMP/go.tar.gz" -C "$TEMP"
-    cp -a "$TEMP/go/." /opt/go1.26.5/
-fi
+# WEB Proxy relay: pinned tested static binary; never fetch Go compiler or
+# build source code on a small Node VPS.
 if [[ ! -x /usr/local/bin/tproxy-server ]]; then
-    mkdir -p "$TEMP/relay"
-    git -C "$TEMP/relay" init -q
-    git -C "$TEMP/relay" remote add origin https://github.com/telegramdesktop/tproxy-server.git
-    git -C "$TEMP/relay" fetch -q --depth 1 origin 52a5feb7fac38f68da5afef9cedd9b3bfc8473ca
-    git -C "$TEMP/relay" checkout -q --detach FETCH_HEAD
-    [[ "$(git -C "$TEMP/relay" rev-parse HEAD)" == 52a5feb7fac38f68da5afef9cedd9b3bfc8473ca ]] || exit 4
-    (cd "$TEMP/relay" && "$GO" test ./internal/config ./internal/server -run '^TestWPO' -count=1)
-    (cd "$TEMP/relay" && "$GO" build -trimpath -ldflags='-s -w' \
-        -o /usr/local/bin/tproxy-server ./cmd/tproxy-server)
+    download_prebuilt tproxy-server-linux-amd64 /usr/local/bin/tproxy-server \
+        aad3ae41787ae1c16b3cb7f9fc6348baa0f7e29d19d99ea269aa5c309aca7391
 fi
 if ! id tproxy >/dev/null 2>&1; then
     useradd --system --home /var/lib/tproxy --create-home --shell /usr/sbin/nologin tproxy
