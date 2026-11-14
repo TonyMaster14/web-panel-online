@@ -388,9 +388,10 @@ function closeCalendar(){
   calendar.classList.remove('is-open');
 }
 function openCalendar(){
-  // The expiration defaults to +1 month; the calendar itself should always
-  // open on the *current* browser-local month so today's date is visible.
+  // Always reopen on the browser-local current date, even if an expiry
+  // such as +12 months was saved. Never overwrite the saved subscription date.
   const current=now();
+  highlightedDate=null;
   viewYear=current.getFullYear();
   viewMonth=current.getMonth();
   refreshLiveClock();
