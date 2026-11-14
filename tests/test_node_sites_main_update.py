@@ -23,7 +23,7 @@ class MainPanelSiteUpdate(unittest.TestCase):
             "wpo-node-site-template-fix.sh",
             "ssh -T",
             "root@$host",
-            "test \\"\\$(python3 -c",
+            'remote_check="test ',
             "bash -s",
             'while IFS=$\'\\t\' read -r node_id host;',
             "ServerAliveInterval=5",
