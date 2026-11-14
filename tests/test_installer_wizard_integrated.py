@@ -115,7 +115,8 @@ def run_case(case):
             os.write(master, b"WPOAdmin\n")
             receive("Пароль (не отображается):")
             os.write(master, b"Secret-6789\n")
-            receive("УСТАНОВКА")
+            # Progress updates are read from the completed PTY recording:
+            # the first frame may race with input echo on fast CI hosts.
             deadline=time.monotonic()+35
             while process.poll() is None and time.monotonic()<deadline:
                 if select.select([master],[],[],.1)[0]:
@@ -129,6 +130,7 @@ def run_case(case):
             assert "Secret-6789" not in decoded[:decoded.find("УСТАНОВКА")], "Password echoed in input section"
             if case == "success":
                 assert rc == 0, (rc, decoded[-4000:])
+                assert "УСТАНОВКА …" in decoded, decoded[:8000]
                 assert "УСТАНОВКА ЗАВЕРШЕНА!" in decoded, decoded[-4000:]
                 assert "100%" in decoded, decoded[-4000:]
                 assert "Этап:" not in plain, plain[-4000:]
