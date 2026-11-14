@@ -91,6 +91,7 @@ wpp_progress 10 "Остановка служб"
 for unit in \
   web-panel-proxy-web-update.service \
   web-panel-proxy-auto-update.timer web-panel-proxy-auto-update.service \
+  web-panel-proxy-component-auto-update.timer web-panel-proxy-component-auto-update.service \
   web-panel-proxy-component-update.service \
   web-panel-proxy-metrics.timer web-panel-proxy-metrics.service \
   tproxy-panel.service web-proxy-panel.service web-proxy-panel-mtproxy.service \
@@ -258,6 +259,8 @@ rm -f -- \
   /etc/systemd/system/web-panel-proxy-auto-update.service \
   /etc/systemd/system/web-panel-proxy-auto-update.timer \
   /etc/systemd/system/web-panel-proxy-component-update.service \
+  /etc/systemd/system/web-panel-proxy-component-auto-update.service \
+  /etc/systemd/system/web-panel-proxy-component-auto-update.timer \
   /etc/systemd/system/web-panel-proxy-metrics.service \
   /etc/systemd/system/web-panel-proxy-metrics.timer \
   /etc/systemd/system/tproxy-panel.service \
