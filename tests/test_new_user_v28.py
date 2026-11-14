@@ -242,7 +242,7 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("id=\"wpoV28TimeZone\"",self.html)
         self.assertNotIn("Время окончания",self.html)
 
-    def test_date_outline_and_quick_period_keep_calendar_open(self):
+    def test_date_outline_and_quick_period_close_after_selection(self):
         script=wpo_user_v28.SCRIPT
         css=wpo_user_v28.STYLE
         self.assertIn("button.classList.toggle('is-highlighted',sameDay(date,highlightedDate||current));",script)
@@ -259,6 +259,13 @@ class NewUserFormTests(unittest.TestCase):
         self.assertNotIn("if(expiry.value!=='0')closeCalendar();",script)
         self.assertIn("chooseDate(addMonths(now(),Number(button.dataset.wpoMonths)),button.dataset.wpoMonths);",script)
         self.assertIn("chooseDate(new Date(2099,11,31),'2099');",script)
+        # Both quick preset handlers persist expiry and then close the popover.
+        self.assertIn("""chooseDate(addMonths(now(),Number(button.dataset.wpoMonths)),button.dataset.wpoMonths);
+  // The chosen expiry is already written to the hidden form field.
+  closeCalendar();""",script)
+        self.assertIn("""chooseDate(new Date(2099,11,31),'2099');
+  closeCalendar();""",script)
+        self.assertIn("expiry.value=good?String(Math.floor(selected.getTime()/1000)):'0';",script)
         self.assertIn("function resetCalendarSelection(){",script)
         self.assertIn("highlightedDate=null;",script)
         self.assertIn("chooseDate(now(),'',false);",script)
