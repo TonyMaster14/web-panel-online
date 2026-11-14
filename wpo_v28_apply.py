@@ -58,15 +58,17 @@ def patch_ui(src):
 
 def patch_panel(src):
     if MARKER in src:
-        return src
+        src = src.replace("time.gmtime(end_timestamp).tm_year>2090",
+                          "end_timestamp>4102487999")
+        return src.replace("до 2090 года", "до 2099 года")
     src = swap(src, CREATE,
                """                # wpo-v28-new-user: UTC expiry parsed in the browser's local zone.
                 try:
                     end_timestamp=int(form.get("expires_at","0"))
                     selected_gb=float(form.get("traffic_limit_gb","0") or "0")
                     if (not end_timestamp or end_timestamp<=int(time.time())+59
-                            or time.gmtime(end_timestamp).tm_year>2090):
-                        create_error("Выберите будущую дату окончания до 2090 года."); return
+                            or end_timestamp>4102487999):
+                        create_error("Выберите будущую дату окончания до 2099 года."); return
                     if selected_gb!=0:
                         create_error("Общий трафик на всех нодах пока не учитывается. Укажите 0 ГБ."); return
                 except (ValueError,OverflowError,TypeError):
@@ -85,15 +87,17 @@ def patch_panel(src):
 
 def patch_subscriptions(src):
     if MARKER in src:
-        return src
+        src = src.replace("time.gmtime(expiry).tm_year>2090",
+                          "expiry>4102487999")
+        return src.replace("до 2090 года", "до 2099 года")
     helper = '''# wpo-v28-new-user
 def validate_expiry(value):
     if value in (None, 0, "0", ""): return 0
     try:
         expiry=int(value)
         now=int(time.time())
-        if expiry<=now+59 or time.gmtime(expiry).tm_year>2090:
-            raise SubscriptionError("Дата окончания должна быть в будущем, до 2090 года.")
+        if expiry<=now+59 or expiry>4102487999:
+            raise SubscriptionError("Дата окончания должна быть в будущем, до 2099 года.")
         return expiry
     except (ValueError,OverflowError,TypeError):
         raise SubscriptionError("Некорректная дата окончания.")
