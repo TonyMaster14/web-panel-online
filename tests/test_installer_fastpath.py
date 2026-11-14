@@ -10,9 +10,13 @@ final = Path("install-final.sh").read_text(encoding="utf-8")
 
 # Backend milestones stay available for diagnostics, but the visual
 # display does not jump to them or fake an early 100%.
-assert 'WPO_PROGRESS_TARGET_SECONDS=240' in launcher
+assert 'WPO_PROGRESS_REFERENCE_SECONDS=240' in launcher
+assert 'read -r real_percent real_stage < "$PROGRESS"' in launcher
+assert 'WPO_CONFIRMED="$real_percent"' in launcher
+assert 'wanted=$((1 + elapsed * 98 / (elapsed+remaining)))' in launcher
+assert '(( wanted > 98 )) && wanted=98' in launcher
 assert 'wpo_progress_tick(){' in launcher
-assert 'if (( shown < expected )); then shown=$((shown+1)); fi' in launcher
+assert 'if (( shown < wanted && elapsed > WPO_LAST_INCREMENT_SECOND )); then' in launcher
 assert 'while (( shown < 100 )); do' in launcher
 assert 'shown=$confirmed' not in launcher
 assert 'stage="Этап:' not in launcher
