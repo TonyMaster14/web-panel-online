@@ -113,6 +113,25 @@ class NodeFederationTests(unittest.TestCase):
         assert "wpo-vpn-controller-v27" in bridge
         assert "def sync_profile(" in (ROOT / "wpp_nodes.py").read_text()
 
+    def test_short_sudo_patch_detects_controller_or_node(self):
+        dispatcher=(ROOT / "wpo-vpn-patch.sh").read_text()
+        self.assertIn("/opt/tproxy-panel/panel.py",dispatcher)
+        self.assertIn("/etc/wpp-node-agent/config.json",dispatcher)
+        self.assertIn('target="wpo-node-controller-vpn.sh"',dispatcher)
+        self.assertIn('target="wpo-node-vpn-enable.sh"',dispatcher)
+        self.assertIn('bash -n "$TMP"',dispatcher)
+        self.assertIn('WPO_NODE_VPN_REF="$REF" bash "$TMP"',dispatcher)
+        self.assertIn('controller == 1 && node == 1',dispatcher)
+
+    def test_runtime_patch_arguments_expand_in_real_bash(self):
+        for filename in ("wpo-node-vpn-enable.sh","wpo-node-controller-vpn.sh","wpo-vpn-patch.sh"):
+            source=(ROOT / filename).read_text()
+            self.assertNotIn(r"\${",source,filename)
+        node_script=(ROOT / "wpo-node-vpn-enable.sh").read_text()
+        self.assertIn('REF="${WPO_NODE_VPN_REF:-test/wpo-smooth-progress-v1}"',node_script)
+        self.assertIn("stream.write('\\n')",node_script)
+        self.assertNotIn("stream.write('\\\\n')",node_script)
+
     def test_package_includes_federation_capability_and_autoinstall(self):
         script=(ROOT / "wpo-node-agent-install-v2.sh").read_text()
         controller=(ROOT / "node-install.sh").read_text()
