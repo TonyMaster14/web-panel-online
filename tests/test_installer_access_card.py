@@ -24,6 +24,14 @@ with tempfile.TemporaryDirectory() as folder:
             if width >= len(url)+6:
                 assert url in text, 'Full URL must remain on one row in a wide SSH window'
                 assert any(url in line and line.count('│') == 2 for line in text.splitlines())
+                # Each final-card field is separated by exactly one empty row.
+                rows=text.splitlines()
+                markers=['WPO 3.0 — ', 'Ссылка на панель:', url, 'Логин: TestAdmin',
+                         'Пароль:', 'Сохраните данные, чтобы не потерять!']
+                indices=[next(i for i,row in enumerate(rows) if marker in row) for marker in markers]
+                assert all(y-x == 2 for x,y in zip(indices,indices[1:])), indices
+                assert all(rows[x+1].startswith('│') and not rows[x+1].strip('│ ')
+                           for x in indices[:-1]), 'Every field gap must be one empty framed row'
             # Narrow windows split only the text BETWEEN side borders.
             section=text.split('Ссылка на панель:',1)[1].split('Логин:',1)[0]
             pieces=[line.split('│',2)[1].strip() for line in section.splitlines() if line.count('│') == 2]
