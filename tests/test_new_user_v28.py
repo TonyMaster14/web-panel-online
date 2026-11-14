@@ -53,6 +53,22 @@ class NewUserFormTests(unittest.TestCase):
             self.assertIn(name,self.html)
         self.assertNotIn('name="connection_web"',self.html)
         self.assertNotIn('name="connection_awg20"',self.html)
+    def test_eight_protocols_are_selectable_if_real_local_templates_exist(self):
+        import wpp_connections
+        all_template_connections=wpp_connections.defaults()
+        html=wpo_user_v28.form("/panel-demo","token",all_template_connections,
+                               self.nodes,{"country_code":"NL"})
+        for spec in all_template_connections:
+            cid=spec["id"]
+            self.assertIn(f'name="connection_{cid}"',html)
+            self.assertIn(f'data-protocol="{spec["protocol"]}"',html)
+        self.assertEqual(html.count('class="wpo-v28-protocol"'),8)
+        self.assertIn("Отдельные протоколы создаются только по одному",html)
+        self.assertIn("kind.value=native[0].dataset.protocol",html)
+        self.assertIn("connection.value=native[0].dataset.connectionId",html)
+        self.assertIn("Срок действия",html)
+        self.assertIn("срок действия пока не применяется автоматически",html)
+
     def test_existing_controller_dom_is_preserved(self):
         for marker in ('id="createAccount"','id="createClientForm"','id="createSummary"',
                        'id="accountName"','id="subscriptionFields"','id="directFields"',
@@ -97,6 +113,7 @@ class NewUserFormTests(unittest.TestCase):
                            wpo_v28_apply.PICKER+"\n    client_script=CLIENTS_JS.replace(",1)
         updated=wpo_v28_apply.patch_ui(staged)
         self.assertIn("wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)",updated)
+        self.assertIn("wpo_user_v28.form(path,csrf,usable,nodes,local_node)",updated)
         self.assertIn("＋ Новый пользователь",updated)
         self.assertEqual(wpo_v28_apply.patch_ui(updated),updated)
         previous=updated.replace("wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)","CLIENTS_JS")
