@@ -116,18 +116,33 @@ python3 - <<'PY_RELAY'
 from pathlib import Path
 import json
 p=Path('/etc/tproxy-server/profiles.json')
+# Do not lose existing WEB Proxy credentials on a reinstall. Repair only
+# the known bootstrap encoding defect from Node Agent 0.4 (a literal "\n"
+# written after the closing JSON brace). Other corruption requires a
+# conscious repair, never an automatic registry reset.
 if p.exists():
+    raw=p.read_text()
     try:
-        data=json.loads(p.read_text())
-    except (ValueError,OSError):
-        data={}
+        data=json.loads(raw)
+    except ValueError:
+        if raw.endswith(r'\n'):
+            try:
+                data=json.loads(raw[:-2])
+            except ValueError:
+                raise SystemExit('Existing WEB Proxy registry is invalid; refusing to overwrite.')
+            p.write_text(json.dumps(data,ensure_ascii=False)+'\n')
+            print('✓ Repaired legacy WEB Proxy JSON newline, preserved profiles.')
+        elif raw.strip():
+            raise SystemExit('Existing WEB Proxy registry is invalid; refusing to overwrite.')
+        else:
+            data={}
     if isinstance(data,dict) and isinstance(data.get('profiles'),list) and data['profiles']:
         raise SystemExit(0)
 secret=Path('/etc/wpp-node-vpn/relay-bootstrap-secret').read_text().strip()
 p.write_text(json.dumps({'profiles':[{
     'name':'node-bootstrap','secret':secret,
     'backend':'127.0.0.1:2398','carrier_mode':'https'
-}]})+'\\n')
+}]})+'\n')
 PY_RELAY
 chown root:tproxy /etc/tproxy-server/profiles.json
 chmod 0400 /etc/tproxy-server/profiles.json
