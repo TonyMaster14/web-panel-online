@@ -110,9 +110,30 @@ p.write_text(json.dumps(doc,indent=2)+'\n')
 PY_DOMAIN
 chown root:tproxy /etc/tproxy-server/config.json
 chmod 0640 /etc/tproxy-server/config.json
-if [[ ! -s /etc/tproxy-server/profiles.json ]]; then
-    printf '{"profiles":[]}\n' > /etc/tproxy-server/profiles.json
+# The upstream Go relay REJECTS an empty profile registry. Install a
+# private, nonfunctional bootstrap profile (unknown random credential)
+# until the first real WEB Proxy user is provisioned.
+if [[ ! -s /etc/wpp-node-vpn/relay-bootstrap-secret ]]; then
+    openssl rand -hex 16 > /etc/wpp-node-vpn/relay-bootstrap-secret
+    chmod 0600 /etc/wpp-node-vpn/relay-bootstrap-secret
 fi
+python3 - <<'PY_RELAY'
+from pathlib import Path
+import json
+p=Path('/etc/tproxy-server/profiles.json')
+if p.exists():
+    try:
+        data=json.loads(p.read_text())
+    except (ValueError,OSError):
+        data={}
+    if isinstance(data,dict) and isinstance(data.get('profiles'),list) and data['profiles']:
+        raise SystemExit(0)
+secret=Path('/etc/wpp-node-vpn/relay-bootstrap-secret').read_text().strip()
+p.write_text(json.dumps({'profiles':[{
+    'name':'node-bootstrap','secret':secret,
+    'backend':'127.0.0.1:2398','carrier_mode':'https'
+}]})+'\\n')
+PY_RELAY
 chown root:tproxy /etc/tproxy-server/profiles.json
 chmod 0400 /etc/tproxy-server/profiles.json
 cat > /etc/systemd/system/wpo-node-relay.service <<'UNIT'
