@@ -181,7 +181,11 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
-ReadWritePaths=/etc/wpp-node-vpn
+# The authenticated 8-engine API must be able to write its actual backend
+# registries. ProtectSystem=strict otherwise made every first VLESS import
+# fail when the old engine touched native backends outside wpp-node-vpn.
+# Paths starting with '-' may not exist until the 8-engine installer runs.
+ReadWritePaths=/etc/wpp-node-vpn -/etc/systemd/system -/etc/tproxy-server -/etc/web-proxy-panel
 [Install]
 WantedBy=multi-user.target
 UNIT
