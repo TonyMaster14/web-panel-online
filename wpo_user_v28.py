@@ -147,7 +147,9 @@ def form(path, csrf, connections, nodes=None, local=None):
         + "".join(f'<span>{day}</span>' for day in ("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"))
         + '</div><div id="wpoV28DayGrid" class="wpo-v28-cal-days" '
         'role="group" aria-label="Выбрать день"></div>'
-        '<small id="wpoV28TimeZone" class="wpo-v28-zone-note"></small>'
+        '<div class="wpo-v28-live-time" aria-label="Текущие дата и время">'
+        '<span>Сейчас: <time id="wpoV28Now"></time></span>'
+        '<small id="wpoV28TimeZone" class="wpo-v28-zone-note"></small></div>'
         '</div></div></div></div>'
         '<div class="wpo-v28-limits">'
         '<label class="wpo-v28-limit-field"><span>Устройств</span>'
@@ -310,8 +312,13 @@ STYLE = """
 .wpo-v28-cal-days button.is-today::after{display:none!important}
 .wpo-v28-zone-note{display:block;font-size:10px;color:var(--muted);
  border-top:1px solid var(--line);padding-top:9px}
-.wpo-v28-months button[data-wpo-2099]{font-weight:700;margin-top:6px;border:1px solid var(--accent)}
-.wpo-v28-months button[data-wpo-2099].is-selected{background:var(--tint);color:var(--accent)}
+.wpo-v28-months button[data-wpo-2099]{font-weight:600;margin-top:6px;border:1px solid var(--line)}
+.wpo-v28-months button[data-wpo-2099].is-selected{background:var(--tint);color:var(--accent);border-color:var(--accent)}
+.wpo-v28-live-time{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:4px 12px;padding-top:9px;border-top:1px solid var(--line);font-size:10px;
+ color:var(--text);font-variant-numeric:tabular-nums}
+.wpo-v28-live-time time{font-weight:600;color:var(--text)}
+.wpo-v28-live-time .wpo-v28-zone-note{border:0;padding:0;font-size:9px;color:var(--muted)}
 @media(max-width:560px){
  .wpo-v28-months{grid-template-columns:repeat(3,minmax(0,1fr))}
  .wpo-v28-calendar-body{position:static;box-shadow:none}
@@ -332,8 +339,15 @@ const yearSelect=document.getElementById('wpoV28Year');
 if(!f||!dt||!expiry||!calendar||!toggle||!popover||!grid||!monthSelect||!yearSelect)return;
 const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Локальное время';
 const zoneLabel=document.getElementById('wpoV28TimeZone');
-if(zoneLabel)zoneLabel.textContent='Часовой пояс: '+tz;
+if(zoneLabel)zoneLabel.textContent=tz;
+const liveTime=document.getElementById('wpoV28Now');
 const now=()=>new Date();
+function refreshLiveClock(){
+  if(liveTime)liveTime.textContent=now().toLocaleString('ru-RU',{
+    day:'numeric',month:'long',year:'numeric',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
+  });
+}
 const pad=n=>String(n).padStart(2,'0');
 const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
 const atEndOfDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,0,0);
@@ -365,6 +379,12 @@ function closeCalendar(){
   calendar.classList.remove('is-open');
 }
 function openCalendar(){
+  // The expiration defaults to +1 month; the calendar itself should always
+  // open on the *current* browser-local month so today's date is visible.
+  const current=now();
+  viewYear=current.getFullYear();
+  viewMonth=current.getMonth();
+  refreshLiveClock();
   renderCalendar();
   popover.hidden=false;
   toggle.setAttribute('aria-expanded','true');
@@ -465,6 +485,22 @@ document.addEventListener('keydown',event=>{
   }
 });
 document.getElementById('createAccount')?.addEventListener('close',closeCalendar);
+refreshLiveClock();
+setInterval(()=>{
+  if(!popover.hidden){
+    refreshLiveClock();
+    const current=now();
+    // At local midnight, refresh the red today outline if the month is visible.
+    if(viewYear===current.getFullYear()&&viewMonth===current.getMonth()){
+      for(const button of grid.querySelectorAll('button')){
+        const day=Number(button.textContent);
+        if(Number.isInteger(day)&&day>0){
+          button.classList.toggle('is-today',day===current.getDate());
+        }
+      }
+    }
+  }
+},1000);
 function choice(){
   const selectedProtocols=[...f.querySelectorAll('.wpo-v28-protocol:checked')];
   const native=selectedProtocols.filter(el=>!['vless','hysteria'].includes(el.dataset.protocol));
