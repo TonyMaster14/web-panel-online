@@ -231,9 +231,10 @@ def _mt_unit(record):
         raise ValueError("Invalid allocated MTProto port")
     return (
         "[Unit]\nDescription=WPO Node Telegram %s profile %s\n"
-        "After=network-online.target\nWants=network-online.target\n"
-        "[Service]\nType=simple\nUser=root\nGroup=root\n"
-        "ExecStart=%s -u nobody -p %d -H %d -S %s --aes-pwd %s %s -M 1\n"
+        "After=network-online.target wpo-node-mt-firewall.service\n"
+        "Wants=network-online.target\nRequires=wpo-node-mt-firewall.service\n"
+        "[Service]\nType=simple\nUser=mtproxy\nGroup=mtproxy\n"
+        "ExecStart=%s -u mtproxy -p %d -H %d -S %s --aes-pwd %s %s -M 1\n"
         "Restart=always\nRestartSec=3\nNoNewPrivileges=true\nPrivateTmp=true\n"
         "[Install]\nWantedBy=multi-user.target\n"
     ) % (proto, uid, MT_BIN, stats, port, record["secret"], MT_AES, MT_CONF)
@@ -261,7 +262,6 @@ def _update_mtproxy(users, domain):
         path = MT_UNIT_DIR / unit
         desired = _mt_unit(record)
         if not path.is_file() or path.read_text() != desired:
-            xray.atomic_json  # no-op; keep import required for static checks
             fd, tmp = __import__("tempfile").mkstemp(dir=str(MT_UNIT_DIR))
             with os.fdopen(fd, "w") as f:
                 f.write(desired)
@@ -274,6 +274,16 @@ def _update_mtproxy(users, domain):
         _call("systemctl", "restart", unit)
         if not _unit_active(unit):
             raise RuntimeError("MTProxy backend failed to start")
+        # An active unit without a live listener must not produce a Telegram
+        # connection URI. The same IPv4 listener works for MTProto and WEB.
+        import time
+        for _ in range(30):
+            sockets = _call("ss", "-lntH", timeout=6).stdout
+            if re.search(r":%d(?:\\s|$)" % int(record["backend_port"]), sockets):
+                break
+            time.sleep(0.2)
+        else:
+            raise RuntimeError("MTProxy backend did not open its listener")
     relay_profiles = [
         {"name": record["id"], "secret": record["secret"],
          "backend": "127.0.0.1:" + str(record["backend_port"]),
