@@ -314,7 +314,7 @@ STYLE = """
 .wpo-v28-calendar-body:not([hidden]){display:grid}
 .wpo-v28-cal-days button.is-highlighted{
  color:var(--red);border:1.5px solid var(--red)!important;
- box-shadow:inset 0 0 0 1px var(--red);font-weight:700}
+ box-shadow:inset 0 0 0 1px var(--red);font-weight:700;opacity:1!important}
 .wpo-v28-cal-days button.is-today::after{display:none!important}
 .wpo-v28-zone-note{display:block;font-size:10px;color:var(--muted);
  border-top:1px solid var(--line);padding-top:9px}
@@ -388,17 +388,21 @@ function closeCalendar(){
   calendar.classList.remove('is-open');
 }
 function openCalendar(){
-  // Always reopen on the browser-local current date, even if an expiry
-  // such as +12 months was saved. Never overwrite the saved subscription date.
+  // Reopen visually at TODAY, not at the previously chosen subscription expiry.
+  // Only clear the calendar's presentation; preserve selected/expiry/dt/display.
   const current=now();
-  highlightedDate=null;
+  highlightedDate=new Date(current.getFullYear(),current.getMonth(),current.getDate());
   viewYear=current.getFullYear();
   viewMonth=current.getMonth();
+  calendar.querySelectorAll('[data-wpo-months],[data-wpo-2099]').forEach(button=>{
+    button.classList.remove('is-selected');
+    button.setAttribute('aria-pressed','false');
+  });
   refreshLiveClock();
-  renderCalendar();
   popover.hidden=false;
   toggle.setAttribute('aria-expanded','true');
   calendar.classList.add('is-open');
+  renderCalendar();
 }
 function chooseDate(date,preset='',highlight=true){
   selected=atEndOfDay(date);
