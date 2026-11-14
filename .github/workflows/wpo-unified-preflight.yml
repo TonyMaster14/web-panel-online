@@ -48,5 +48,70 @@ jobs:
           chmod +x "$tmp/xray"
           "$tmp/xray" run -test -config "$tmp/config-empty.json"
           "$tmp/xray" run -test -config "$tmp/config.json"
+      - name: Smoke-test native eight-protocol binaries
+        if: github.ref == 'refs/heads/test/wpo-smooth-progress-v1'
+        run: |
+          set -Eeuo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          echo "9b8912d203ba7142c1957913047bb9efd6e02c173c1f3bf852c652b16aada60f  assets/amneziawg-go-linux-amd64" | sha256sum -c -
+          echo "23d29323258166183eeeb288c1f9f08b879f3707e54591b1bfb2402413f6d8d8  assets/awg-linux-amd64" | sha256sum -c -
+          echo "f4bb0f5d63665ade87f0cb9f2185c43515cff09868637eb311f98f65a318722c  assets/awg-quick-linux-amd64" | sha256sum -c -
+          echo "c273dc07dd79c5919f97639cbdcb559d40ce90475dbd8aac80641b0a8c8065ff  assets/caddy-forwardproxy-naive-v2.11.7-naive2.tar.xz" | sha256sum -c -
+          echo "ea35fdef84bef1378f32b74a2d5a883d508a49dd4e64dba9a3a8363beed5798c  assets/mita-v3.39.0-linux-amd64.tar.gz" | sha256sum -c -
+          install -m 0755 assets/awg-linux-amd64 "$tmp/awg"
+          "$tmp/awg" genkey | "$tmp/awg" pubkey >/dev/null
+          tar -xJf assets/caddy-forwardproxy-naive-v2.11.7-naive2.tar.xz -C "$tmp"
+          tar -xzf assets/mita-v3.39.0-linux-amd64.tar.gz -C "$tmp"
+          "$tmp/caddy-forwardproxy-naive/caddy" version
+          "$tmp/mita" version
+
+      - name: Verify pinned WEB Proxy relay boots and serves a real site
+        if: github.ref == 'refs/heads/test/wpo-smooth-progress-v1'
+        run: |
+          set -Eeuo pipefail
+          tmp="$(mktemp -d)"
+          pid=""
+          trap 'if test -n "$pid"; then kill "$pid" 2>/dev/null || true; fi; rm -rf "$tmp"' EXIT
+          git -C "$tmp" init -q
+          git -C "$tmp" remote add origin https://github.com/telegramdesktop/tproxy-server.git
+          git -C "$tmp" fetch -q --depth 1 origin 52a5feb7fac38f68da5afef9cedd9b3bfc8473ca
+          git -C "$tmp" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$tmp" rev-parse HEAD)" = 52a5feb7fac38f68da5afef9cedd9b3bfc8473ca
+          (cd "$tmp" && go build -o "$tmp/tproxy-server" ./cmd/tproxy-server)
+          mkdir -p "$tmp/site"
+          printf '<html><body>WPO Node Site</body></html>\n' > "$tmp/site/index.html"
+          python3 - "$tmp" <<'PY'
+          import json,secrets,sys
+          from pathlib import Path
+          root=Path(sys.argv[1])
+          config={
+              "public_hostname":"se.example.net",
+              "listen":"127.0.0.1:18080",
+              "admin_listen":"127.0.0.1:18081",
+              "public_dir":str(root/"site"),
+              "profiles_file":str(root/"profiles.json")
+          }
+          (root/"config.json").write_text(json.dumps(config))
+          (root/"profiles.json").write_text(json.dumps({"profiles":[{
+              "name":"node-bootstrap",
+              "secret":secrets.token_hex(16),
+              "backend":"127.0.0.1:12345","carrier_mode":"https"
+          }]}))
+          PY
+          chmod 0600 "$tmp/profiles.json"
+          "$tmp/tproxy-server" -config "$tmp/config.json" >"$tmp/relay.log" 2>&1 &
+          pid=$!
+          ready=0
+          for i in $(seq 1 25); do
+            if curl -fsS --max-time 1 http://127.0.0.1:18081/readyz >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep .2
+          done
+          if test "$ready" != 1; then cat "$tmp/relay.log"; exit 1; fi
+          curl -fsS --max-time 2 http://127.0.0.1:18080/ | grep -q 'WPO Node Site'
+
       - name: Exercise terminal success and failure paths
         run: python3 tests/test_installer_wizard_integrated.py
