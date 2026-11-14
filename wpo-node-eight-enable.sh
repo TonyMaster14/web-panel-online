@@ -30,8 +30,11 @@ apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y \
     zlib1g-dev util-linux xz-utils tar nftables iproute2 wireguard-tools \
     python3 openssl procps
 install -d -m 0755 /opt/web-panel-proxy
-install -d -m 0700 /etc/web-proxy-panel /etc/web-proxy-panel/awg
-install -d -m 0755 /etc/web-proxy-panel/extra-protocols
+# NaiveProxy (caddy) and Mieru (mita) must traverse the shared parent.
+# AWG credentials remain locked inside the root-only awg subdirectory.
+install -d -o root -g root -m 0755 /etc/web-proxy-panel
+install -d -o root -g root -m 0700 /etc/web-proxy-panel/awg
+install -d -o root -g root -m 0755 /etc/web-proxy-panel/extra-protocols
 install -d -m 0755 /opt/wpp-node-agent
 
 # Original Telegram MTProxy at the exact pinned source and archive checksum.
@@ -278,7 +281,7 @@ if ! id mita >/dev/null 2>&1; then
     useradd --system --gid mita --home-dir /var/lib/mita \
         --create-home --shell /usr/sbin/nologin mita
 fi
-install -d -o root -g caddy -m 0750 /etc/web-proxy-panel/extra-protocols
+install -d -o root -g root -m 0755 /etc/web-proxy-panel/extra-protocols
 cat > /etc/systemd/system/web-panel-proxy-naive.service <<'UNIT'
 [Unit]
 Description=WPO Node NaiveProxy
