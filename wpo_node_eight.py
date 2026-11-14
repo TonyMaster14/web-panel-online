@@ -279,7 +279,7 @@ def _update_mtproxy(users, domain):
         import time
         for _ in range(30):
             sockets = _call("ss", "-lntH", timeout=6).stdout
-            if re.search(r":%d(?:\\s|$)" % int(record["backend_port"]), sockets):
+            if re.search(r":%d(?:\s|$)" % int(record["backend_port"]), sockets):
                 break
             time.sleep(0.2)
         else:
