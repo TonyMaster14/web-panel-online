@@ -43,9 +43,25 @@ BODY='''            # wpo-happ-fast-feed-v1: no remote POST in the Happ HTTP thr
                 first=result["users"][0]
                 remote_id=federation_id(first.get("subscription_id",""),
                                         first.get("device_id",""))
-                for uid in chosen:
-                    if uid=="local": continue
-                    node=available[uid]
+                remotes=[available[uid] for uid in chosen if uid!="local"]
+                # Start every selected node at once. When the controller has
+                # already pre-provisioned the device, these calls return
+                # immediately and all 3 nodes fit within Happ's 9s default.
+                for node in remotes:
+                    if node.get("enabled",True):
+                        wpo_happ_async_feed.enqueue(
+                            node_api,node,remote_id,node_api.location_prefix(node),wanted)
+                # Never wait beyond 2.5s even when the node is applying Xray
+                # for the first time. Happ's default request limit is 9s.
+                deadline=time.monotonic()+2.5
+                while time.monotonic()<deadline:
+                    if all(not n.get("enabled",True) or
+                           wpo_happ_async_feed.enqueue(
+                               node_api,n,remote_id,node_api.location_prefix(n),wanted)[0]
+                           for n in remotes):
+                        break
+                    time.sleep(0.05)
+                for node in remotes:
                     if not node.get("enabled",True):
                         pending_count+=1
                         continue
@@ -53,7 +69,7 @@ BODY='''            # wpo-happ-fast-feed-v1: no remote POST in the Happ HTTP thr
                         node_api,node,remote_id,node_api.location_prefix(node),wanted)
                     if ready:
                         lines.extend(ready)
-                    elif waiting:
+                    else:
                         pending_count+=1
             # No invented or unverified remote credentials. When only a
             # remote node was chosen, there is no safe fallback local link.
