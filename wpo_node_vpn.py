@@ -165,6 +165,10 @@ def apply(state):
     config = render_xray(state, settings)
     previous = XRAY.read_bytes() if XRAY.is_file() else None
     atomic_json(XRAY, config)
+    # The Xray daemon runs as a locked-down xray user, not root.
+    import grp
+    os.chown(XRAY, 0, grp.getgrnam("xray").gr_gid)
+    os.chmod(XRAY, 0o640)
     try:
         result = command(XRAY_BIN, "run", "-test", "-config", str(XRAY), timeout=15)
         if result.returncode:
