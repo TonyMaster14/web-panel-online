@@ -76,7 +76,7 @@ def create(node_id, name, protocol, registry, expiry=0):
     if expiry:
         try: deadline=int(expiry)
         except (TypeError,ValueError) as exc: raise ValueError("Incorrect expiry") from exc
-        if deadline<=int(time.time())+59 or time.gmtime(deadline).tm_year>2090:
+        if deadline<=int(time.time())+59 or deadline>4102487999:
             raise ValueError("Incorrect future expiry")
     identifier=secrets.token_hex(16)
     external_id=secrets.token_hex(32)
