@@ -50,7 +50,7 @@ def form(path, csrf, connections, nodes=None, local=None):
                 f'<label class="wpo-v28-option"><input class="wpo-v28-protocol" type="checkbox" '
                 f'name="connection_{h(cid)}" value="1" data-connection-id="{h(cid)}" '
                 f'data-protocol="{h(protocol)}" data-label="{h(title)}" '
-                f'{"checked" if not native else ""}><span class="wpo-v28-radio">✓</span>'
+                f'><span class="wpo-v28-radio">✓</span>'
                 f'<span><strong>{h(title)}</strong><small>{h(subtitle)}</small></span></label>'
             )
         else:
