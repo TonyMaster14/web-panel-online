@@ -104,14 +104,14 @@ jobs:
           pid=$!
           ready=0
           for i in $(seq 1 25); do
-            if curl -fsS --max-time 1 http://127.0.0.1:18081/readyz >/dev/null; then
+            if curl -fsS --max-time 1 -H 'Host: se.example.net' http://127.0.0.1:18080/ | grep -q 'WPO Node Site'; then
               ready=1
               break
             fi
             sleep .2
           done
           if test "$ready" != 1; then cat "$tmp/relay.log"; exit 1; fi
-          curl -fsS --max-time 2 http://127.0.0.1:18080/ | grep -q 'WPO Node Site'
+          curl -fsS --max-time 2 -H 'Host: se.example.net' http://127.0.0.1:18080/ | grep -q 'WPO Node Site'
 
       - name: Exercise terminal success and failure paths
         run: python3 tests/test_installer_wizard_integrated.py
