@@ -7,7 +7,9 @@ umask 077
 APP=/opt/tproxy-panel
 PANEL="$APP/panel.py"
 SUBS="$APP/wpp_subscriptions.py"
-[[ -s "$PANEL" && -s "$SUBS" && -s /var/lib/tproxy-panel/nodes.json &&
+NODE_INSTALLER="$APP/wpp-node-agent-install.sh"
+[[ -s "$PANEL" && -s "$SUBS" && -s "$NODE_INSTALLER" &&
+   -s /var/lib/tproxy-panel/nodes.json &&
    -s /etc/web-proxy-panel/users.json && ! -e /etc/wpp-node-agent/config.json ]] || {
     echo 'Нужна основная WPO с зарегистрированными нодами.' >&2; exit 2;
 }
@@ -23,6 +25,7 @@ cleanup() {
     echo 'Проверка панели не пройдена. Возвращаю прежние модули.' >&2
     cp -a "$BACKUP/panel.py" "$PANEL" || true
     cp -a "$BACKUP/wpp_subscriptions.py" "$SUBS" || true
+    cp -a "$BACKUP/wpp-node-agent-install.sh" "$NODE_INSTALLER" || true
     for f in wpo_happ_async_feed.py wpo_happ_preparer.py; do
       if [[ -s "$BACKUP/$f" ]]; then cp -a "$BACKUP/$f" "$APP/$f" || true
       else rm -f "$APP/$f"; fi
@@ -45,6 +48,11 @@ for f in wpo-happ-preallocate-patch.py wpo-happ-async-panel-patch.py \
     curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
       --connect-timeout 12 --max-time 90 "$BASE/$f" -o "$WORK/$f"
 done
+# Future nodes must not inherit the proven read-only federation defect.
+curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3   --connect-timeout 12 --max-time 90   "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/50fc724db31fe2e8b20862dfc5eff67e99e67984/wpo-node-agent-install-v2.sh"   -o "$WORK/wpp-node-agent-install.sh"
+bash -n "$WORK/wpp-node-agent-install.sh"
+grep -Fqx 'ENGINE_REV=b4d2691a6e942c0ff1ff4652acd63819cc0e0c6f'   "$WORK/wpp-node-agent-install.sh"
+grep -Fq 'wpo-node-site-template-fix.sh' "$WORK/wpp-node-agent-install.sh"
 
 echo '=== Проверка кода и защиты существующих профилей ==='
 python3 -m py_compile "$WORK/"*.py
@@ -65,12 +73,14 @@ grep -Fq 'def verified_links(' "$WORK/wpo_happ_async_feed.py"
 install -d -o root -g root -m 0700 "$BACKUP"
 cp -a "$PANEL" "$BACKUP/panel.py"
 cp -a "$SUBS" "$BACKUP/wpp_subscriptions.py"
+cp -a "$NODE_INSTALLER" "$BACKUP/wpp-node-agent-install.sh"
 for f in wpo_happ_async_feed.py wpo_happ_preparer.py; do
   if [[ -e "$APP/$f" ]]; then cp -a "$APP/$f" "$BACKUP/$f"; fi
 done
 ROLLBACK=1
 install -o root -g root -m 0644 "$WORK/panel.py" "$PANEL"
 install -o root -g root -m 0644 "$WORK/wpp_subscriptions.py" "$SUBS"
+install -o root -g root -m 0755 "$WORK/wpp-node-agent-install.sh" "$NODE_INSTALLER"
 for f in wpo_happ_async_feed.py wpo_happ_preparer.py; do
   install -o root -g root -m 0644 "$WORK/$f" "$APP/$f"
 done
@@ -97,6 +107,7 @@ done
 [[ "$READY" == 1 ]] || { echo 'Панель не ответила. Выполняю откат.' >&2; exit 4; }
 ROLLBACK=0
 echo '✓ WPO работает. Быстрый Happ и создание первого профиля установлены.'
+echo '✓ Установщик будущих нод обновлён: исправлена песочница VPN Federation.'
 
 # Watch subscription changes; every worker uses controller's existing
 # authorized Node API and never asks for node SSH passwords.
