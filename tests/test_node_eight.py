@@ -53,6 +53,38 @@ class EightEngineTests(unittest.TestCase):
             "awg_parameters":{},"awg_schema":2
         }
 
+    def test_vless_hysteria_subscription_never_restarts_unrelated_native_backends(self):
+        # Simulate the user's three-node Happ import. Each remote receives a
+        # VLESS-only federation profile; MTProxy/WEB/AWG/Naive/Mieru are idle.
+        result = engine.sync({
+            "external_id":"9"*64,
+            "name":"Швеция",
+            "protocols":["vless"],
+        })
+        self.assertTrue(result["ok"])
+        self.assertEqual([p["protocol"] for p in result["profiles"]],["vless"])
+        self.fake_xray.assert_called_once()
+        self.fake_native.assert_not_called()
+        # A repeated Happ refresh must be an idempotent read.
+        engine.sync({"external_id":"9"*64,"name":"Швеция","protocols":["vless"]})
+        self.fake_native.assert_not_called()
+        self.assertEqual(self.fake_xray.call_count,1)
+        # Add Hysteria2 to the same subscription: still no native restarts.
+        engine.sync({"external_id":"9"*64,"name":"Швеция",
+                     "protocols":["vless","hysteria"]})
+        self.assertEqual(self.fake_xray.call_count,2)
+        self.fake_native.assert_not_called()
+
+    def test_native_backend_is_only_applied_when_selected_native_profile_changes(self):
+        engine.sync({"external_id":"8"*64,"name":"Швеция","protocols":["vless"]})
+        self.fake_native.assert_not_called()
+        engine.sync({"external_id":"8"*64,"name":"Швеция","protocols":["vless","web"]})
+        self.assertEqual(self.fake_native.call_count,1)
+        engine.sync({"external_id":"8"*64,"name":"Швеция","protocols":["vless","web"]})
+        self.assertEqual(self.fake_native.call_count,1)
+        engine.sync({"external_id":"8"*64,"name":"Швеция","protocols":["vless"]})
+        self.assertEqual(self.fake_native.call_count,2)
+
     def test_eight_protocols_are_unique(self):
         self.assertEqual(len(engine.KNOWN),8)
         self.assertEqual(set(engine.KNOWN),{"vless","hysteria","web","mtproto",
