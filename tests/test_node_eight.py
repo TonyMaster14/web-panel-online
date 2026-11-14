@@ -155,7 +155,9 @@ class EightEngineTests(unittest.TestCase):
                        "caddy-naive","mita-wpp","wpo_node_eight.py"):
             self.assertIn(needed,installer)
         self.assertIn("wpo-node-eight-enable.sh",agent)
-        self.assertIn("WPO_NODE_VPN_REF='test/wpo-smooth-progress-v1' bash \"$EIGHT_SETUP\"",agent)
+        self.assertIn('WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"',agent)
+        self.assertIn("ENGINE_REV=38d269532bd37a72fbbb940fb881010730dc653a",agent)
+        self.assertIn("Node API lacks live engines:",agent)
         self.assertIn("wpo-node-agent-install-v2.sh",core)
         self.assertIn("systemctl is-active --quiet wpo-node-relay.service",installer)
 
