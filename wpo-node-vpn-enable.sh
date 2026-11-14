@@ -222,6 +222,23 @@ for _ in 1 2 3 4 5 6; do
     sleep 1
 done
 (( ok == 1 )) || { echo 'VPN health check failed' >&2; exit 3; }
+# Bump the advertised agent version only after both real VPN services work.
+python3 - <<'PY_VERSION'
+from pathlib import Path
+import json,os,tempfile
+p=Path('/etc/wpp-node-agent/config.json')
+d=json.loads(p.read_text(encoding='utf-8'))
+d['version']='0.3.0'
+fd,temp=tempfile.mkstemp(dir=str(p.parent))
+with os.fdopen(fd,'w',encoding='utf-8') as stream:
+    json.dump(d,stream)
+    stream.write('\\n')
+os.chmod(temp,0o600)
+os.replace(temp,p)
+PY_VERSION
+systemctl restart wpp-node-agent.service
+systemctl is-active --quiet wpp-node-agent.service || {
+    echo 'Node Agent status update failed' >&2; exit 3; }
 echo '✓ VPN node ready: VLESS XHTTP (TCP 443), Hysteria2 (UDP 8443)'
 echo '✓ The existing node website, templates and API key were preserved.'
 echo 'Important: allow UDP 8443 in the VPS provider firewall if it is enabled.'
