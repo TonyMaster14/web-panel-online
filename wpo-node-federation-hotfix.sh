@@ -69,8 +69,10 @@ python3 -m py_compile "$TMP/wpo_node_eight.py"
 grep -Fq 'native_changed = assemble(old) != assemble(new)' "$TMP/wpo_node_eight.py"
 grep -Fq 'if native_changed:' "$TMP/wpo_node_eight.py"
 grep -Fq 'xray.apply(new)' "$TMP/wpo_node_eight.py"
-if cmp -s "$TMP/wpo_node_eight.py" "$MODULE"; then
-    echo '✓ На этой ноде уже установлен исправленный модуль федерации.'
+if cmp -s "$TMP/wpo_node_eight.py" "$MODULE" &&
+   [[ -f "$DROPIN" ]] &&
+   grep -Fq 'ReadWritePaths=-/etc/systemd/system -/etc/tproxy-server -/etc/web-proxy-panel' "$DROPIN"; then
+    echo '✓ На этой ноде уже исправлены модуль федерации и права native-сервисов.'
     exit 0
 fi
 
