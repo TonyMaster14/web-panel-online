@@ -171,8 +171,9 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion:reduce",self.html)
         self.assertIn('class="wpo-v28-limit-field"',self.html)
         self.assertIn('height:40px',self.html)
-        for n in ("1","2","3","6","12"):
+        for n in ("1","3","6","9","12"):
             self.assertIn(f'data-wpo-months="{n}"',self.html)
+        self.assertNotIn('data-wpo-months="2"',self.html)
         self.assertIn('data-wpo-2099="1"',self.html)
         self.assertIn("До 2099",self.html)
 
@@ -232,12 +233,30 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("selected=atEndOfDay(date);",script)
         self.assertIn("document.getElementById('wpoV28Now')",script)
         self.assertIn("setInterval(()=>{",script)
-        self.assertIn("day===current.getDate()",script)
+        self.assertIn("let highlightedDate=null;",script)
+        self.assertIn("button.classList.toggle('is-highlighted',sameDay(date,highlightedDate||current));",script)
+        self.assertIn("if(dayKey!==lastLiveDay){",script)
         self.assertIn("now().toLocaleString('ru-RU'",script)
         self.assertIn("id=\"wpoV28Now\"",self.html)
         self.assertIn("Текущие дата и время",self.html)
         self.assertIn("id=\"wpoV28TimeZone\"",self.html)
         self.assertNotIn("Время окончания",self.html)
+
+    def test_date_outline_and_quick_period_keep_calendar_open(self):
+        script=wpo_user_v28.SCRIPT
+        css=wpo_user_v28.STYLE
+        self.assertIn("button.classList.toggle('is-highlighted',sameDay(date,highlightedDate||current));",script)
+        self.assertIn("if(highlight)highlightedDate=selected;",script)
+        self.assertIn(".wpo-v28-cal-days button.is-highlighted{",css)
+        self.assertNotIn(".wpo-v28-cal-days button.is-selected{background:var(--tint);border:1px solid var(--accent)",css)
+        self.assertNotIn("if(expiry.value!=='0')closeCalendar();",script)
+        self.assertIn("chooseDate(addMonths(now(),Number(button.dataset.wpoMonths)),button.dataset.wpoMonths);",script)
+        self.assertIn("chooseDate(new Date(2099,11,31),'2099');",script)
+        self.assertIn("function resetCalendarSelection(){",script)
+        self.assertIn("highlightedDate=null;",script)
+        self.assertIn("chooseDate(now(),'',false);",script)
+        self.assertNotIn("chooseDate(addMonths(now(),1),'1');",script)
+        self.assertIn("document.dispatchEvent(new Event('wpo-v28-reset-calendar'));",wpo_user_v28.LEGACY_CREATE_JS)
 
     def test_until_2099_button_only_accented_when_selected(self):
         css=wpo_user_v28.STYLE
