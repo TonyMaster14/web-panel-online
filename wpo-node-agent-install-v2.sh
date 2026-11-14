@@ -26,6 +26,17 @@ fail() {
   exit "$rc"
 }
 trap fail ERR
+# Do not enter provisioning while Ubuntu is already unpacking its own
+# security updates. fuser checks real file users; pgrep covers minimal
+# images where psmisc/fuser has not been installed.
+if { command -v fuser >/dev/null 2>&1 && fuser -s /var/lib/dpkg/lock-frontend; } ||
+   { command -v pgrep >/dev/null 2>&1 && pgrep -x 'apt-get|dpkg' >/dev/null 2>&1; }; then
+  echo 'Ubuntu сейчас обновляет системные пакеты (apt/dpkg занят).' >&2
+  echo 'Не удаляйте блокировку и не запускайте установщик параллельно.' >&2
+  echo 'Проверьте завершение обновления и повторно создайте установщик в WPO.' >&2
+  report error 'Менеджер пакетов занят обновлением Ubuntu; установка не начиналась.'
+  exit 75
+fi
 report installing 'Проверка VPS и домена.'
 echo '=== WEB PANEL ONLINE — Node Agent 0.4 · 8 протоколов ==='
 read -r -p 'Домен ноды (например, de.example.com): ' DOMAIN
