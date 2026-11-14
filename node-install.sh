@@ -3352,6 +3352,17 @@ if [[ -s "$PACKAGE_DIR/wpo-node-controller-vpn.sh" ]] &&
         bash "$PACKAGE_DIR/wpo-node-controller-vpn.sh"
 fi
 
+# v28 test: the UI and expiry protection are installed with the panel,
+# so the user never needs a separate patch on the additional node VPS.
+if [[ -s "$PACKAGE_DIR/wpo_v28_apply.py" && -s "$PACKAGE_DIR/wpo_user_v28.py" ]]; then
+    TOUCHED=1
+    python3 "$PACKAGE_DIR/wpo_v28_apply.py" --app "$APP" \
+        --manager /usr/local/sbin/web-proxy-panelctl \
+        --helper "$PACKAGE_DIR/wpo_user_v28.py"
+else
+    die 'В тестовом пакете отсутствует интерфейс пользователей v28.'
+fi
+
 for file in "$PANEL" "$UI" "$GEO" "$AUTO"; do [[ -s "$file" ]] || die "Отсутствует файл: $file"; done
 # Validate the final generated-node installer and controller feature set.
 grep -Fq 'node-agent-installer.sh' "$PANEL" || die 'Нет маршрута установщика ноды.'
@@ -3394,4 +3405,5 @@ echo '✓ Компоненты ноды WPO установлены/провер�
 echo "✓ Фиксированная версия: $REF"
 echo "✓ Резервная копия до обновления: $BACKUP"
 echo '✓ Геолокация, флаги, индикаторы по центру и мгновенный выбор шаблонов сайтов сохранены.'
-echo 'Важно: Node Agent 0.2 управляет HTTPS-страницей и статусом. VPN на удалённой ноде пока не активирован.'
+echo '✓ Установщик новой ноды включает Xray и VPN-федерацию: VLESS XHTTP + Hysteria2.'
+echo 'Другие протоколы отображаются в каталоге и будут активированы после серверной реализации.'
