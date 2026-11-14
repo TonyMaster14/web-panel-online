@@ -8,6 +8,8 @@ are bounded. A remote-only feed with nothing ready must still report pending.
 """
 import concurrent.futures
 import hashlib
+import json
+from pathlib import Path
 import threading
 import time
 import sys
@@ -150,6 +152,34 @@ def invalidate_all():
         CACHE.clear()
         FAILURES.clear()
 
+
+
+def prewarmed(nodes, external_id, protocols):
+    """Return true only when the controller verified each remote in advance.
+
+    The preparer stores timestamps only, not credentials. During Happ fetch
+    the remote link is verified against the node's authenticated API.
+    """
+    try:
+        store = json.loads(
+            Path("/var/lib/tproxy-panel/happ-node-ready.json").read_text(encoding="utf-8")
+        )
+        if not isinstance(store, dict):
+            return False
+        now = time.time()
+        for node in nodes:
+            if not node.get("enabled", True):
+                return False
+            key = hashlib.sha256((
+                external_id + ":" + str(node.get("id", "")) + ":" +
+                str(node.get("url", "")) + ":" + ",".join(protocols)
+            ).encode()).hexdigest()
+            age = now - int(store.get(key, 0))
+            if not 0 <= age < 12 * 3600:
+                return False
+        return bool(nodes)
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return False
 
 
 def warm(api, node, external_id, name, protocols):
