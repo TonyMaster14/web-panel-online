@@ -13,7 +13,25 @@ DOMAIN="$(python3 -c 'import json;print(json.load(open("/etc/wpp-node-agent/conf
 [[ "$DOMAIN" =~ ^([a-z0-9-]+\.)+[a-z]{2,63}$ ]] || exit 2
 echo "Activating test VPN on node $DOMAIN"
 TEMP="$(mktemp -d /tmp/wpo-vpn-test.XXXXXXXX)"
-trap 'rm -rf -- "$TEMP"' EXIT
+BACKUP=""
+ROLLBACK=0
+cleanup(){
+    local rc=$?
+    trap - EXIT
+    if (( rc != 0 && ROLLBACK == 1 )); then
+        echo 'VPN activation failed; restoring original Node Agent and Caddyfile.' >&2
+        cp -a "$BACKUP/agent.py" "$AGENT" || true
+        cp -a "$BACKUP/Caddyfile" /etc/caddy/Caddyfile || true
+        if [[ -e "$BACKUP/wpo_node_vpn.py" ]]; then
+            cp -a "$BACKUP/wpo_node_vpn.py" /opt/wpp-node-agent/wpo_node_vpn.py || true
+        fi
+        systemctl reload-or-restart caddy.service 2>/dev/null || true
+        systemctl restart wpp-node-agent.service 2>/dev/null || true
+    fi
+    rm -rf -- "$TEMP"
+    exit "$rc"
+}
+trap cleanup EXIT
 if ! command -v unzip >/dev/null; then
     apt-get -o DPkg::Lock::Timeout=600 update
     apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends unzip
@@ -47,6 +65,7 @@ BACKUP="/etc/wpp-node-vpn/backup-$(date -u +%Y%m%dT%H%M%SZ)"
 install -d -m 0700 "$BACKUP"
 cp -a "$AGENT" "$BACKUP/agent.py"
 cp -a /etc/caddy/Caddyfile "$BACKUP/Caddyfile"
+ROLLBACK=1
 [[ ! -e "$VPN_PY" ]] || cp -a "$VPN_PY" "$BACKUP/wpo_node_vpn.py"
 install -m 0700 "$TEMP/wpo_node_vpn.py" "$VPN_PY"
 python3 - "$DOMAIN" <<'PY_SETTINGS'
@@ -239,6 +258,7 @@ PY_VERSION
 systemctl restart wpp-node-agent.service
 systemctl is-active --quiet wpp-node-agent.service || {
     echo 'Node Agent status update failed' >&2; exit 3; }
+ROLLBACK=0
 echo '✓ VPN node ready: VLESS XHTTP (TCP 443), Hysteria2 (UDP 8443)'
 echo '✓ The existing node website, templates and API key were preserved.'
 echo 'Important: allow UDP 8443 in the VPS provider firewall if it is enabled.'
