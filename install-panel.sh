@@ -5186,11 +5186,11 @@ fi
     card_cols="${WPO_CARD_COLUMNS:-80}"
     [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
     (( card_cols < 28 )) && card_cols=28
-    # Expand only the final card to fit the complete URL, then center it.
-    card_width=${#card_url}
-    (( card_width < 60 )) && card_width=60
-    (( card_width > card_cols-8 )) && card_width=$((card_cols-8))
-    card_left=$(((card_cols-card_width-8)/2+1))
+    # Keep the access card the same compact width as the wizard header.
+    # The full URL is displayed separately BELOW the closed frame, never
+    # printed between the side borders (where terminal wrapping tears them).
+    card_width=$((card_cols-5))
+    (( card_width > 60 )) && card_width=60
     card_indent=""
     printf -v card_rule '%*s' "$((card_width+2))" ''
     card_rule="${card_rule// /─}"
@@ -5212,14 +5212,6 @@ fi
         card_line 'WPO 3.0 — УСТАНОВЛЕНО' "$card_bold"
     fi
     card_line ''
-    card_line 'Ссылка на панель:'
-    if (( ${#card_url} <= card_width )); then
-        card_line "$card_url" "$card_value"
-    else
-        # One complete plain URL; the terminal may soft-wrap it, never the script.
-        printf '  %s%s%s\n' "$card_value" "$card_url" "$card_reset"
-    fi
-    card_line ''
     card_line "Логин: $ADMIN"
     card_line ''
     if [[ "$UPDATING" == 1 ]]; then
@@ -5231,5 +5223,9 @@ fi
     card_line ''
     card_line 'Сохраните данные, чтобы не потерять!' "$card_warning"
     card_line ''
-    printf "${card_indent}"'%s╰%s╯%s\n\n' "$card_blue" "$card_rule" "$card_reset"
+    printf "${card_indent}"'%s╰%s╯%s\n' "$card_blue" "$card_rule" "$card_reset"
+    # URL outside the border: one complete link, unbroken by script newlines.
+    # A narrow terminal may soft-wrap normally without damaging the frame.
+    printf '\n  %sСсылка на панель:%s\n  %s%s%s\n\n' \
+        "$card_label" "$card_reset" "$card_value" "$card_url" "$card_reset"
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
