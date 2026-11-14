@@ -11,6 +11,7 @@ MODULE="$ROOT/wpo_node_eight.py"
 CONFIG=/etc/wpp-node-agent/config.json
 STATE=/etc/wpp-node-vpn/profiles.json
 SERVICE=wpo-node-vpn.service
+DROPIN=/etc/systemd/system/wpo-node-vpn.service.d/10-wpo-native-writes.conf
 [[ "$EUID" == 0 ]] || { echo 'Нужны права root на ДОПОЛНИТЕЛЬНОЙ ноде.' >&2; exit 2; }
 [[ -s "$MODULE" && -s "$CONFIG" && -s "$STATE" &&
    -s /etc/wpp-node-vpn/settings.json && ! -e /opt/tproxy-panel/panel.py ]] || {
@@ -28,13 +29,20 @@ flock -w 40 8 || { echo 'Нода создаёт VPN-профиль. Измен�
 TMP="$(mktemp -d /tmp/wpo-node-federation.XXXXXXXX)"
 BACKUP="/etc/wpp-node-vpn/federation-module-backup-$(date -u +%Y%m%dT%H%M%SZ)"
 ROLLBACK=0
+DROPIN_WAS_PRESENT=0
 cleanup() {
     code=$?
     trap - EXIT
     if [[ "$ROLLBACK" == 1 ]]; then
         echo 'Проверка службы не прошла. Возвращаю старый код Node Agent.' >&2
         cp -a "$BACKUP/wpo_node_eight.py" "$MODULE" || true
+        if [[ "$DROPIN_WAS_PRESENT" == 1 ]]; then
+            cp -a "$BACKUP/native-writes.conf" "$DROPIN" || true
+        else
+            rm -f "$DROPIN"
+        fi
         rm -f "$ROOT"/__pycache__/wpo_node_eight.*.pyc
+        systemctl daemon-reload || true
         systemctl restart "$SERVICE" >/dev/null 2>&1 || true
     fi
     rm -rf -- "$TMP"
@@ -68,7 +76,20 @@ fi
 
 mkdir -m 0700 "$BACKUP"
 cp -a "$MODULE" "$BACKUP/wpo_node_eight.py"
+if [[ -f "$DROPIN" ]]; then
+    DROPIN_WAS_PRESENT=1
+    cp -a "$DROPIN" "$BACKUP/native-writes.conf"
+fi
 ROLLBACK=1
+install -d -o root -g root -m 0755 /etc/systemd/system/wpo-node-vpn.service.d
+cat >"$DROPIN" <<'DROPIN_UNIT'
+[Service]
+# Keep strict service isolation, but permit authenticated native backends
+# to update their actual configuration files on selected protocol changes.
+ReadWritePaths=-/etc/systemd/system -/etc/tproxy-server -/etc/web-proxy-panel
+DROPIN_UNIT
+chmod 0644 "$DROPIN"
+systemctl daemon-reload
 install -o root -g root -m 0644 "$TMP/wpo_node_eight.py" "$MODULE"
 rm -f "$ROOT"/__pycache__/wpo_node_eight.*.pyc
 # The Python federation server caches imported modules between requests.
@@ -92,6 +113,7 @@ done
 ROLLBACK=0
 echo '✓ WPO Node: модуль создания VPN-профилей исправлен.'
 echo '✓ VLESS/Hysteria не перезапускают WEB Proxy, MTProto, AWG, Naive и Mieru.'
+echo '✓ Исправлена песочница VPN Federation для выбранных native-протоколов.'
 echo '✓ Подписки и ключи на диске сохранены.'
 echo '✓ Xray, Caddy, WEB Proxy и шаблоны сайтов не перезапускались.'
 echo "Резервная копия: $BACKUP"
