@@ -302,7 +302,21 @@ if ! curl -4fsS --connect-timeout 4 --max-time 12 \
   echo 'Node Agent не принимает новый ключ API (проверьте systemctl status wpp-node-agent.service).'
   exit 4
 fi
-report registration 'HTTPS готов. Регистрация в основной панели.'
+# Test-only VPN capability is installed before enrollment. Registration
+# is blocked on failure: controller must never see a "ready" VPN node without
+# working local Xray and authenticated federation API.
+report installing 'Активация VPN ноды: VLESS XHTTP и Hysteria2.'
+VPN_SETUP="$(mktemp /tmp/wpo-node-vpn-enable.XXXXXXXX.sh)"
+trap 'rm -f -- "${VPN_SETUP:-}"; fail' ERR
+curl -4fsSL --proto '=https' --proto-redir '=https' \
+    --retry 3 --connect-timeout 15 --max-time 90 \
+    'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/test/wpo-smooth-progress-v1/wpo-node-vpn-enable.sh' \
+    -o "$VPN_SETUP"
+bash -n "$VPN_SETUP"
+WPO_NODE_VPN_REF='test/wpo-smooth-progress-v1' bash "$VPN_SETUP"
+rm -f -- "$VPN_SETUP"
+trap fail ERR
+report registration 'VPN и HTTPS готовы. Регистрация в основной панели.'
 if ENROLL_RESULT="$(python3 - "$ENROLL_URL" "$TOKEN" "$DOMAIN" "$API_KEY" <<'PY_ENROLL'
 import json,sys,urllib.request,urllib.error
 url,token,domain,key=sys.argv[1:]
