@@ -316,7 +316,7 @@ if ! curl -4fsS --connect-timeout 4 --max-time 12 \
 fi
 # Pin backend scripts and their imported modules to one reviewed Git commit.
 # Avoid moving branch references during long multi-engine installation.
-ENGINE_REV=ecb7b8d9297af06cce419f28e47d79f4ebf6db52
+ENGINE_REV=c7a026d48cf928b5f10b988199baff433cc36698
 # Test-only VPN capability is installed before enrollment. Registration
 # is blocked on failure: controller must never see a "ready" VPN node without
 # working local Xray and authenticated federation API.
