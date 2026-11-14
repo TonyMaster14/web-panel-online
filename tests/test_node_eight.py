@@ -188,7 +188,7 @@ class EightEngineTests(unittest.TestCase):
             self.assertIn(needed,installer)
         self.assertIn("wpo-node-eight-enable.sh",agent)
         self.assertIn('WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"',agent)
-        self.assertIn("ENGINE_REV=c7a026d48cf928b5f10b988199baff433cc36698",agent)
+        self.assertIn("ENGINE_REV=5f497290fe041149521b7d6006a1dd5b2e833885",agent)
         # A background Ubuntu dist-upgrade must not be interrupted by WPO
         # or make the user enter node data just to fail on dpkg lock.
         self.assertIn("fuser -s /var/lib/dpkg/lock-frontend",agent)
