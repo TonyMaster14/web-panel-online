@@ -63,11 +63,11 @@ class NewUserFormTests(unittest.TestCase):
             self.assertIn(f'name="connection_{cid}"',html)
             self.assertIn(f'data-protocol="{spec["protocol"]}"',html)
         self.assertEqual(html.count('class="wpo-v28-protocol"'),8)
-        self.assertIn("Отдельные протоколы создаются только по одному",html)
+        self.assertIn("Отдельные протоколы создаются по одному",html)
         self.assertIn("kind.value=native[0].dataset.protocol",html)
         self.assertIn("connection.value=native[0].dataset.connectionId",html)
         self.assertIn("Срок действия",html)
-        self.assertIn("срок действия пока не применяется автоматически",html)
+        self.assertIn("Лимит срока для отдельных профилей пока нужно проверять отдельно",html)
 
     def test_existing_controller_dom_is_preserved(self):
         for marker in ('id="createAccount"','id="createClientForm"','id="createSummary"',
