@@ -308,19 +308,23 @@ RESULT="$(mktemp /run/wpo-ui-result.XXXXXXXX)"
 chmod 0600 "$PROGRESS" "$RESULT"
 printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 
-# Keep one five-row progress block: status, gap, bar, gap, current stage.
-# Reserve its rows once. Resize events rebuild the layout once on the new screen.
+# Cosmetic progress follows the ~4-minute successful VPS installation.
+# It is deliberately independent of backend stage jumps. A slow download
+# may hold 99%, but 100% is never displayed before verified success.
+WPO_PROGRESS_TARGET_SECONDS="\${WPO_PROGRESS_TARGET_SECONDS:-240}"
+if ! [[ "$WPO_PROGRESS_TARGET_SECONDS" =~ ^[0-9]+$ ]] ||
+   (( WPO_PROGRESS_TARGET_SECONDS < 10 || WPO_PROGRESS_TARGET_SECONDS > 3600 )); then
+    WPO_PROGRESS_TARGET_SECONDS=240
+fi
+# Three rows only: status, blank row, progress bar with elapsed time.
 DRAW_LAST="" DRAW_READY=0 DRAW_RESIZED=0
 trap 'DRAW_RESIZED=1' WINCH
 draw(){
-    local pct="$1" label="$2" elapsed="$3" width filled empty bar rest key
-    local status stage packet prefix="" maxtext
-    [[ "$label" != 'Установка нод' ]] || label='Установка ноды'
-    if (( pct >= 90 && pct < 100 )); then label='Завершение установки'; fi
-    key="$pct|$label|$elapsed"
+    local pct="$1" elapsed="$2" width filled empty bar rest key prefix="" maxtext status packet
+    key="$pct|$elapsed"
     [[ "$key" != "$DRAW_LAST" || "$DRAW_RESIZED" == 1 ]] || return 0
     DRAW_LAST="$key"
-    local previous_cols="$UI_COLS" previous_rows="${UI_ROWS:-24}"
+    local previous_cols="$UI_COLS" previous_rows="\${UI_ROWS:-24}"
     terminal_size
     if [[ "$UI_COLS" != "$previous_cols" || "$UI_ROWS" != "$previous_rows" ]]; then DRAW_RESIZED=1; fi
     if (( DRAW_RESIZED )); then
@@ -330,36 +334,37 @@ draw(){
         DRAW_RESIZED=0
     fi
     if (( ! DRAW_READY )); then
-        # Ensure all rows exist even when the previous prompt was near the bottom.
-        printf '\n\n\n\n\n'
+        printf '\n\n\n'
         DRAW_READY=1
     fi
-    prefix=$'\033[4A\r'
+    prefix=$'\033[2A\r'
     width=$((UI_COLS-24))
     (( width > 40 )) && width=40
     (( width < 1 )) && width=1
     filled=$((pct*width/100)); empty=$((width-filled))
-    printf -v bar '%*s' "$filled" ''; bar="${bar// /█}"
-    printf -v rest '%*s' "$empty" ''; rest="${rest// /░}"
+    printf -v bar '%*s' "$filled" ''; bar="\${bar// /█}"
+    printf -v rest '%*s' "$empty" ''; rest="\${rest// /░}"
     maxtext=$((UI_COLS-3))
     status='УСТАНОВКА …'
-    stage="Этап: $label"
-    if (( pct == 100 )); then
-        status='УСТАНОВКА ЗАВЕРШЕНА!'
-        stage=''
-    fi
-    printf -v packet '%s\033[2K  %s%s%s\n\r\033[2K\n\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s\n\r\033[2K\n\r\033[2K  %s%s%s' \
-        "$prefix" "$bold$success" "${status:0:maxtext}" "$reset" \
+    if (( pct == 100 )); then status='УСТАНОВКА ЗАВЕРШЕНА!'; fi
+    printf -v packet '%s\033[2K  %s%s%s\n\r\033[2K\n\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s' \
+        "$prefix" "$bold$success" "\${status:0:maxtext}" "$reset" \
         "$cyan" "$bar" "$blue" "$rest" "$reset" "$pct" \
-        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset" \
-        "$ice" "${stage:0:maxtext}" "$reset"
+        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
     printf '%s' "$packet"
+}
+# At most one integer percentage per tick: never 1 -> 14 or 14 -> 36.
+wpo_progress_tick(){
+    local elapsed="$((SECONDS-started))" expected
+    expected=$((1 + elapsed * 98 / WPO_PROGRESS_TARGET_SECONDS))
+    (( expected > 99 )) && expected=99
+    if (( shown < expected )); then shown=$((shown+1)); fi
+    draw "$shown" "$elapsed"
 }
 printf '\033[?25l'
 started=$SECONDS
 shown=1
-label='Загрузка пакета'
-draw "$shown" "$label" "$((SECONDS-started))"
+draw "$shown" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
     SOURCE="$LOCAL_BASE"
@@ -374,7 +379,7 @@ else
     git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$WORK/source" >> "$LOG" 2>&1 &
     INSTALL_PID=$!
     while kill -0 "$INSTALL_PID" 2>/dev/null; do
-        draw "$shown" 'Загрузка GitHub' "$((SECONDS-started))"
+        wpo_progress_tick
         sleep 0.2
     done
     if ! wait "$INSTALL_PID"; then
@@ -388,32 +393,17 @@ fi
     printf '\n'; error "Неполный пакет установщика. Журнал: $LOG"
 }
 chmod 0700 "$SOURCE"/*.sh
-printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
-label='Проверка установочного пакета'
-# Show the actual verified milestone immediately, not one extra second per %.
-shown=7
-draw "$shown" "$label" "$((SECONDS-started))"
-confirmed=7
+# Backend milestones stay in the log but never jump the visible percent.
+wpo_progress_tick
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
     WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=0 WPO_CARD_COLUMNS="$UI_COLS" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
-label='Проверка установочного пакета'
 while kill -0 "$INSTALL_PID" 2>/dev/null; do
-    if IFS=$'\t' read -r target current_label < "$PROGRESS"; then
-        if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target < 100 )); then
-            # Animate toward confirmed progress without running ahead of the installer.
-            (( target > confirmed )) && confirmed="$target"
-            [[ -n "$current_label" ]] && label="$current_label"
-        fi
-    fi
-    # The backend writes only verified milestones. Never artificially lag
-    # behind it by one percent per second on fast VPS installations.
-    if (( shown < confirmed )); then shown=$confirmed; fi
-    draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 1
+    wpo_progress_tick
+    sleep 0.2
 done
 code=0
 wait "$INSTALL_PID" || code=$?
@@ -424,10 +414,13 @@ if (( code == 0 )); then
         printf '\n'
         error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     fi
-    # A successful backend and valid result permit 100% immediately: no
-    # artificial 1-second-per-percent countdown before the finished screen.
-    shown=100
-    draw "$shown" "$label" "$((SECONDS-started))"
+    # After genuine success, animate every remaining integer up to 100.
+    # Catch up quickly only if the whole installation beat the estimate.
+    while (( shown < 100 )); do
+        shown=$((shown+1))
+        draw "$shown" "$((SECONDS-started))"
+        if (( shown < 100 )); then sleep 0.10; fi
+    done
     # Show verified access details two seconds after the 100% milestone.
     sleep 2
     # One final screen transition after the two-second success hold.
