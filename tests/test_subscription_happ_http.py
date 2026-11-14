@@ -115,15 +115,13 @@ class HappSubscription(unittest.TestCase):
     def test_happ_receives_importable_xray_profiles_with_correct_title_and_node(self):
         status,h,body=self.fetch()
         self.assertEqual(status,200)
-        self.assertIn("application/json",h["Content-Type"])
         self.assertEqual(h["profile-title"],"base64:"+base64.b64encode(b"Global VPN").decode())
         self.assertEqual(h["subscription-userinfo"],"upload=120; download=340; total=0; expire=0")
-        result=json.loads(body)
-        self.assertEqual(len(result),1)
-        self.assertEqual(result[0]["remarks"],"🇳🇱 Нидерланды")
-        self.assertTrue(any(x["protocol"]=="vless" for x in result[0]["outbounds"]))
-        self.assertFalse(any(x.get("routing",{}).get("balancers") for x in result))
-        self.assertFalse(any("Автовыбор" in x.get("remarks","") for x in result))
+        # One VLESS node is a native Happ link: no extra JSON profile or balancer.
+        decoded=base64.b64decode(body,validate=True).decode("utf-8").strip()
+        self.assertTrue(decoded.startswith("vless://"),decoded)
+        self.assertEqual(len(decoded.splitlines()),1)
+        self.assertNotIn("Автовыбор",decoded)
 
     def test_two_protocols_on_one_node_never_generate_auto_balancer(self):
         second={**self.user,"id":"v"*16,"protocol":"hysteria",
@@ -132,11 +130,11 @@ class HappSubscription(unittest.TestCase):
         self.manager["users"]=[self.user.copy(),second]
         status,_,body=self.fetch()
         self.assertEqual(status,200)
-        configs=json.loads(body)
-        self.assertEqual(len(configs),2)
-        self.assertEqual([cfg["remarks"] for cfg in configs],
-                         ["🇳🇱 Нидерланды","🇳🇱 Нидерланды"])
-        self.assertFalse(any(cfg.get("routing",{}).get("balancers") for cfg in configs))
+        links=base64.b64decode(body,validate=True).decode("utf-8").strip().splitlines()
+        self.assertEqual(len(links),2)
+        self.assertTrue(links[0].startswith("vless://"))
+        self.assertTrue(links[1].startswith("hysteria2://"))
+        self.assertFalse(any("Автовыбор" in link for link in links))
 
     def remote_node(self):
         remote_link=("vless://11111111-1111-4111-8111-111111111111"
@@ -167,9 +165,19 @@ class HappSubscription(unittest.TestCase):
         self.remote_node()
         status,_,body=self.fetch()
         self.assertEqual(status,200)
+        links=base64.b64decode(body,validate=True).decode("utf-8").strip().splitlines()
+        self.assertEqual(len(links),2)
+        self.assertFalse(any("Автовыбор" in link for link in links))
+
+    def test_explicit_xray_format_still_returns_single_node_json(self):
+        status,h,body=self.fetch("?format=xray")
+        self.assertEqual(status,200)
+        self.assertIn("application/json",h["Content-Type"])
         configs=json.loads(body)
-        self.assertEqual(len(configs),2)
-        self.assertFalse(any("Автовыбор" in cfg.get("remarks","") for cfg in configs))
+        self.assertEqual(len(configs),1)
+        self.assertEqual(configs[0]["remarks"],"🇳🇱 Нидерланды")
+        self.assertTrue(any(o["protocol"]=="vless" for o in configs[0]["outbounds"]))
+        self.assertFalse(configs[0].get("routing",{}).get("balancers"))
 
     def test_generic_client_receives_base64_vless_subscription(self):
         status,headers,body=self.fetch(ua="GenericVPN/1.0")
