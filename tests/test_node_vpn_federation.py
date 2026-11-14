@@ -111,7 +111,7 @@ class NodeFederationTests(unittest.TestCase):
         assert '"federation" not in caps' in bridge
         assert '"GET",node_api.API_PREFIX+"/status"' in bridge
         assert "wpo-vpn-controller-v27" in bridge
-        assert "node_api.sync_profile" in (ROOT / "wpp_nodes.py").read_text()
+        assert "def sync_profile(" in (ROOT / "wpp_nodes.py").read_text()
 
     def test_package_includes_federation_capability_and_autoinstall(self):
         script=(ROOT / "wpo-node-agent-install-v2.sh").read_text()
