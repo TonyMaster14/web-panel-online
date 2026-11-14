@@ -18,7 +18,7 @@ SERVICE=tproxy-panel.service
 exec 9>/run/lock/web-panel-proxy.lock
 flock -n 9 || { echo 'Другое обновление WPO выполняется.' >&2; exit 2; }
 
-PATCH_REV=4b085447bf7b29b04dc12feeb39942153e3b85ca
+PATCH_REV=749027c575d759e27c00761de20150d27c1961b7
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$PATCH_REV"
 TMP="$(mktemp -d /tmp/wpo-exact-nodes.XXXXXXXX)"
 BACKUP="/var/lib/tproxy-panel/nodes-routing-backup-$(date -u +%Y%m%dT%H%M%SZ)"
