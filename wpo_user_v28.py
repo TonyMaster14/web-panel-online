@@ -131,7 +131,8 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<div class="wpo-v28-section"><h3>Протоколы</h3><p>Happ и остальные поддерживаемые приложения</p>'
         '<div id="subscriptionConnections" class="wpo-v28-grid">' + "".join(choices) +
         '</div><p>Happ объединяет выбранные ноды. Telegram, Amnezia, Naive и Mieru '
-        'пока создаются отдельным подключением на основной ноде.</p></div></section>'
+        'пока создаются отдельным подключением на основной ноде. Для этих отдельных '
+        'профилей срок действия пока не применяется автоматически.</p></div></section>'
         + hidden_compat +
         '<div class="create-summary"><span>Будет создано</span>'
         '<b id="createSummary">Подписка для Happ</b><small id="wpoV28Count"></small></div>'
@@ -188,8 +189,22 @@ function syncDate(){const d=new Date(dt.value);const valid=Number.isFinite(d.get
 expiry.value=valid?String(Math.floor(d.getTime()/1000)):'0';
 display.textContent=valid?d.toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}):'Выбрать будущую дату';
 }
-function summary(){const ns=f.querySelectorAll('.wpo-v28-node input:checked').length,ps=f.querySelectorAll('.wpo-v28-protocol:checked').length;
-document.getElementById('wpoV28Count').textContent=ns+' нод × '+ps+' протокола = '+(ns*ps)+' подключений для Happ';}
+function choice(){
+ const selected=[...f.querySelectorAll('.wpo-v28-protocol:checked')];
+ const native=selected.filter(el=>!['vless','hysteria'].includes(el.dataset.protocol));
+ const checkedNodes=[...f.querySelectorAll('.wpo-v28-node input:checked')];
+ return {selected,native,checkedNodes};
+}
+function summary(){
+ const {selected,native,checkedNodes}=choice();
+ const text=native.length
+   ? (native.length===1&&selected.length===1&&checkedNodes.length===1&&checkedNodes[0].name==='node_local'
+      ? '1 отдельный профиль · основная нода · '+native[0].dataset.label
+      : 'Отдельные протоколы создаются только по одному на основной ноде')
+   : checkedNodes.length+' нод × '+selected.length+' протокола = '+(checkedNodes.length*selected.length)+' подключений Happ';
+ document.getElementById('wpoV28Count').textContent=text;
+ document.getElementById('createSummary').textContent=native.length?'Отдельная конфигурация':'Подписка для Happ';
+}
 document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',()=>{
 const d=current(),m=Number(button.dataset.wpoMonths),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+m);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));
 setDate(d);document.getElementById('wpoV28Calendar').open=false;summary()}));
@@ -198,12 +213,33 @@ f.addEventListener('change',()=>queueMicrotask(summary));
 f.addEventListener('input',()=>queueMicrotask(summary));
 document.getElementById('newAccount')?.addEventListener('click',()=>{setDate(new Date(current().getTime()+30*86400000));queueMicrotask(summary)});
 document.addEventListener('submit',e=>{if(e.target!==f)return;syncDate();
-const protocols=f.querySelectorAll('.wpo-v28-protocol:checked').length;
-const nodes=f.querySelectorAll('.wpo-v28-node input:checked').length;
+const {selected,native,checkedNodes}=choice();
 const err=document.getElementById('createError');
 const traffic=Number(document.getElementById('wpoV28Traffic').value);
-const message=!protocols?'Выберите хотя бы один доступный протокол.':!nodes?'Выберите хотя бы одну доступную ноду.':!Number(expiry.value)?'Выберите будущую дату окончания подписки.':(traffic>0?'Лимит трафика на нескольких нодах пока не активирован. Укажите 0 ГБ.':'');
-if(message){e.preventDefault();e.stopImmediatePropagation();err.textContent=message;err.hidden=false;}},true);
+const kind=document.getElementById('accountKind');
+const connection=document.getElementById('wpoV28DirectConnection');
+const devices=document.getElementById('wpoV28DirectDevices');
+let message='';
+if(!selected.length) message='Выберите хотя бы один доступный протокол.';
+else if(!checkedNodes.length) message='Выберите хотя бы одну доступную ноду.';
+else if(native.length && (selected.length!==1||checkedNodes.length!==1||checkedNodes[0].name!=='node_local'))
+  message='WEB Proxy, Telegram, Amnezia, Naive и Mieru сейчас создаются отдельным профилем только на основной ноде. Для Happ выбирайте VLESS и Hysteria2.';
+else if(!Number(expiry.value)) message='Выберите будущую дату окончания.';
+else if(!Number.isFinite(traffic)||traffic!==0)
+  message='Общий лимит трафика пока не активирован. Укажите 0 ГБ.';
+if(message){e.preventDefault();e.stopImmediatePropagation();err.textContent=message;err.hidden=false;return;}
+if(native.length){
+ kind.value=native[0].dataset.protocol;
+ connection.value=native[0].dataset.connectionId;
+ const limit=Number(document.getElementById('deviceLimit').value);
+ devices.value=String(['awg20','awg31','naive','mieru'].includes(kind.value)?1:Math.max(1,Math.min(20,limit||1)));
+ // Native direct users use the current standalone protocol backend; expiry
+ // cannot be claimed as enforced for this branch until its own expiry guard.
+}else{
+ kind.value='subscription';
+ connection.value='';
+}
+},true);
 setDate(new Date(current().getTime()+30*86400000));summary();
 })();"""
 
