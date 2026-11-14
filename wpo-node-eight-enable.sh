@@ -407,8 +407,28 @@ systemctl enable wpo-node-relay.service
 systemctl restart wpo-node-relay.service
 systemctl is-active --quiet wpo-node-relay.service || {
     echo 'Node WEB relay could not start; inspect journalctl -u wpo-node-relay' >&2
+    journalctl -u wpo-node-relay.service --no-pager -n 20 >&2 || true
     exit 4
 }
+# systemd Type=simple can report 'active' before a crashing binary finishes
+# loading its profile registry. Confirm an HTTP response from the real relay.
+RELAY_DOMAIN="$(python3 -c 'import json;print(json.load(open("/etc/wpp-node-agent/config.json"))["domain"])')"
+RELAY_READY=0
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if systemctl is-active --quiet wpo-node-relay.service &&
+       curl -4fsS --noproxy '*' --connect-timeout 1 --max-time 2 \
+         -H "Host: $RELAY_DOMAIN" http://127.0.0.1:8080/ >/dev/null 2>&1; then
+        RELAY_READY=1
+        break
+    fi
+    sleep 0.2
+done
+if [[ "$RELAY_READY" != 1 ]]; then
+    echo 'WEB Proxy relay did not become HTTP-ready. Check the logs below:' >&2
+    journalctl -u wpo-node-relay.service --no-pager -n 25 >&2 || true
+    exit 4
+fi
+echo '✓ WEB Proxy relay is serving HTTP with verified JSON profiles.'
 # Preserve the last known-good Caddy configuration. Syntax validation as
 # root does not ensure that the caddy systemd user can open the file.
 CADDY_BACKUP="$(mktemp /tmp/wpo-node-caddy-before-eight.XXXXXXXX)"
