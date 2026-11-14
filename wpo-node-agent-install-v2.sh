@@ -307,7 +307,8 @@ fi
 # working local Xray and authenticated federation API.
 report installing 'Активация VPN ноды: VLESS XHTTP и Hysteria2.'
 VPN_SETUP="$(mktemp /tmp/wpo-node-vpn-enable.XXXXXXXX.sh)"
-trap 'rm -f -- "${VPN_SETUP:-}"; fail' ERR
+trap fail ERR
+trap 'rm -f -- "$VPN_SETUP"' EXIT
 curl -4fsSL --proto '=https' --proto-redir '=https' \
     --retry 3 --connect-timeout 15 --max-time 90 \
     'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/test/wpo-smooth-progress-v1/wpo-node-vpn-enable.sh' \
