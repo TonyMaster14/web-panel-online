@@ -341,7 +341,7 @@ function validDate(d){
   const current=now();
   return d instanceof Date&&Number.isFinite(d.getTime())&&
     d.getTime()>current.getTime()+59000&&d.getFullYear()>=current.getFullYear()&&
-    d.getFullYear()<=2090&&d.getUTCFullYear()<=2090;
+    d.getFullYear()<=2099;
 }
 function syncDate(){
   if(!selected){expiry.value='0';display.textContent='Выберите дату окончания';apply.disabled=true;return;}
@@ -368,17 +368,17 @@ function setDate(d,preset=0){
 function renderCalendar(){
   const current=now();
   if(!yearSelect.options.length){
-    for(let year=current.getFullYear();year<=2090;year++){
+    for(let year=current.getFullYear();year<=2099;year++){
       const option=document.createElement('option');
       option.value=String(year);option.textContent=String(year);
       yearSelect.appendChild(option);
     }
   }
-  viewYear=Math.max(current.getFullYear(),Math.min(2090,viewYear));
+  viewYear=Math.max(current.getFullYear(),Math.min(2099,viewYear));
   monthSelect.value=String(viewMonth);
   yearSelect.value=String(viewYear);
   const minIndex=current.getFullYear()*12+current.getMonth();
-  const maxIndex=2090*12+11;
+  const maxIndex=2099*12+11;
   const index=viewYear*12+viewMonth;
   document.getElementById('wpoV28PrevMonth').disabled=index<=minIndex;
   document.getElementById('wpoV28NextMonth').disabled=index>=maxIndex;
@@ -418,7 +418,7 @@ function renderCalendar(){
 function changeMonth(direction){
   const index=viewYear*12+viewMonth+direction;
   const min=now().getFullYear()*12+now().getMonth();
-  if(index<min||index>2090*12+11)return;
+  if(index<min||index>2099*12+11)return;
   viewYear=Math.floor(index/12);
   viewMonth=index%12;
   renderCalendar();
