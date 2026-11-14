@@ -117,6 +117,17 @@ def patch_panel(source):
         raise ValueError("No safe multi-node auto-select guard")
     # Keep existing Happ response format; never change VLESS/Hysteria transports.
     result=before+METHOD+body+NEXT_METHOD+after
+    # Installing eight engines (including MTProxy and AWG builds) can exceed
+    # the historical 15-minute enrollment TTL on a small VPS. Keep the
+    # cryptographically random token single-use, but allow two hours to finish.
+    if 'if path==PANEL_PATH+"/node-bootstrap":' in result:
+        old_ttl='"expires_at":now+900'
+        old_ui='"expires_in":900'
+        if result.count(old_ttl)==1 and result.count(old_ui)==1:
+            result=result.replace(old_ttl,'"expires_at":now+7200',1)
+            result=result.replace(old_ui,'"expires_in":7200',1)
+        elif not ('"expires_at":now+7200' in result and '"expires_in":7200' in result):
+            raise ValueError("Unexpected bootstrap token expiry settings")
     ast.parse(result,filename="panel.py")
     return result
 
