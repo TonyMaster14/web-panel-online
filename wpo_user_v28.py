@@ -300,70 +300,219 @@ STYLE = """
 }
 """
 
-SCRIPT = r"""(()=>{const f=document.getElementById('createClientForm'),dt=document.getElementById('wpoV28Date');
-const display=document.getElementById('wpoV28DateDisplay'),expiry=document.getElementById('wpoV28Expiry');
-if(!f||!dt||!expiry)return;
-const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Локальный часовой пояс';
-document.getElementById('wpoV28TimeZone').textContent='Часовой пояс браузера: '+tz;
-const fmt=d=>{const pad=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())};
-const current=()=>new Date();
-function setDate(d){dt.value=fmt(d);syncDate()}
-function syncDate(){const d=new Date(dt.value);const valid=Number.isFinite(d.getTime())&&d>current()&&d.getFullYear()<=2090;
-expiry.value=valid?String(Math.floor(d.getTime()/1000)):'0';
-display.textContent=valid?d.toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}):'Выбрать будущую дату';
+SCRIPT = r"""(()=>{
+const f=document.getElementById('createClientForm');
+const dt=document.getElementById('wpoV28Date');
+const expiry=document.getElementById('wpoV28Expiry');
+const display=document.getElementById('wpoV28DateDisplay');
+const calendar=document.getElementById('wpoV28Calendar');
+const grid=document.getElementById('wpoV28DayGrid');
+const monthSelect=document.getElementById('wpoV28Month');
+const yearSelect=document.getElementById('wpoV28Year');
+const hourSelect=document.getElementById('wpoV28Hour');
+const minuteSelect=document.getElementById('wpoV28Minute');
+const apply=document.getElementById('wpoV28Apply');
+if(!f||!dt||!expiry||!calendar||!grid||!monthSelect||!yearSelect||!hourSelect||!minuteSelect)return;
+const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Локальное время браузера';
+const zoneLabel=document.getElementById('wpoV28TimeZone');
+zoneLabel.textContent=tz;
+const now=()=>new Date();
+const pad=n=>String(n).padStart(2,'0');
+const fmt=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+let selected=null;
+let viewYear=now().getFullYear();
+let viewMonth=now().getMonth();
+function addMonths(base,count){
+  const result=new Date(base.getFullYear(),base.getMonth()+count,1,base.getHours(),base.getMinutes(),0,0);
+  result.setDate(Math.min(base.getDate(),new Date(result.getFullYear(),result.getMonth()+1,0).getDate()));
+  return result;
 }
+function formatSelected(d){
+  return d.toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function refreshClock(){
+  const clock=document.getElementById('wpoV28CurrentDateTime');
+  if(clock)clock.textContent=now().toLocaleString(undefined,{
+    day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'
+  });
+}
+function validDate(d){
+  const current=now();
+  return d instanceof Date&&Number.isFinite(d.getTime())&&
+    d.getTime()>current.getTime()+59000&&d.getFullYear()>=current.getFullYear()&&
+    d.getFullYear()<=2090&&d.getUTCFullYear()<=2090;
+}
+function syncDate(){
+  if(!selected){expiry.value='0';display.textContent='Выберите дату окончания';apply.disabled=true;return;}
+  const good=validDate(selected);
+  dt.value=fmt(selected);
+  expiry.value=good?String(Math.floor(selected.getTime()/1000)):'0';
+  display.textContent=good?formatSelected(selected):'Выберите будущую дату и время';
+  display.style.color=good?'':'var(--red)';
+  apply.disabled=!good;
+  hourSelect.value=String(selected.getHours());
+  minuteSelect.value=String(selected.getMinutes());
+}
+function setDate(d,preset=0){
+  selected=d;
+  viewYear=d.getFullYear();
+  viewMonth=d.getMonth();
+  syncDate();
+  document.querySelectorAll('[data-wpo-months]').forEach(button=>{
+    button.classList.toggle('is-selected',Number(button.dataset.wpoMonths)===preset);
+    button.setAttribute('aria-pressed',String(Number(button.dataset.wpoMonths)===preset));
+  });
+  renderCalendar();
+}
+function renderCalendar(){
+  const current=now();
+  if(!yearSelect.options.length){
+    for(let year=current.getFullYear();year<=2090;year++){
+      const option=document.createElement('option');
+      option.value=String(year);option.textContent=String(year);
+      yearSelect.appendChild(option);
+    }
+  }
+  viewYear=Math.max(current.getFullYear(),Math.min(2090,viewYear));
+  monthSelect.value=String(viewMonth);
+  yearSelect.value=String(viewYear);
+  const minIndex=current.getFullYear()*12+current.getMonth();
+  const maxIndex=2090*12+11;
+  const index=viewYear*12+viewMonth;
+  document.getElementById('wpoV28PrevMonth').disabled=index<=minIndex;
+  document.getElementById('wpoV28NextMonth').disabled=index>=maxIndex;
+  grid.replaceChildren();
+  const first=new Date(viewYear,viewMonth,1);
+  const offset=(first.getDay()+6)%7;
+  const count=new Date(viewYear,viewMonth+1,0).getDate();
+  for(let i=0;i<offset;i++){
+    const spacer=document.createElement('span');
+    spacer.setAttribute('aria-hidden','true');grid.appendChild(spacer);
+  }
+  for(let day=1;day<=count;day++){
+    const button=document.createElement('button');
+    button.type='button';button.textContent=String(day);
+    const date=new Date(viewYear,viewMonth,day);
+    const endOfDay=new Date(viewYear,viewMonth,day,23,59,59,999);
+    button.disabled=endOfDay.getTime()<=current.getTime();
+    button.classList.toggle('is-today',sameDay(date,current));
+    button.classList.toggle('is-selected',selected!==null&&sameDay(date,selected));
+    button.setAttribute('aria-pressed',String(selected!==null&&sameDay(date,selected)));
+    button.setAttribute('aria-label',date.toLocaleDateString(undefined,{
+      weekday:'long',day:'numeric',month:'long',year:'numeric'
+    }));
+    button.addEventListener('click',()=>{
+      let d=new Date(viewYear,viewMonth,day,
+        selected?selected.getHours():current.getHours(),
+        selected?selected.getMinutes():current.getMinutes(),0,0);
+      if(d.getTime()<=now().getTime()+59000){
+        const next=now();next.setMinutes(next.getMinutes()+2,0,0);
+        d=next;
+      }
+      setDate(d);
+    });
+    grid.appendChild(button);
+  }
+}
+function changeMonth(direction){
+  const index=viewYear*12+viewMonth+direction;
+  const min=now().getFullYear()*12+now().getMonth();
+  if(index<min||index>2090*12+11)return;
+  viewYear=Math.floor(index/12);
+  viewMonth=index%12;
+  renderCalendar();
+}
+document.getElementById('wpoV28PrevMonth').addEventListener('click',()=>changeMonth(-1));
+document.getElementById('wpoV28NextMonth').addEventListener('click',()=>changeMonth(1));
+monthSelect.addEventListener('change',()=>{viewMonth=Number(monthSelect.value);renderCalendar();});
+yearSelect.addEventListener('change',()=>{viewYear=Number(yearSelect.value);renderCalendar();});
+function changeTime(){
+  if(!selected)return;
+  const d=new Date(selected.getFullYear(),selected.getMonth(),selected.getDate(),
+    Number(hourSelect.value),Number(minuteSelect.value),0,0);
+  setDate(d);
+}
+hourSelect.addEventListener('change',changeTime);
+minuteSelect.addEventListener('change',changeTime);
+document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',()=>{
+  setDate(addMonths(now(),Number(button.dataset.wpoMonths)),Number(button.dataset.wpoMonths));
+}));
+document.getElementById('wpoV28Today').addEventListener('click',()=>{
+  const d=now();d.setHours(d.getHours()+1,0,0,0);
+  setDate(d);
+});
+apply.addEventListener('click',()=>{
+  syncDate();
+  if(expiry.value!=='0')calendar.open=false;
+});
+calendar.addEventListener('toggle',()=>{if(calendar.open){refreshClock();renderCalendar();}});
+document.addEventListener('click',e=>{
+  if(calendar.open&&!calendar.contains(e.target))calendar.open=false;
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&calendar.open){
+    e.preventDefault();e.stopPropagation();calendar.open=false;
+  }
+});
+setInterval(refreshClock,1000);
 function choice(){
- const selected=[...f.querySelectorAll('.wpo-v28-protocol:checked')];
- const native=selected.filter(el=>!['vless','hysteria'].includes(el.dataset.protocol));
- const checkedNodes=[...f.querySelectorAll('.wpo-v28-node input:checked')];
- return {selected,native,checkedNodes};
+  const selectedProtocols=[...f.querySelectorAll('.wpo-v28-protocol:checked')];
+  const native=selectedProtocols.filter(el=>!['vless','hysteria'].includes(el.dataset.protocol));
+  const checkedNodes=[...f.querySelectorAll('.wpo-v28-node input:checked')];
+  return {selected:selectedProtocols,native,checkedNodes};
 }
 function summary(){
- const {selected,native,checkedNodes}=choice();
- const text=native.length
-   ? (native.length===1&&selected.length===1&&checkedNodes.length===1
-      ? '1 отдельный профиль · выбранная нода · '+native[0].dataset.label
-      : 'Отдельные протоколы создаются по одному на выбранной ноде')
-   : checkedNodes.length+' нод × '+selected.length+' протокола = '+(checkedNodes.length*selected.length)+' подключений Happ';
- document.getElementById('wpoV28Count').textContent=text;
- document.getElementById('createSummary').textContent=native.length?'Отдельная конфигурация':'Подписка для Happ';
+  const {selected,native,checkedNodes}=choice();
+  const text=native.length
+    ? (native.length===1&&selected.length===1&&checkedNodes.length===1
+       ? '1 отдельный профиль · выбранная нода · '+native[0].dataset.label
+       : 'Отдельные протоколы создаются по одному на выбранной ноде')
+    : checkedNodes.length+' нод × '+selected.length+' протокола = '+(checkedNodes.length*selected.length)+' подключений Happ';
+  document.getElementById('wpoV28Count').textContent=text;
+  document.getElementById('createSummary').textContent=native.length?'Отдельная конфигурация':'Подписка для Happ';
 }
-document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',()=>{
-const d=current(),m=Number(button.dataset.wpoMonths),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+m);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));
-setDate(d);document.getElementById('wpoV28Calendar').open=false;summary()}));
-dt.addEventListener('change',syncDate);
 f.addEventListener('change',()=>queueMicrotask(summary));
 f.addEventListener('input',()=>queueMicrotask(summary));
-document.getElementById('newAccount')?.addEventListener('click',()=>{setDate(new Date(current().getTime()+30*86400000));queueMicrotask(summary)});
-document.addEventListener('submit',e=>{if(e.target!==f)return;syncDate();
-const {selected,native,checkedNodes}=choice();
-const err=document.getElementById('createError');
-const traffic=Number(document.getElementById('wpoV28Traffic').value);
-const kind=document.getElementById('accountKind');
-const connection=document.getElementById('wpoV28DirectConnection');
-const devices=document.getElementById('wpoV28DirectDevices');
-let message='';
-if(!selected.length) message='Выберите хотя бы один доступный протокол.';
-else if(!checkedNodes.length) message='Выберите хотя бы одну доступную ноду.';
-else if(native.length && (selected.length!==1||checkedNodes.length!==1))
-  message='WEB Proxy, Telegram, Amnezia, Naive и Mieru создаются по одному на одной ноде. Для общей подписки Happ выберите VLESS или Hysteria2.';
-else if(!Number(expiry.value)) message='Выберите будущую дату окончания.';
-else if(!Number.isFinite(traffic)||traffic!==0)
-  message='Общий лимит трафика пока не активирован. Укажите 0 ГБ.';
-if(message){e.preventDefault();e.stopImmediatePropagation();err.textContent=message;err.hidden=false;return;}
-if(native.length){
- kind.value=native[0].dataset.protocol;
- connection.value=native[0].dataset.connectionId;
- const limit=Number(document.getElementById('deviceLimit').value);
- devices.value=String(['awg20','awg31','naive','mieru'].includes(kind.value)?1:Math.max(1,Math.min(20,limit||1)));
- // Native direct users use the current standalone protocol backend; expiry
- // cannot be claimed as enforced for this branch until its own expiry guard.
-}else{
- kind.value='subscription';
- connection.value='';
-}
+document.getElementById('newAccount')?.addEventListener('click',()=>{
+  calendar.open=false;
+  setDate(addMonths(now(),1),1);
+  queueMicrotask(summary);
+});
+document.addEventListener('submit',e=>{
+  if(e.target!==f)return;
+  syncDate();
+  const {selected,native,checkedNodes}=choice();
+  const err=document.getElementById('createError');
+  const traffic=Number(document.getElementById('wpoV28Traffic').value);
+  const kind=document.getElementById('accountKind');
+  const connection=document.getElementById('wpoV28DirectConnection');
+  const devices=document.getElementById('wpoV28DirectDevices');
+  let message='';
+  if(!selected.length)message='Выберите хотя бы один доступный протокол.';
+  else if(!checkedNodes.length)message='Выберите хотя бы одну доступную ноду.';
+  else if(native.length&&(selected.length!==1||checkedNodes.length!==1))
+    message='WEB Proxy, Telegram, Amnezia, Naive и Mieru создаются по одному на одной ноде. Для общей подписки Happ выберите VLESS или Hysteria2.';
+  else if(!Number(expiry.value))message='Выберите будущую дату окончания.';
+  else if(!Number.isFinite(traffic)||traffic!==0)
+    message='Общий лимит трафика пока не активирован. Укажите 0 ГБ.';
+  if(message){
+    e.preventDefault();e.stopImmediatePropagation();
+    err.textContent=message;err.hidden=false;return;
+  }
+  if(native.length){
+    kind.value=native[0].dataset.protocol;
+    connection.value=native[0].dataset.connectionId;
+    const limit=Number(document.getElementById('deviceLimit').value);
+    devices.value=String(['awg20','awg31','naive','mieru'].includes(kind.value)?1:Math.max(1,Math.min(20,limit||1)));
+  }else{
+    kind.value='subscription';
+    connection.value='';
+  }
 },true);
-setDate(new Date(current().getTime()+30*86400000));summary();
+refreshClock();
+setDate(addMonths(now(),1),1);
+summary();
 })();"""
 
 
