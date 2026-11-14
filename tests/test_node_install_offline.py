@@ -22,6 +22,10 @@ with tempfile.TemporaryDirectory(prefix='wpo-node-offline-') as folder:
     for name in ('install-final.sh','wpo-node-agent-install-v2.sh','wpo-node-geo-v13.py','wpo-node-autotemplate-v20.py',
                  'wpo-node-controller-vpn.sh','wpo_user_v28.py','wpo_v28_apply.py'):
         shutil.copyfile(root/name,package/name)
+    bridge=package/'wpo-node-controller-vpn.sh'
+    bridge.write_text(bridge.read_text().replace('/opt/tproxy-panel',str(app))
+                      .replace('/var/lib/tproxy-panel',str(data))
+                      .replace('[[ $EUID -eq 0 ]]','true'))
     src=(root/'node-install.sh').read_text().replace('/opt/tproxy-panel',str(app)).replace('/var/lib/tproxy-panel',str(data)).replace('/etc/systemd/system/tproxy-panel.service',str(service)).replace('/usr/local/sbin/web-proxy-panelctl',str(manager)).replace('[[ $EUID -eq 0 ]]','true')
     (package/'node-install.sh').write_text(src)
     mocks={'systemctl':'exit 0', 'chown':'exit 0', 'sleep':'exit 0',
