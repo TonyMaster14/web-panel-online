@@ -210,20 +210,14 @@ STYLE = """
 .wpo-v28-dialog .unavailable .wpo-v28-radio i{animation:none}
 .wpo-v28-calendar{position:relative;z-index:8;border:1px solid var(--line);
  border-radius:12px;background:var(--surface)}
-.wpo-v28-calendar[open]{border-color:var(--accent)}
-.wpo-v28-calendar>summary{display:flex;justify-content:space-between;align-items:center;
- padding:13px 15px;cursor:pointer;list-style:none;gap:12px}
-.wpo-v28-calendar>summary::-webkit-details-marker{display:none}
 .wpo-v28-date-head{display:grid;gap:4px}
 .wpo-v28-date-head b{font-size:12px;color:var(--text)}
 .wpo-v28-date-head small{font-size:11px;color:var(--muted)}
 .wpo-v28-calendar-icon{flex:0 0 auto;color:var(--accent);opacity:.92}
-.wpo-v28-calendar[open] .wpo-v28-calendar-icon{filter:drop-shadow(0 0 5px var(--accent))}
 .wpo-v28-calendar-body{position:absolute;top:calc(100% + 9px);left:0;right:0;z-index:30;
  display:grid;grid-template-columns:134px minmax(0,1fr);gap:15px;padding:15px;
  background:var(--raised);border:1px solid var(--line);border-radius:14px;
  box-shadow:0 18px 45px #0009}
-.wpo-v28-calendar:not([open]) .wpo-v28-calendar-body{display:none}
 .wpo-v28-cal-aside{display:flex;flex-direction:column;gap:12px;border-right:1px solid var(--line);
  padding-right:12px;min-width:0}
 .wpo-v28-cal-aside>b{font-size:11px;color:var(--muted);white-space:nowrap}
@@ -290,6 +284,16 @@ STYLE = """
 
 /* WPO UI v29: deterministic calendar toggle for Safari and mobile browsers */
 .wpo-v28-dialog .wpo-v28-section h3{color:#fff!important;font-weight:650}
+.wpo-v28-dialog #subscriptionFields .wpo-v28-section>h3,
+.wpo-v28-dialog #subscriptionFields .wpo-v28-section>p,
+.wpo-v28-dialog #subscriptionFields .wpo-v28-node strong,
+.wpo-v28-dialog #subscriptionFields .wpo-v28-node small,
+.wpo-v28-dialog #subscriptionFields .wpo-v28-option strong,
+.wpo-v28-dialog #subscriptionFields .wpo-v28-option small{
+ color:#fff!important;opacity:1!important
+}
+/* Disabled protocols stay nonselectable, but their captions remain white. */
+.wpo-v28-dialog #subscriptionFields .unavailable{opacity:1;cursor:not-allowed}
 .wpo-v28-calendar{z-index:8;position:relative}
 .wpo-v28-calendar:has(.wpo-v28-calendar-trigger[aria-expanded="true"]){border-color:var(--accent)}
 .wpo-v28-calendar-trigger{display:flex;justify-content:space-between;align-items:center;gap:12px;
