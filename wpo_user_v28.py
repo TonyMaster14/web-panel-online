@@ -107,7 +107,7 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<input type="hidden" name="nodes_selector_present" value="1">'
         '<input type="hidden" name="expires_at" id="wpoV28Expiry" value="0">'
         '<label for="accountName" class="wpo-v28-label">Имя конфигурации</label>'
-        '<input id="accountName" name="name" placeholder="Например, Анна · iPhone" '
+        '<input id="accountName" name="name" placeholder="Например, Home VPN" '
         'maxlength="80" autocomplete="off" required>'
         '<div class="wpo-v28-section wpo-v28-date-section">'
         '<details class="wpo-v28-calendar" id="wpoV28Calendar"><summary>'
@@ -411,6 +411,8 @@ function renderCalendar(){
         d=next;
       }
       setDate(d);
+      // Selecting a day completes the choice: collapse the calendar.
+      if(expiry.value!=='0')calendar.open=false;
     });
     grid.appendChild(button);
   }
@@ -437,6 +439,8 @@ hourSelect.addEventListener('change',changeTime);
 minuteSelect.addEventListener('change',changeTime);
 document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',()=>{
   setDate(addMonths(now(),Number(button.dataset.wpoMonths)),Number(button.dataset.wpoMonths));
+  // Quick month selection also closes the popover.
+  if(expiry.value!=='0')calendar.open=false;
 }));
 document.getElementById('wpoV28Today').addEventListener('click',()=>{
   const d=now();d.setHours(d.getHours()+1,0,0,0);
