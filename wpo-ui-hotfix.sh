@@ -52,6 +52,17 @@ for token in required:
         raise SystemExit("Сборка не содержит новое меню: "+token)
 if 'placeholder="Например, Анна · iPhone"' in src:
     raise SystemExit("Загружена устаревшая форма")
+if '.wpo-v28-calendar:not([open]) .wpo-v28-calendar-body' in src:
+    raise SystemExit("Загружена старая CSS-ошибка: календарь всегда скрыт")
+required_css=(
+    '.wpo-v28-calendar-body:not([hidden]){display:grid}',
+    '#subscriptionFields .wpo-v28-option strong',
+    '#subscriptionFields .wpo-v28-node strong',
+    'color:#fff!important;opacity:1!important',
+)
+for token in required_css:
+    if token not in src:
+        raise SystemExit("Отсутствует исправление календаря/белого текста: "+token)
 if 'wpo_user_v28.form(' not in ui or 'import wpo_user_v28' not in ui:
     raise SystemExit("Панель не подключена к новому модулю пользователей")
 print("✓ Проверена новая форма: Home VPN и закрытие календаря")
@@ -71,6 +82,9 @@ assert "toggle.addEventListener('click',event=>{" in html
 assert "if(popover.hidden)openCalendar();" in html
 assert 'data-wpo-2099="1"' in html
 assert 'id="wpoV28Hour"' not in html
+assert '.wpo-v28-calendar:not([open]) .wpo-v28-calendar-body' not in html
+assert '#subscriptionFields .wpo-v28-option strong' in html
+assert '#subscriptionFields .wpo-v28-node strong' in html
 print('✓ Установленный модуль выдаёт Home VPN')
 PY_TEST
 systemctl restart "$SERVICE"
@@ -93,5 +107,5 @@ done
 SAVED=0
 echo '✓ WPO перезапущена, новая форма установлена и проверена.'
 echo '✓ Подсказка: Например, Home VPN'
-echo '✓ Календарь закрывается по иконке, выбору дня, быстрому сроку и Esc.'
+echo '✓ Календарь открывается и закрывается по иконке; ноды и протоколы — белым.'
 echo 'Закройте старую вкладку панели, откройте её заново и нажмите «Новый пользователь».'
