@@ -9,6 +9,7 @@ are bounded. A remote-only feed with nothing ready must still report pending.
 import concurrent.futures
 import threading
 import time
+import sys
 from urllib.parse import urlparse
 
 WORKERS = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="wpo-fed")
@@ -16,7 +17,7 @@ LOCK = threading.RLock()
 CACHE = {}
 PENDING = {}
 FAILURES = {}
-CACHE_TTL = 180
+CACHE_TTL = 86400
 RETRY_DELAY = 30
 MAX_ENTRIES = 2048
 
@@ -60,6 +61,9 @@ def _sync_worker(key, api, node, external_id, name, protocols):
     except Exception as exc:
         # Print only the safe class, not server text, domains, tokens or links.
         error_kind = type(exc).__name__
+        # Node ID is opaque; never log HTTP response bodies or credentials.
+        print("wpo asynchronous node sync failed:", key[0], error_kind,
+              file=sys.stderr, flush=True)
         with LOCK:
             FAILURES[key] = (time.monotonic() + RETRY_DELAY, error_kind)
     else:
