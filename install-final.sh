@@ -155,12 +155,11 @@ done
 [[ -x /usr/local/sbin/WPP ]] || die "WPP console menu was not installed."
 systemctl is-active --quiet web-panel-proxy-sync-tls.timer ||
     die "The Xray TLS synchronization timer did not start."
-echo "Checking the latest Xray and OpenFlux releases..."
-wpp_progress 77 "Проверка Xray и OpenFlux"
-flock -u 9
-if ! systemctl start web-panel-proxy-component-auto-update.service; then
-    echo "WARNING: Latest Xray/OpenFlux check failed; the automatic timer will retry." >&2
-fi
+# Installed component readiness has already been verified above. Release
+# discovery/downloads are optional maintenance and must not block fresh setup.
+# Keep the installer lock through the bundled node installer and Xray test.
+echo "Checking installed Xray and OpenFlux components..."
+wpp_progress 77 "Проверка установленных компонентов"
 # Nodes Lab v26 is bundled into the nodes-lab branch installation.
 # Runs after base WPO 3.0 is healthy. This activates "Ноды → Добавить ноду"
 # with the current Node Agent installer, auto-geolocation, status checks,
@@ -193,6 +192,12 @@ printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
 chmod 0600 /etc/web-proxy-panel/version
 [[ -s "$WPO_UI_RESULT_FILE" ]] || die "Access card was not created by panel installer."
 echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
+# All critical installation checks have now passed. Release maintenance can
+# run later without delaying the access card, even if GitHub responds slowly.
+flock -u 9
+if ! systemctl start --no-block web-panel-proxy-component-auto-update.service; then
+    echo "WARNING: Xray/OpenFlux maintenance was not queued; the timer will retry." >&2
+fi
 wpp_progress 100 "Установка завершена"
 # Print credentials only after the full installation succeeds.
 # In wizard mode, install.sh displays this same card as its final screen.
