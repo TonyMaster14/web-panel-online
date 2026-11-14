@@ -27,7 +27,7 @@ fail() {
 }
 trap fail ERR
 report installing 'Проверка VPS и домена.'
-echo '=== WEB PANEL ONLINE — Node Agent 0.2 ==='
+echo '=== WEB PANEL ONLINE — Node Agent 0.4 · 8 протоколов ==='
 read -r -p 'Домен ноды (например, de.example.com): ' DOMAIN
 DOMAIN=$(printf '%s' "$DOMAIN" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]')
 [[ "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || { report error 'Некорректный домен.'; echo 'Некорректный домен.'; exit 2; }
