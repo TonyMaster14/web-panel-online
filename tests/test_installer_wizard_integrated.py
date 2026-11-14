@@ -56,7 +56,7 @@ def run_case(case):
         # Only privilege/host paths and timing are substituted; real rendering runs.
         source=SOURCE.replace('[[ $EUID -eq 0 ]]', 'true').replace('/run/', str(directory)+'/').replace('/var/log/web-panel-online', str(directory)+'/logs')
         source=source.replace('-o root -g root ', '').replace('</dev/tty','<&0')
-        source=source.replace('sleep 1', 'sleep .01').replace('sleep 4', 'sleep .04')
+        source=source.replace('sleep 1', 'sleep .01').replace('sleep 2', 'sleep .02')
         (directory / "install.sh").write_text(source, encoding="utf-8")
         (directory / "install-final.sh").write_text(MOCK_BACKEND, encoding="utf-8")
         (directory / "node-install.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
@@ -144,6 +144,9 @@ def run_case(case):
                 assert "Сохраните данные, чтобы не потерять!" in final_plain
                 assert "Ссылка на панель:" in final_plain
                 assert "https://panel.example.com/panel-test-install/login" in final_plain
+                # Link appears strictly below the closed credential card.
+                card_tail=final_plain.split('WPO 3.0 — УСТАНОВЛЕНО',1)[1]
+                assert card_tail.index('╰') < card_tail.index('Ссылка на панель:')
                 assert "Логин: WPOAdmin" in final_plain
                 assert "Пароль: Secret-6789" in final_plain
                 for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "УСТАНОВКА ЗАВЕРШЕНА!", "100%", "◷ 00:"):
