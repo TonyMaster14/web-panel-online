@@ -366,6 +366,12 @@ wpo_progress_tick(){
         if [[ "$real_percent" =~ ^[0-9]+$ ]] &&
            (( real_percent > WPO_CONFIRMED && real_percent <= 100 )); then
             WPO_CONFIRMED="$real_percent"
+            # Record real checkpoints privately for comparing 4/5/6.5-min runs.
+            # Display remains stage-free.
+            if [[ -n "${LOG:-}" ]]; then
+                printf '[WPO timing] +%ds milestone=%d %s\n' \
+                    "$elapsed" "$WPO_CONFIRMED" "$real_stage" >> "$LOG"
+            fi
         fi
     fi
     remaining=$((WPO_PROGRESS_REFERENCE_SECONDS * (100-WPO_CONFIRMED) / 100))
