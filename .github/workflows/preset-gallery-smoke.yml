@@ -58,7 +58,8 @@ jobs:
           assert 'https://panel.example.test/panel-test/__preview_asset/preset-cars.webp?v=' in preview
           css = inline_bundled_preset_photos('.car{background:url("/preset-car-white.webp")}')
           assert "data:image/webp;base64," in css
-          assert "inline_bundled_preset_photos(css)" in installer
+          assert "do not inline images into published CSS" in installer
+          assert "Keep /preset-*.webp references, served as local static relay assets." in installer
 
           ui = Path("wpp_ui.py").read_text(encoding="utf-8")
           js_start = "    js = r'''<script>"
