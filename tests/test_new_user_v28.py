@@ -78,6 +78,25 @@ class NewUserFormTests(unittest.TestCase):
             self.assertIn(marker,self.html,marker)
         self.assertIn("Новый пользователь",self.html)
         self.assertNotIn("Один ключ",self.html)
+    def test_focused_ui_hotfix_is_self_verifying_and_rolls_back(self):
+        import subprocess
+        launcher=(ROOT / "wpo-ui-hotfix.sh").read_text(encoding="utf-8")
+        required=(
+            'wpo_user_v28.py', 'placeholder="Например, Home VPN"',
+            'wpo_v28', 'systemctl restart "$SERVICE"',
+            'curl -4fsS --max-time 3',
+            'cp -a "$BACKUP" "$MODULE"',
+            'Закройте старую вкладку панели',
+            "if(expiry.value!=='0')calendar.open=false;",
+        )
+        for needle in required:
+            self.assertIn(needle,launcher,needle)
+        self.assertNotIn("wpo-node-vpn-enable.sh",launcher)
+        self.assertNotIn("wpo-node-eight-enable.sh",launcher)
+        result=subprocess.run(["bash","-n"],input=launcher,text=True,
+                              capture_output=True,timeout=8)
+        self.assertEqual(result.returncode,0,result.stderr)
+
     def test_old_wizard_js_replaced_without_busting_other_actions(self):
         import ast
         import subprocess
