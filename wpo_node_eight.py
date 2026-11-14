@@ -280,6 +280,20 @@ def _update_mtproxy(users, domain):
          "carrier_mode": "https"}
         for record in current.values() if record["protocol"] == "web"
     ]
+    if not relay_profiles:
+        # The upstream Go relay requires a nonempty registry even when no
+        # WEB subscribers exist. Keep a private, random bootstrap capability
+        # that routes to an unused local port, never disclose it to clients.
+        bootstrap = Path("/etc/wpp-node-vpn/relay-bootstrap-secret")
+        if not bootstrap.is_file():
+            raise RuntimeError("WEB relay bootstrap credential is missing")
+        secret = bootstrap.read_text(encoding="ascii").strip()
+        if not HEX_SECRET_RE.fullmatch(secret):
+            raise RuntimeError("WEB relay bootstrap credential is invalid")
+        relay_profiles = [{
+            "name": "node-bootstrap", "secret": secret,
+            "backend": "127.0.0.1:2398", "carrier_mode": "https"
+        }]
     xray.atomic_json(RELAY_CONFIG, {"profiles": relay_profiles})
     import grp
     os.chown(RELAY_CONFIG, 0, grp.getgrnam("tproxy").gr_gid)
