@@ -30,7 +30,7 @@ cleanup(){
 }
 trap cleanup EXIT
 # Fetch an immutable commit, not a branch-ref URL that can be cached by the CDN.
-MODULE_COMMIT=ebe8f35d32a407dcb8b62792f5d3d7c3dfcda7ee
+MODULE_COMMIT=d82803565a8068669252ce8d8323261b2f5e5a26
 URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${MODULE_COMMIT}/wpo_user_v28.py"
 curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
   --connect-timeout 15 --max-time 90 "$URL" -o "$TMP/new.py"
@@ -58,6 +58,9 @@ required=[
     "button.setAttribute('aria-pressed','false');",
     "font-weight:700;opacity:1!important",
     "for m in (1, 3, 6, 9, 12))",
+    '("web", "WEB Proxy", "Telegram", "telegram")',
+    '("mtproto", "MTProto", "Telegram", "telegram")',
+    'subtitle = "Telegram" if protocol in ("web", "mtproto")',
 ]
 for token in required:
     if token not in src:
@@ -88,7 +91,9 @@ rm -f "$APP"/__pycache__/wpo_user_v28.*.pyc
 PYTHONPATH="$APP" python3 - <<'PY_TEST'
 import wpo_user_v28
 html=wpo_user_v28.form('/panel-check','test-csrf',[
-    {'id':'vless-primary','protocol':'vless','enabled':True}
+    {'id':'vless-primary','protocol':'vless','enabled':True},
+    {'id':'web-primary','protocol':'web','enabled':True},
+    {'id':'mtproto-primary','protocol':'mtproto','enabled':True}
 ],[],{'country_code':'NL','country_name':'Нидерланды'})
 assert 'placeholder="Например, Home VPN"' in html
 assert 'Например, Анна · iPhone' not in html
@@ -107,7 +112,12 @@ assert "highlightedDate=new Date(current.getFullYear(),current.getMonth(),curren
 assert "button.classList.remove('is-selected');" in html
 assert "button.setAttribute('aria-pressed','false');" in html
 assert "font-weight:700;opacity:1!important" in html
-print('✓ Установлен календарь: повторное открытие — сегодня, без активного периода')
+import re
+for title in ("WEB Proxy","MTProto"):
+    card=re.search(r'<strong>'+title+r'</strong><small>(.*?)</small>',html)
+    assert card and card.group(1)=="Telegram", f"Неверная подпись: {title}"
+assert 'Telegram · отдельная ссылка' not in html
+print('✓ Календарь сохранён, WEB Proxy и MTProto подписаны только Telegram')
 PY_TEST
 systemctl restart "$SERVICE"
 PANEL_PATH="$(sed -n 's/^Environment=WEBPROXY_PANEL_PATH=//p' /etc/systemd/system/tproxy-panel.service | head -n1)"
@@ -134,4 +144,5 @@ echo '✓ Подсказка: Например, Home VPN'
 echo '✓ Календарь открывается на текущем месяце и показывает живые дату/время.'
 echo '✓ При повторном открытии видны текущий месяц, красная рамка сегодня и неактивные кнопки периодов.'
 echo '✓ Выбранная дата окончания сохраняется; быстрые сроки закрывают календарь.'
+echo '✓ В карточках WEB Proxy и MTProto отображается только Telegram.'
 echo 'Закройте старую вкладку панели, откройте её заново и нажмите «Новый пользователь».'
