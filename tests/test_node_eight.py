@@ -156,7 +156,7 @@ class EightEngineTests(unittest.TestCase):
             self.assertIn(needed,installer)
         self.assertIn("wpo-node-eight-enable.sh",agent)
         self.assertIn('WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"',agent)
-        self.assertIn("ENGINE_REV=ecb7b8d9297af06cce419f28e47d79f4ebf6db52",agent)
+        self.assertIn("ENGINE_REV=c7a026d48cf928b5f10b988199baff433cc36698",agent)
         # A background Ubuntu dist-upgrade must not be interrupted by WPO
         # or make the user enter node data just to fail on dpkg lock.
         self.assertIn("fuser -s /var/lib/dpkg/lock-frontend",agent)
@@ -177,6 +177,8 @@ class EightEngineTests(unittest.TestCase):
         self.assertIn("systemctl is-active --quiet wpo-node-relay.service",installer)
         self.assertIn("http://127.0.0.1:8080/",installer)
         self.assertIn("RELAY_READY=0",installer)
+        self.assertIn('"$BASE/wpo-node-site-template-fix.sh"',installer)
+        self.assertIn('bash "$TEMP/site-template-fix.sh"',installer)
         self.assertIn("journalctl -u wpo-node-relay.service",installer)
         self.assertIn("if missing: raise SystemExit('Missing WPO node backends:",installer)
 
