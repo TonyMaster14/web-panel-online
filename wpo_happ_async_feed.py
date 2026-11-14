@@ -82,7 +82,9 @@ def enqueue(api, node, external_id, name, protocols):
     if not node.get("enabled", True):
         return [], False
     protocols = tuple(protocols)
-    key = (str(node.get("id", "")), str(node.get("url", "")),\n           hashlib.sha256(str(node.get("token", "")).encode()).hexdigest(),\n           external_id, protocols)
+    key = (str(node.get("id", "")), str(node.get("url", "")),
+           hashlib.sha256(str(node.get("token", "")).encode()).hexdigest(),
+           external_id, protocols)
     now = time.monotonic()
     with LOCK:
         item = CACHE.get(key)
@@ -153,7 +155,9 @@ def invalidate_all():
 def warm(api, node, external_id, name, protocols):
     """One-time blocking prewarm outside Happ HTTP; uses same verified cache."""
     protocols = tuple(protocols)
-    key = (str(node.get("id", "")), str(node.get("url", "")),\n           hashlib.sha256(str(node.get("token", "")).encode()).hexdigest(),\n           external_id, protocols)
+    key = (str(node.get("id", "")), str(node.get("url", "")),
+           hashlib.sha256(str(node.get("token", "")).encode()).hexdigest(),
+           external_id, protocols)
     result = verified_links(api, node, external_id, name, protocols, timeout=90)
     with LOCK:
         CACHE[key] = (time.monotonic() + CACHE_TTL, tuple(result))
