@@ -388,14 +388,22 @@ def sync(data):
         old = xray.read_json(STATE, {"profiles": {}}).get("profiles", {})
         new = with_profile(old, external_id, name, protocols)
         if new != old:
+            # VLESS/Hysteria-only subscriptions must never reconfigure/restart
+            # unrelated MTProxy, WEB relay, AWG, NaiveProxy or Mieru services.
+            # Those engines may take >20s or even fail on a one-GB VPS,
+            # causing Happ's federation HTTP request to return 503.
+            native_changed = assemble(old) != assemble(new)
             try:
                 xray.apply(new)
-                native_apply(new, xray.read_json(SETTINGS))
+                if native_changed:
+                    native_apply(new, xray.read_json(SETTINGS))
             except Exception:
-                # A failed sync is not recorded as a successful profile.
+                # Roll back only the engines actually modified. Restarting
+                # unused native services on failure can mask the real error.
                 try:
                     xray.apply(old)
-                    native_apply(old, xray.read_json(SETTINGS))
+                    if native_changed:
+                        native_apply(old, xray.read_json(SETTINGS))
                 except Exception:
                     pass
                 raise
