@@ -359,6 +359,9 @@ if new not in s:
     p.with_suffix('.eight-caddy-test').write_text(s.replace(old,new))
 else:
     p.with_suffix('.eight-caddy-test').write_text(s)
+# The script runs with umask 077: write_text() creates a 0600 file.
+# Caddy's non-root systemd service MUST be able to read the installed file.
+p.with_suffix('.eight-caddy-test').chmod(0o644)
 PY_CADDY
 caddy validate --config /etc/caddy/Caddyfile.eight-caddy-test --adapter caddyfile >/dev/null || {
     echo 'Go relay Caddyfile is invalid; existing site left unchanged.' >&2
@@ -403,8 +406,22 @@ systemctl is-active --quiet wpo-node-relay.service || {
     echo 'Node WEB relay could not start; inspect journalctl -u wpo-node-relay' >&2
     exit 4
 }
-mv -f /etc/caddy/Caddyfile.eight-caddy-test /etc/caddy/Caddyfile
-systemctl reload caddy.service
+# Preserve the last known-good Caddy configuration. Syntax validation as
+# root does not ensure that the caddy systemd user can open the file.
+CADDY_BACKUP="$(mktemp /tmp/wpo-node-caddy-before-eight.XXXXXXXX)"
+cp -a /etc/caddy/Caddyfile "$CADDY_BACKUP"
+install -o root -g root -m 0644 /etc/caddy/Caddyfile.eight-caddy-test /etc/caddy/Caddyfile
+rm -f /etc/caddy/Caddyfile.eight-caddy-test
+if ! systemctl reload caddy.service; then
+    echo 'Caddy reload failed, restoring previous Caddyfile.' >&2
+    cp -a "$CADDY_BACKUP" /etc/caddy/Caddyfile
+    chmod 0644 /etc/caddy/Caddyfile
+    systemctl reload-or-restart caddy.service || true
+    rm -f "$CADDY_BACKUP"
+    echo 'Node installation stopped before enrollment; see journalctl -u caddy.' >&2
+    exit 4
+fi
+rm -f "$CADDY_BACKUP"
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
     ufw route allow from 10.80.0.0/14 to any >/dev/null
     ufw allow 25000:25949/tcp >/dev/null
