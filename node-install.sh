@@ -119,7 +119,7 @@ new_nodes=r"""def nodes_ui(nodes, local, connection_token, path, csrf, pending_n
         name=str(n.get('name') or n.get('country_name') or 'Нода')
         code=str(n.get('country_code','UN')).upper()
         caps=n.get('capabilities') if isinstance(n.get('capabilities'),list) else []
-        cap='VLESS · Hysteria2' if 'federation' in caps or not caps else 'Node Agent'
+        cap='VLESS XHTTP · Hysteria2' if 'federation' in caps else 'Node Agent · VPN не установлена'
         edit=f'<button class="icon-btn" type="button" data-node-edit="{esc(uid)}" data-node-name="{esc(name)}" title="Переименовать" aria-label="Переименовать">{icon("edit")}</button>'
         delete=f'<form method="post" action="{esc(path)}/node-action" data-confirm="Удалить ноду «{esc(name)}»? Все управляемые профили будут отозваны.">{hidden(csrf,operation="delete",id=uid)}<button class="icon-btn danger" title="Удалить" aria-label="Удалить">{icon("trash")}</button></form>'
         cards.append(f'<article class="card wpo-node-card"><div class="wpo-node-card-top"><span class="wpo-node-flag">{esc(node_flag(code))}</span><div class="wpo-node-card-title"><strong>{esc(name)}</strong><small>{esc(n.get("country_name","Страна не определена"))} · {esc(n.get("url",""))}</small></div>{status(uid,state)}</div><div class="wpo-node-card-meta"><span>Агент {esc(n.get("version","—"))}</span><span>{esc(cap)}</span></div><div class="wpo-node-card-actions">{edit}{delete}</div></article>')
