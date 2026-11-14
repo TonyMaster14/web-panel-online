@@ -69,6 +69,21 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("Срок действия",html)
         self.assertIn("Лимит срока для отдельных профилей пока нужно проверять отдельно",html)
 
+    def test_telegram_cards_show_only_telegram_subtitle(self):
+        import re
+        import wpp_connections
+        conns=wpp_connections.defaults()
+        html=wpo_user_v28.form("/panel-demo","csrf-token",conns,self.nodes,{})
+        for title in ("WEB Proxy","MTProto"):
+            card=re.search(
+                r'<label class="wpo-v28-option">.*?<strong>'+re.escape(title)+
+                r'</strong><small>(.*?)</small>.*?</label>',html,re.S)
+            self.assertIsNotNone(card,title)
+            self.assertEqual(card.group(1),"Telegram",title)
+        self.assertNotIn("Telegram · отдельная ссылка",html)
+        self.assertIn('Happ · HTTPS 443 · выбранные ноды',html)
+        self.assertIn('Amnezia · конфигурация · одна выбранная нода',html)
+
     def test_existing_controller_dom_is_preserved(self):
         for marker in ('id="createAccount"','id="createClientForm"','id="createSummary"',
                        'id="accountName"','id="subscriptionFields"','id="directFields"',
