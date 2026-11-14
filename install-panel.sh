@@ -4253,13 +4253,19 @@ class Handler(BaseHTTPRequestHandler):
             # Happ displays profile-title as the subscription heading; JSON
             # remarks must remain only the child node label (flag/country).
             xray_configs=routing_store.subscription_xray_configs_by_link(routing_entries,"")
-            failover=bool(lines)
+            # Auto-balancing is meaningful only across different node hosts.
+            # A single-node Happ subscription must not receive an extra
+            # leastLoad/observatory profile that interferes with its latency test.
+            distinct_nodes={urlparse(link).hostname for link in lines if urlparse(link).hostname}
+            failover=bool(subscription.get("failover_enabled",True)) and len(distinct_nodes)>1
             if failover:
                 try:
                     auto_config=routing_store.failover_xray_config(lines,merged_remote,"🇪🇺 Автовыбор")
                     xray_configs.insert(0,auto_config)
                 except routing_store.RoutingError: pass
-            if requested_format in ("xray","xray-json","json") or (happ and (selected_routing or failover)):
+            # Happ always receives importable Xray JSON, including for one
+            # VLESS/Hysteria node; do not downgrade single-node feeds to URLs.
+            if requested_format in ("xray","xray-json","json") or (happ and bool(xray_configs)):
                 if not xray_configs:
                     self.send_data("В подписке нет VLESS или Hysteria2 для Xray-маршрутизации.",409,headers=headers); return
                 self.send_data(json.dumps(xray_configs,ensure_ascii=False,separators=(",",":")),mime="application/json; charset=utf-8",headers=headers); return
