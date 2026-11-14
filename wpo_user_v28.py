@@ -228,11 +228,11 @@ openCreate.addEventListener('click',()=>{
   createError.hidden=true;
   // Reapply an actual current date after the reset, not a stale default.
   document.querySelector('[data-wpo-months="1"]')?.click();
-  document.getElementById('wpoV28Count')?.replaceChildren();
+  // The calendar listener refreshes the preview after a reset.
   createDialog.showModal();
   setTimeout(()=>document.getElementById('accountName').focus(),30);
 });
-createForm.querySelectorAll('[data-close-dialog]').forEach(button=>
+createDialog.querySelectorAll('[data-close-dialog]').forEach(button=>
   button.addEventListener('click',()=>createDialog.close()));
 document.querySelectorAll('[data-open-client]').forEach(button=>
   button.addEventListener('click',()=>document.getElementById('client-'+button.dataset.openClient).showModal()));
