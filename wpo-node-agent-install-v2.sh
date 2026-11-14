@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # wpo-node-agent-eight-pinned-v1: eight actual engines, pinned backend source and live API readiness
+# wpo-node-agent-reinstall-v23: restart agent after key rotation and explain enrollment failures
 set -Eeuo pipefail
 umask 077
 [[ $EUID -eq 0 ]] || { echo 'Запустите от root.'; exit 1; }
