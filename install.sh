@@ -57,6 +57,10 @@ terminal_size(){
 box_rule(){
     BOX_WIDTH=$((UI_COLS-3))
     (( BOX_WIDTH > 62 )) && BOX_WIDTH=62
+    # Only on the final success screen: match the actual access-card border.
+    if [[ "${WPO_FINAL_BANNER_INNER_WIDTH:-}" =~ ^[0-9]+$ ]]; then
+        BOX_WIDTH="$WPO_FINAL_BANNER_INNER_WIDTH"
+    fi
     printf -v BOX_RULE '%*s' "$BOX_WIDTH" ''
     BOX_RULE="${BOX_RULE// /─}"
 }
@@ -343,6 +347,21 @@ if (( code == 0 )); then
     # Clear the visible screen only; do not erase terminal scrollback.
     printf '\033[0m\033[2J\033[H'
     terminal_size
+    # Match the upper banner's horizontal extent to the lower access frame.
+    # The result file may start with a color-reset-only line, so locate the
+    # actual ╭...╮ line instead of assuming it is the first line.
+    final_card_rule=""
+    while IFS= read -r final_card_line; do
+        if [[ "$final_card_line" == *"╭"*"╮"* ]]; then
+            final_card_rule="${final_card_line#*╭}"
+            final_card_rule="${final_card_rule%%╮*}"
+            # Strip the leading ANSI color sequence without changing the ─.
+            final_card_rule="${final_card_rule##*m}"
+            break
+        fi
+    done < "$RESULT"
+    [[ "$final_card_rule" =~ ^─+$ ]] || error 'Не удалось определить длину итоговой рамки.'
+    WPO_FINAL_BANNER_INNER_WIDTH="${#final_card_rule}"
     banner
     cat -- "$RESULT"
     FINAL_SCREEN=1
