@@ -194,6 +194,35 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn('.wpo-v28-dialog .wpo-v28-section h3{color:#fff!important',self.html)
         self.assertIn('placeholder="Например, Home VPN"',self.html)
 
+    def test_calendar_popup_is_not_hidden_by_obsolete_details_css(self):
+        # Regression: this selector targets the newer DIV as well and silently
+        # forces display:none even after JS sets hidden=false.
+        self.assertNotIn('.wpo-v28-calendar:not([open]) .wpo-v28-calendar-body',
+                         wpo_user_v28.STYLE)
+        self.assertNotIn('.wpo-v28-calendar[open]',wpo_user_v28.STYLE)
+        self.assertIn('.wpo-v28-calendar-body[hidden]{display:none!important}',
+                      wpo_user_v28.STYLE)
+        self.assertIn('.wpo-v28-calendar-body:not([hidden]){display:grid}',
+                      wpo_user_v28.STYLE)
+        self.assertIn("popover.hidden=false;",wpo_user_v28.SCRIPT)
+        self.assertIn("popover.hidden=true;",wpo_user_v28.SCRIPT)
+        self.assertIn("if(popover.hidden)openCalendar();",wpo_user_v28.SCRIPT)
+        self.assertIn("else closeCalendar();",wpo_user_v28.SCRIPT)
+
+    def test_node_and_protocol_copy_is_white_even_when_unavailable(self):
+        css=wpo_user_v28.STYLE
+        for selector in (
+            '#subscriptionFields .wpo-v28-section>h3',
+            '#subscriptionFields .wpo-v28-section>p',
+            '#subscriptionFields .wpo-v28-node strong',
+            '#subscriptionFields .wpo-v28-node small',
+            '#subscriptionFields .wpo-v28-option strong',
+            '#subscriptionFields .wpo-v28-option small',
+        ):
+            self.assertIn(selector,css,selector)
+        self.assertIn('color:#fff!important;opacity:1!important',css)
+        self.assertIn('#subscriptionFields .unavailable{opacity:1',css)
+
     def test_selected_node_and_protocol_has_pulsing_green_dot(self):
         self.assertIn('wpo-v28-radio" aria-hidden="true"><i></i>',self.html)
         self.assertIn("background:var(--green)",self.html)
