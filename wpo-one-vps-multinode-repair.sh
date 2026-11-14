@@ -16,12 +16,12 @@ for bin in ssh curl python3 flock; do
   command -v "$bin" >/dev/null || { echo "Не установлен $bin." >&2; exit 2; }
 done
 SSH_PORT=22
-[[ -z "$WPO_NODE_SSH_PORT" ]] || SSH_PORT="$WPO_NODE_SSH_PORT"
+[[ -z "${WPO_NODE_SSH_PORT:-}" ]] || SSH_PORT="$WPO_NODE_SSH_PORT"
 [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]] && (( 10#$SSH_PORT > 0 && 10#$SSH_PORT <= 65535 )) || {
   echo 'Некорректный SSH-порт.' >&2; exit 2;
 }
 SSH_USER=root
-[[ -z "$WPO_NODE_SSH_USER" ]] || SSH_USER="$WPO_NODE_SSH_USER"
+[[ -z "${WPO_NODE_SSH_USER:-}" ]] || SSH_USER="$WPO_NODE_SSH_USER"
 [[ "$SSH_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || {
   echo 'Некорректный SSH-пользователь.' >&2; exit 2;
 }
