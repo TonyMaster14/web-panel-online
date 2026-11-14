@@ -18,5 +18,31 @@ jobs:
           python3 -m compileall -q .
       - name: Test protocols, installer and bundled nodes without a VPS
         run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Verify remote VPN config with pinned Xray binary
+        if: github.ref == 'refs/heads/test/wpo-smooth-progress-v1'
+        run: |
+          set -Eeuo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          curl -fSL --retry 3 --connect-timeout 15 --max-time 180 \
+            'https://github.com/XTLS/Xray-core/releases/download/v26.7.28/Xray-linux-64.zip' -o "$tmp/xray.zip"
+          echo "8195d909f1109b8f3d99eefe401a3c451d7bf4af71f24d3815420f77e5dd2a40  $tmp/xray.zip" | sha256sum -c -
+          unzip -q "$tmp/xray.zip" xray -d "$tmp"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=se.example.net' -keyout "$tmp/key.pem" -out "$tmp/cert.pem" >/dev/null 2>&1
+          python3 - "$tmp" <<'PY'
+          import json,sys,uuid
+          from pathlib import Path
+          import wpo_node_vpn as vpn
+          root=Path(sys.argv[1])
+          vpn.CERT=root/'cert.pem'
+          vpn.KEY=root/'key.pem'
+          data={'a'*64:{'name':'Sweden','secrets':{
+              'vless':str(uuid.uuid4()), 'hysteria':str(uuid.uuid4())}}}
+          settings={'domain':'se.example.net','xhttp_path':'/wpo-xhttp-1234567890abcdef12345678'}
+          (root/'config.json').write_text(json.dumps(vpn.render_xray(data,settings)))
+          PY
+          chmod +x "$tmp/xray"
+          "$tmp/xray" run -test -config "$tmp/config.json"
       - name: Exercise terminal success and failure paths
         run: python3 tests/test_installer_wizard_integrated.py
