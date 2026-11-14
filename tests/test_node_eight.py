@@ -156,7 +156,7 @@ class EightEngineTests(unittest.TestCase):
             self.assertIn(needed,installer)
         self.assertIn("wpo-node-eight-enable.sh",agent)
         self.assertIn('WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"',agent)
-        self.assertIn("ENGINE_REV=f8675f32ec63d2ffaa9d167b925a153b85a6e04c",agent)
+        self.assertIn("ENGINE_REV=ab1e7978bf56de6629b4958f591a126eea031174",agent)
         self.assertIn("Node API lacks live engines:",agent)
         self.assertIn("download_prebuilt mtproto-proxy-linux-amd64",installer)
         self.assertIn("download_prebuilt tproxy-server-linux-amd64",installer)
