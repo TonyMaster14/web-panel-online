@@ -49,13 +49,13 @@ for file in wpo_happ_async_feed.py wpo_happ_preparer.py wpo-happ-preallocate-pat
 done
 # New nodes must inherit the VLESS/Hysteria-only federation fix as well.
 # This updates the MAIN WPO's installer file, not any registered remote VPS.
-NODE_INSTALL_REV=a3bcb61506c9813c473a01cd968238c667857a23
+NODE_INSTALL_REV=50fc724db31fe2e8b20862dfc5eff67e99e67984
 curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
   --connect-timeout 15 --max-time 90 \
   "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$NODE_INSTALL_REV/wpo-node-agent-install-v2.sh" \
   -o "$WORK/wpp-node-agent-install.sh"
 bash -n "$WORK/wpp-node-agent-install.sh"
-grep -Fqx 'ENGINE_REV=5f497290fe041149521b7d6006a1dd5b2e833885' "$WORK/wpp-node-agent-install.sh"
+grep -Fqx 'ENGINE_REV=b4d2691a6e942c0ff1ff4652acd63819cc0e0c6f' "$WORK/wpp-node-agent-install.sh"
 grep -Fq 'wpo-node-site-template-fix.sh' "$WORK/wpp-node-agent-install.sh"
 python3 "$WORK/wpo-happ-preallocate-patch.py" --input "$SUBS" --output "$WORK/wpp_subscriptions.py"
 python3 "$WORK/wpo-happ-async-panel-patch.py" --panel "$PANEL" --output "$WORK/panel.py"
