@@ -144,9 +144,10 @@ def run_case(case):
                 assert "Сохраните данные, чтобы не потерять!" in final_plain
                 assert "Ссылка на панель:" in final_plain
                 assert "https://panel.example.com/panel-test-install/login" in final_plain
-                # Link appears strictly below the closed credential card.
+                # The full link appears INSIDE the frame, before its bottom border.
                 card_tail=final_plain.split('WPO 3.0 — УСТАНОВЛЕНО',1)[1]
-                assert card_tail.index('╰') < card_tail.index('Ссылка на панель:')
+                assert card_tail.index('Ссылка на панель:') < card_tail.index('╰')
+                assert any('https://panel.example.com/panel-test-install/login' in line and line.count('│') == 2 for line in final_plain.splitlines())
                 assert "Логин: WPOAdmin" in final_plain
                 assert "Пароль: Secret-6789" in final_plain
                 for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "УСТАНОВКА ЗАВЕРШЕНА!", "100%", "◷ 00:"):
