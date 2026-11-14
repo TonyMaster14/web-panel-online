@@ -110,23 +110,26 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<input id="accountName" name="name" placeholder="Например, Home VPN" '
         'maxlength="80" autocomplete="off" required>'
         '<div class="wpo-v28-section wpo-v28-date-section">'
-        '<details class="wpo-v28-calendar" id="wpoV28Calendar"><summary>'
+        '<div class="wpo-v28-calendar" id="wpoV28Calendar">'
+        '<button type="button" class="wpo-v28-calendar-trigger" id="wpoV28CalendarToggle" '
+        'aria-expanded="false" aria-controls="wpoV28CalendarBody">'
         '<span class="wpo-v28-date-head"><b>Срок действия</b>'
-        '<small id="wpoV28DateDisplay">Выбрать дату и время окончания</small></span>'
+        '<small id="wpoV28DateDisplay">Выбрать дату окончания</small></span>'
         '<svg class="wpo-v28-calendar-icon" width="23" height="23" viewBox="0 0 24 24" '
         'fill="none" stroke="currentColor" stroke-width="1.8" '
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
         '<rect x="3" y="5" width="18" height="16" rx="2.5"/>'
         '<path d="M7 3v4M17 3v4M3 10h18"/>'
-        '<path d="M8 14h2M14 14h2M8 18h2"/></svg></summary>'
-        '<div class="wpo-v28-calendar-body">'
+        '<path d="M8 14h2M14 14h2M8 18h2"/></svg></button>'
+        '<div class="wpo-v28-calendar-body" id="wpoV28CalendarBody" hidden>'
         '<input id="wpoV28Date" type="hidden" value="">'
         '<aside class="wpo-v28-cal-aside" aria-label="Быстрый выбор срока">'
         '<b>Быстрый срок</b><div class="wpo-v28-months">'
         + "".join(f'<button type="button" data-wpo-months="{m}">{m} '
                   f'{"месяц" if m == 1 else "месяца" if m in (2, 3) else "месяцев"}</button>'
                   for m in (1, 2, 3, 6, 12))
-        + '</div></aside>'
+        + '<button type="button" id="wpoV28Until2099" data-wpo-2099="1">До 2099</button>'
+        '</div></aside>'
         '<div class="wpo-v28-cal-main">'
         '<div class="wpo-v28-cal-toolbar">'
         '<button type="button" id="wpoV28PrevMonth" class="wpo-v28-cal-nav" '
@@ -144,22 +147,8 @@ def form(path, csrf, connections, nodes=None, local=None):
         + "".join(f'<span>{day}</span>' for day in ("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"))
         + '</div><div id="wpoV28DayGrid" class="wpo-v28-cal-days" '
         'role="group" aria-label="Выбрать день"></div>'
-        '<div class="wpo-v28-cal-live">'
-        '<i class="wpo-v28-live-dot" aria-hidden="true"></i>'
-        '<span>Сегодня: <time id="wpoV28CurrentDateTime"></time></span></div>'
-        '<div class="wpo-v28-cal-time">'
-        '<span class="wpo-v28-time-label">Время окончания</span>'
-        '<label for="wpoV28Hour">Часы<select id="wpoV28Hour" aria-label="Часы">'
-        + "".join(f'<option value="{i}">{i:02d}</option>' for i in range(24))
-        + '</select></label><span class="wpo-v28-time-colon">:</span>'
-        '<label for="wpoV28Minute">Минуты<select id="wpoV28Minute" aria-label="Минуты">'
-        + "".join(f'<option value="{i}">{i:02d}</option>' for i in range(60))
-        + '</select></label>'
-        '<small id="wpoV28TimeZone"></small></div>'
-        '<div class="wpo-v28-cal-actions">'
-        '<button type="button" id="wpoV28Today">Сегодня</button>'
-        '<button type="button" class="primary" id="wpoV28Apply">Применить</button>'
-        '</div></div></div></details></div>'
+        '<small id="wpoV28TimeZone" class="wpo-v28-zone-note"></small>'
+        '</div></div></div></div>'
         '<div class="wpo-v28-limits">'
         '<label class="wpo-v28-limit-field"><span>Устройств</span>'
         '<input id="deviceLimit" name="max_devices" type="number" min="0" max="20" value="2" required>'
@@ -297,6 +286,31 @@ STYLE = """
 @media(prefers-reduced-motion:reduce){
  .wpo-v28-node:has(input:checked) .wpo-v28-radio i,
  .wpo-v28-option:has(input:checked) .wpo-v28-radio i{animation:none}
+}
+
+/* WPO UI v29: deterministic calendar toggle for Safari and mobile browsers */
+.wpo-v28-dialog .wpo-v28-section h3{color:#fff!important;font-weight:650}
+.wpo-v28-calendar{z-index:8;position:relative}
+.wpo-v28-calendar:has(.wpo-v28-calendar-trigger[aria-expanded="true"]){border-color:var(--accent)}
+.wpo-v28-calendar-trigger{display:flex;justify-content:space-between;align-items:center;gap:12px;
+ width:100%;height:auto;min-height:58px;padding:13px 15px;margin:0;border:0;
+ border-radius:12px;text-align:left;color:var(--text);background:transparent;cursor:pointer}
+.wpo-v28-calendar-trigger:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wpo-v28-calendar-trigger .wpo-v28-date-head{display:grid;gap:4px}
+.wpo-v28-calendar-trigger .wpo-v28-calendar-icon{pointer-events:none}
+.wpo-v28-calendar-body[hidden]{display:none!important}
+.wpo-v28-calendar-body:not([hidden]){display:grid}
+.wpo-v28-cal-days button.is-today,.wpo-v28-cal-days button.is-selected.is-today{
+ color:var(--red);border:1.5px solid var(--red)!important;
+ box-shadow:inset 0 0 0 1px var(--red);font-weight:700}
+.wpo-v28-cal-days button.is-today::after{display:none!important}
+.wpo-v28-zone-note{display:block;font-size:10px;color:var(--muted);
+ border-top:1px solid var(--line);padding-top:9px}
+.wpo-v28-months button[data-wpo-2099]{font-weight:700;margin-top:6px;border:1px solid var(--accent)}
+.wpo-v28-months button[data-wpo-2099].is-selected{background:var(--tint);color:var(--accent)}
+@media(max-width:560px){
+ .wpo-v28-months{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .wpo-v28-calendar-body{position:static;box-shadow:none}
 }
 """
 
