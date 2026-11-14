@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wpo-node-agent-reinstall-v23: restart agent after key rotation and explain enrollment failures
+# wpo-node-agent-eight-pinned-v1: eight actual engines, pinned backend source and live API readiness
 set -Eeuo pipefail
 umask 077
 [[ $EUID -eq 0 ]] || { echo 'Запустите от root.'; exit 1; }
@@ -302,6 +302,9 @@ if ! curl -4fsS --connect-timeout 4 --max-time 12 \
   echo 'Node Agent не принимает новый ключ API (проверьте systemctl status wpp-node-agent.service).'
   exit 4
 fi
+# Pin backend scripts and their imported modules to one reviewed Git commit.
+# Avoid moving branch references during long multi-engine installation.
+ENGINE_REV=38d269532bd37a72fbbb940fb881010730dc653a
 # Test-only VPN capability is installed before enrollment. Registration
 # is blocked on failure: controller must never see a "ready" VPN node without
 # working local Xray and authenticated federation API.
@@ -311,10 +314,10 @@ trap fail ERR
 trap 'rm -f -- "$VPN_SETUP"' EXIT
 curl -4fsSL --proto '=https' --proto-redir '=https' \
     --retry 3 --connect-timeout 15 --max-time 90 \
-    'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/test/wpo-smooth-progress-v1/wpo-node-vpn-enable.sh' \
+    "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${ENGINE_REV}/wpo-node-vpn-enable.sh" \
     -o "$VPN_SETUP"
 bash -n "$VPN_SETUP"
-WPO_NODE_VPN_REF='test/wpo-smooth-progress-v1' bash "$VPN_SETUP"
+WPO_NODE_VPN_REF="$ENGINE_REV" bash "$VPN_SETUP"
 rm -f -- "$VPN_SETUP"
 trap fail ERR
 # All eight server engines are mandatory: do NOT enroll a partly provisioned
@@ -324,11 +327,34 @@ EIGHT_SETUP="$(mktemp /tmp/wpo-node-eight.XXXXXXXX.sh)"
 trap 'rm -f -- "${EIGHT_SETUP:-}" "${VPN_SETUP:-}"' EXIT
 curl -4fsSL --proto '=https' --proto-redir '=https' \
     --retry 3 --connect-timeout 15 --max-time 90 \
-    'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/test/wpo-smooth-progress-v1/wpo-node-eight-enable.sh' \
+    "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${ENGINE_REV}/wpo-node-eight-enable.sh" \
     -o "$EIGHT_SETUP"
 bash -n "$EIGHT_SETUP"
-WPO_NODE_VPN_REF='test/wpo-smooth-progress-v1' bash "$EIGHT_SETUP"
+WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"
 rm -f -- "$EIGHT_SETUP"
+# Refuse to enroll unless the AUTHENTICATED agent reports the exact expected
+# set; component files alone do not prove that the serving API is ready.
+if ! NODE_STATUS="$(curl -4fsS --connect-timeout 5 --max-time 15 \
+      -H "Authorization: Bearer $API_KEY" \
+      "https://$DOMAIN/wpp-api/v1/status")"; then
+  report error 'Node Agent не отвечает после установки восьми протоколов.'
+  echo 'Не удалось проверить Node Agent: нода не будет зарегистрирована.' >&2
+  exit 4
+fi
+if ! NODE_STATUS="$NODE_STATUS" python3 - <<'PY_EIGHT_STATUS'
+import json,os
+data=json.loads(os.environ.get("NODE_STATUS","{}"))
+expected={"federation","vless","hysteria","web","mtproto","awg20","awg31","naive","mieru"}
+actual=set(data.get("capabilities",[]))
+missing=sorted(expected-actual)
+if not data.get("ok") or missing:
+    raise SystemExit("Node API lacks live engines: "+", ".join(missing))
+print("✓ Восемь протоколов и Federation подтверждены живым API Node Agent.")
+PY_EIGHT_STATUS
+then
+  report error 'API ноды не подтвердил доступность всех восьми протоколов.'
+  exit 4
+fi
 report registration 'Все 8 протоколов и HTTPS готовы. Регистрация ноды в панели.'
 if ENROLL_RESULT="$(python3 - "$ENROLL_URL" "$TOKEN" "$DOMAIN" "$API_KEY" <<'PY_ENROLL'
 import json,sys,urllib.request,urllib.error
