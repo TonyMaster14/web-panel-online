@@ -97,9 +97,11 @@ def patch(source):
     body,suffix=rem.split(END,1)
     updated=prefix+BODY+END+suffix
     needle='"profile-update-interval":"6"'
-    if updated.count(needle)!=1:
-        raise ValueError("Happ subscription headers missing")
-    # Happ specifies the interval in hours, not seconds; use its minimum.
+    # The main subscription AND direct-profile handler both have this header.
+    # Change ONLY the first occurrence (multi-node subscription). Preserve
+    # the standalone/direct profile's original refresh behavior.
+    if updated.count(needle)!=2:
+        raise ValueError("Expected two WPO Happ interval headers")
     updated=updated.replace(needle,'"profile-update-interval":"1"',1)
     for safe in ('local_count=len(result["users"]) if local_selected else 0',
                  'len(distinct_nodes)>1','SUB_FETCH_SLOTS.release()',
