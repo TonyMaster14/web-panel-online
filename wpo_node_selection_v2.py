@@ -33,7 +33,7 @@ FEED = '''            # wpo-exact-node-selection-v1: build ONLY the chosen nodes
             wanted=list(dict.fromkeys(u["protocol"] for u in result["users"]
                                       if u["protocol"] in ("vless","hysteria")))
             if not wanted:
-                self.send_data("В подписке нет поддерживаемых VPN-протоколов.",409); return
+                self.send_data("В подписке пока нет активных VLESS или Hysteria2.",409); return
             lines=[]
             if local_selected:
                 lines.extend(proxy_link(u["protocol"],u["secret"],u["backend_port"],
