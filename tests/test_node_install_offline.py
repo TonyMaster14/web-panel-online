@@ -20,7 +20,8 @@ with tempfile.TemporaryDirectory(prefix='wpo-node-offline-') as folder:
     manager=temp/'manager.py'
     manager.write_text(source.split('cat > "$MANAGER" <<\'PY\'\n',1)[1].split('\nPY\n',1)[0])
     for name in ('install-final.sh','wpo-node-agent-install-v2.sh','wpo-node-geo-v13.py','wpo-node-autotemplate-v20.py',
-                 'wpo-node-controller-vpn.sh','wpo_user_v28.py','wpo_v28_apply.py'):
+                 'wpo-node-controller-vpn.sh','wpo_user_v28.py','wpo_v28_apply.py',
+                 'wpo_node_remote.py','wpo_node_remote_patch.py'):
         shutil.copyfile(root/name,package/name)
     bridge=package/'wpo-node-controller-vpn.sh'
     bridge.write_text(bridge.read_text().replace('/opt/tproxy-panel',str(app))
@@ -44,6 +45,8 @@ with tempfile.TemporaryDirectory(prefix='wpo-node-offline-') as folder:
     assert '# wpo-v28-new-user' in (app/'wpp_subscriptions.py').read_text()
     assert '# wpo-v28-new-user' in manager.read_text()
     assert (app/'wpo_user_v28.py').is_file()
+    assert (app/'wpo_node_remote.py').is_file()
+    assert '# wpo-remote-native-v04' in (app/'panel.py').read_text()
     for name in ('wpp_ui.py','panel.py','wpp_subscriptions.py','wpo_user_v28.py'):
         compile((app/name).read_text(),name,'exec')
     assert '# wpo-node-country-v13' in (app/'panel.py').read_text()
