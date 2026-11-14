@@ -479,10 +479,13 @@ yearSelect.addEventListener('change',()=>{viewYear=Number(yearSelect.value);rend
 document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',event=>{
   event.preventDefault();
   chooseDate(addMonths(now(),Number(button.dataset.wpoMonths)),button.dataset.wpoMonths);
+  // The chosen expiry is already written to the hidden form field.
+  closeCalendar();
 }));
 document.getElementById('wpoV28Until2099').addEventListener('click',event=>{
   event.preventDefault();
   chooseDate(new Date(2099,11,31),'2099');
+  closeCalendar();
 });
 document.addEventListener('pointerdown',event=>{
   if(!popover.hidden&&!calendar.contains(event.target))closeCalendar();
