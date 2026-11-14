@@ -98,6 +98,39 @@ class NodeFederationTests(unittest.TestCase):
             with self.subTest(data=data), self.assertRaises(ValueError):
                 vpn.valid_params(data)
 
+    def test_base_health_remains_ready_during_incomplete_eight_engine_retry(self):
+        # A first installation may fail after dropping wpo_node_eight.py,
+        # while its remaining native services are not running yet.
+        import wpo_node_eight as eight
+        replies = []
+        handler = type("FakeHandler", (), {
+            "path": "/healthz",
+            "respond": lambda self, body, status=200: replies.append((status, body)),
+        })()
+        with mock.patch.object(vpn, "live", return_value=True), \
+             mock.patch.object(eight, "available", return_value=frozenset({"vless", "hysteria"})), \
+             mock.patch.object(eight, "full_ready", return_value=False):
+            vpn.API.do_GET(handler)
+        self.assertEqual(replies[0][0], 200)
+        self.assertTrue(replies[0][1]["ok"], "Base VPN must not depend on all 8 engines")
+        self.assertFalse(replies[0][1]["all_protocols_ready"])
+        self.assertEqual(set(replies[0][1]["capabilities"]),
+                         {"federation", "vless", "hysteria"})
+
+    def test_base_health_rejects_unhealthy_xray_or_caddy(self):
+        import wpo_node_eight as eight
+        replies=[]
+        handler=type("FakeHandler", (), {
+            "path": "/healthz",
+            "respond": lambda self, body, status=200: replies.append(body),
+        })()
+        with mock.patch.object(vpn, "live", return_value=False), \
+             mock.patch.object(eight, "available", return_value=frozenset()), \
+             mock.patch.object(eight, "full_ready", return_value=False):
+            vpn.API.do_GET(handler)
+        self.assertFalse(replies[0]["ok"])
+        self.assertFalse(replies[0]["all_protocols_ready"])
+
     def test_node_agent_never_advertises_vpn_if_sidecar_unhealthy(self):
         installer=(ROOT / "wpo-node-vpn-enable.sh").read_text()
         assert "if vpn_ready() else []" in installer
