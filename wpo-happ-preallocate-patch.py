@@ -53,9 +53,10 @@ ISSUE_REPLACE='''    if device is None:
             device = reserved
             device["hwid_hash"] = digest
             device.pop("preallocated", None)
-            device["name"] = suggested if (suggested := str(request.get("device_name", "")).strip())
-                and len(suggested) <= 40 and not any(ord(c) < 32 for c in suggested)
-                else "Устройство " + device["id"][:6]
+            suggested = str(request.get("device_name", "")).strip()
+            if not suggested or len(suggested) > 40 or any(ord(c) < 32 for c in suggested):
+                suggested = "Устройство " + device["id"][:6]
+            device["name"] = suggested
             for user in data["users"]:
                 if user.get("subscription_id") == sub["id"] and user.get("device_id") == device["id"]:
                     user["name"] = sub["name"] + " / " + device["name"]
