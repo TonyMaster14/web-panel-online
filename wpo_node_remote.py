@@ -80,7 +80,12 @@ def create(node_id, name, protocol, registry, expiry=0):
             raise ValueError("Incorrect future expiry")
     identifier=secrets.token_hex(16)
     external_id=secrets.token_hex(32)
-    answer=nodes.sync_profile(node,external_id,name,[protocol])
+    # First native service launch (especially Mieru/AWG) may be slower than
+    # lightweight XHTTP provisioning. Only acknowledge success after the
+    # additional VPS returns its committed real service configuration.
+    answer=nodes.request(node,"POST",nodes.API_PREFIX+"/federation/sync",{
+        "external_id":external_id,"name":name,"protocols":[protocol]
+    },timeout=90)
     profiles=answer.get("profiles") if isinstance(answer,dict) else None
     if not isinstance(profiles,list) or len(profiles)!=1:
         try: nodes.delete_profile(node,external_id)
