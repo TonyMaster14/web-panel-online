@@ -3342,6 +3342,16 @@ apply wpo-nodes-lab-v24-install.sh "$UI" "/* wpo-node-indicator-center-v24 */"
 apply wpo-nodes-lab-v25-install.sh "$PANEL" "# wpo-node-template-save-v25"
 apply wpo-nodes-lab-v26-install.sh "$UI" "/* wpo-node-spinner-center-v26 */"
 
+# v27 test bridge: keep remote Node Agent support distinct from the 26
+# already validated UI stages. This is bundled with the branch's package
+# and never modifies unrelated node websites or subscriber keys.
+if [[ -s "$PACKAGE_DIR/wpo-node-controller-vpn.sh" ]] &&
+   ! grep -Fq '# wpo-vpn-controller-v27' "$PANEL"; then
+    TOUCHED=1
+    WPO_NODES_VPN_DURING_INSTALL=1 WPO_NODES_BATCH_RESTART=1 \
+        bash "$PACKAGE_DIR/wpo-node-controller-vpn.sh"
+fi
+
 for file in "$PANEL" "$UI" "$GEO" "$AUTO"; do [[ -s "$file" ]] || die "Отсутствует файл: $file"; done
 # Validate the final generated-node installer and controller feature set.
 grep -Fq 'node-agent-installer.sh' "$PANEL" || die 'Нет маршрута установщика ноды.'
