@@ -74,6 +74,9 @@ class RelayBootstrapRegression(unittest.TestCase):
         if not executable.is_file():
             self.skipTest("precompiled relay not available on this platform")
         self.run_bootstrap()
+        # The production installer uses mode 0400 because the real relay
+        # rejects credential registries readable by group or others.
+        self.registry.chmod(0o400)
         root=self.base/"site"
         root.mkdir()
         (root/"index.html").write_text("<html>WPO WEB relay OK</html>")
