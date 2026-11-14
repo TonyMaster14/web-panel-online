@@ -16,17 +16,23 @@ with tempfile.TemporaryDirectory() as folder:
             assert run.returncode==0,run.stderr
             assert 'TestSecret123' not in run.stdout+run.stderr
             text=re.sub(r'\x1b\[[0-9;]*m','',dest.read_text())
-            assert url in text, 'Installer must never split URL with a hard newline'
             assert '╭' in text and '╰' in text
             assert 'Логин: TestAdmin' in text
-            assert text.index('Логин:')<text.index('Пароль:')<text.index('Сохраните')<text.index(url)
-            # The URL is physically after the closed frame, not inside a side border.
-            card_end=text.index('╰', text.index('WPO 3.0 — '))
-            assert card_end < text.index('Ссылка на панель:') < text.index(url)
-            assert not any(url in line and '│' in line for line in text.splitlines())
+            assert text.index('Ссылка на панель:')<text.index('Логин:')<text.index('Пароль:')<text.index('Сохраните')
+            assert text.index('Ссылка на панель:') < text.index('╰', text.index('WPO 3.0 — '))
+            # An ordinary terminal has a full, uninterrupted URL inside the frame.
+            if width >= len(url)+6:
+                assert url in text, 'Full URL must remain on one row in a wide SSH window'
+                assert any(url in line and line.count('│') == 2 for line in text.splitlines())
+            # Narrow windows split only the text BETWEEN side borders.
+            section=text.split('Ссылка на панель:',1)[1].split('Логин:',1)[0]
+            pieces=[line.split('│',2)[1].strip() for line in section.splitlines() if line.count('│') == 2]
+            assert ''.join(pieces)==url, 'Complete URL must be inside the intact frame'
+            lines=[line for line in text.splitlines() if line.startswith('│')]
+            assert all(line.count('│') == 2 for line in lines)
             assert ('TestSecret123' in text)==(updating=='0')
 boot=Path('install.sh').read_text()
 assert 'sleep 2' in boot and 'sleep 4' not in boot
 assert boot.index('if [[ ! -s "$RESULT" ]]')<boot.index('sleep 2')<boot.index('cat -- "$RESULT"')
 assert 'WEB_PANEL_PROXY_REF:-main' in boot
-print('PASS: final card, intact URL, private secrets, upgrade preservation, two-second completion hold')
+print('PASS: full-width framed login URL, narrow terminal wrapping, private secrets, upgrades, two-second hold')
