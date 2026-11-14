@@ -7,7 +7,7 @@ umask 077
 AGENT=/opt/wpp-node-agent/agent.py
 [[ -s "$AGENT" && -s /etc/wpp-node-agent/config.json && -s /etc/caddy/Caddyfile ]] || {
     echo 'Node Agent 0.2 must be installed first.' >&2; exit 2; }
-REF="\${WPO_NODE_VPN_REF:-test/wpo-smooth-progress-v1}"
+REF="${WPO_NODE_VPN_REF:-test/wpo-smooth-progress-v1}"
 [[ "$REF" =~ ^[A-Za-z0-9._/-]{1,120}$ ]] || exit 2
 DOMAIN="$(python3 -c 'import json;print(json.load(open("/etc/wpp-node-agent/config.json"))["domain"])')"
 [[ "$DOMAIN" =~ ^([a-z0-9-]+\.)+[a-z]{2,63}$ ]] || exit 2
@@ -251,7 +251,7 @@ d['version']='0.3.0'
 fd,temp=tempfile.mkstemp(dir=str(p.parent))
 with os.fdopen(fd,'w',encoding='utf-8') as stream:
     json.dump(d,stream)
-    stream.write('\\n')
+    stream.write('\n')
 os.chmod(temp,0o600)
 os.replace(temp,p)
 PY_VERSION
