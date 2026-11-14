@@ -31,14 +31,23 @@ def swap(src, old, new, label):
 
 
 def patch_ui(src):
+    # Also upgrade an already-installed v28 form. The first revision rendered
+    # HTML but kept the old wizard JavaScript, breaking Create in the browser.
     if MARKER in src:
-        return src
+        if "wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)" in src:
+            return src
+        return swap(src, "client_script=CLIENTS_JS.replace(",
+                   "client_script=wpo_user_v28.replace_legacy_create_js(CLIENTS_JS).replace(",
+                   "replace incompatible old creation JS")
     src = swap(src, "import json\n", "import json\nimport wpo_user_v28\n", "import user form module")
     src = swap(src, PICKER,
                PICKER + "\n    " + MARKER + "\n"
                + "    creation=wpo_user_v28.form(path,csrf,subscription_connections,nodes,local_node)",
                "insert form after node picker")
     src = swap(src, '＋ Добавить клиента', '＋ Новый пользователь', "user button label")
+    src = swap(src, "client_script=CLIENTS_JS.replace(",
+               "client_script=wpo_user_v28.replace_legacy_create_js(CLIENTS_JS).replace(",
+               "disable obsolete create-account wizard JavaScript")
     return src
 
 
