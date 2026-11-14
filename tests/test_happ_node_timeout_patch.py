@@ -25,10 +25,10 @@ class FederationTimeoutTests(unittest.TestCase):
             def open(_,request,timeout):
                 self.assertEqual(timeout,90)
                 raise backend_error
-        with mock.patch.dict(self.ns):
+        with mock.patch.dict(self.ns), mock.patch.object(
+                self.ns["urllib"].request,"build_opener",return_value=Opener()):
             self.ns["normalize_url"]=lambda url:url
             self.ns["resolve_public"]=lambda host:None
-            self.ns["urllib"].request.build_opener=lambda *x:Opener()
             try:
                 self.ns["sync_profile"](
                     {"url":"https://node.example.net","token":"SENSITIVE_NODE_TOKEN"},
