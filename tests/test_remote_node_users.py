@@ -22,9 +22,11 @@ class RemoteNodeUserTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.status=mock.patch.object(remote.nodes,"request",
             return_value={"ok":True,"capabilities":CAPS})
+        # POST and GET share the same authenticated request helper; the
+        # side-effect mock below handles both paths.
         self.status.start()
         self.addCleanup(self.status.stop)
-        self.sync=mock.patch.object(remote.nodes,"sync_profile",side_effect=self.generate)
+        self.sync=mock.patch.object(remote.nodes,"request",side_effect=self.generate_request)
         self.mock_sync=self.sync.start()
         self.addCleanup(self.sync.stop)
         self.delete=mock.patch.object(remote.nodes,"delete_profile",
@@ -33,8 +35,11 @@ class RemoteNodeUserTests(unittest.TestCase):
         self.addCleanup(self.delete.stop)
 
     @staticmethod
-    def generate(node,external_id,name,protocols):
-        p=protocols[0]
+    def generate_request(node,method,path,payload=None,timeout=0):
+        if method=="GET":
+            return {"ok":True,"capabilities":CAPS}
+        assert method=="POST" and path.endswith("/federation/sync")
+        p=payload["protocols"][0]
         if p in ("awg20","awg31"):
             return {"ok":True,"profiles":[{"protocol":p,"config":"[Interface]\nPrivateKey = test"}]}
         return {"ok":True,"profiles":[{"protocol":p,"link":
@@ -47,7 +52,7 @@ class RemoteNodeUserTests(unittest.TestCase):
                 self.assertEqual(result["protocol"],p)
                 self.assertEqual(result["node_id"],"a"*16)
         self.assertEqual(len(remote.load()["users"]),6)
-        self.assertEqual(self.mock_sync.call_count,6)
+        self.assertEqual(self.mock_sync.call_count,12)
 
     def test_no_nonexistent_node_or_cached_only_capability(self):
         with self.assertRaises(ValueError):
@@ -72,7 +77,9 @@ class RemoteNodeUserTests(unittest.TestCase):
         self.assertEqual(remote.load()["users"],[])
         self.mock_delete.assert_called_once()
         self.assertEqual(self.mock_delete.call_args.args[1],
-                         self.mock_sync.call_args.args[1])
+                         self.mock_sync.call_args.kwargs["payload"]["external_id"]
+                         if "payload" in self.mock_sync.call_args.kwargs
+                         else self.mock_sync.call_args.args[3]["external_id"])
 
     def test_failed_revoke_preserves_credentials_for_retry(self):
         item=remote.create("a"*16,"Telegram","web",[NODE])
@@ -82,8 +89,10 @@ class RemoteNodeUserTests(unittest.TestCase):
         self.assertEqual(len(remote.load()["users"]),1)
 
     def test_wrong_protocol_answer_never_looks_successful(self):
-        self.mock_sync.side_effect=lambda n,e,name,p: {
-            "ok":True,"profiles":[{"protocol":"hysteria","link":"wrong"}]}
+        self.mock_sync.side_effect=lambda n,method,path,payload=None,timeout=0: (
+            {"ok":True,"capabilities":CAPS} if method=="GET" else
+            {"ok":True,"profiles":[{"protocol":"hysteria","link":"wrong"}]}
+        )
         with self.assertRaises(remote.nodes.NodeError):
             remote.create("a"*16,"Bad","web",[NODE])
         self.assertEqual(self.mock_delete.call_count,1)
