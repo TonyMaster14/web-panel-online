@@ -1,0 +1,83 @@
+name: WPO one-time branch cleanup
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/wpo-branch-cleanup-once.yml
+permissions:
+  contents: write
+jobs:
+  remove-legacy-refs:
+    if: github.repository == 'TonyMaster14/web-panel-online' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Preserve unmerged histories under one archive tag and remove legacy branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          api = f"https://api.github.com/repos/{repo}/git"
+          headers = {
+              "Authorization": "Bearer " + token,
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+          }
+          def request(method, url, data=None):
+              payload = None if data is None else json.dumps(data).encode()
+              req = urllib.request.Request(url, data=payload, headers=headers, method=method)
+              if payload is not None:
+                  req.add_header("Content-Type", "application/json")
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      body = response.read()
+                      return response.status, json.loads(body) if body else None
+              except urllib.error.HTTPError as error:
+                  if error.code == 404:
+                      return 404, None
+                  raise
+          archive_commit = "245ea66590d92656b0f29a7a34a9f3aba47a3d27"
+          archive_tag = "refs/tags/archive/precleanup-2026-11-14"
+          branches = {
+              "feature/vless-tcp-reality-vision": "d3cc23c9880756c12403e381c6b2e38e922e31aa",
+              "feature/vless-tcp-reality-vision-20261112": "6067618c72660a6736bc31d87d0e376dc075aa96",
+              "fix/wpo-installer-login-screen-20261113": "44b5543c8445a58b7d07c260686ad7a89a04d6f3",
+              "nodes-lab": "ea2235fe06f150e8bcdb36dadb5f87ca57f43e1a",
+              "preview/happ-node-names": "a4fded7c3c333c0cba9d3a63a24270ddba5bc9b5",
+              "preview-happ-node-names": "a83d94008ffe003321c4ec6926838eb89d792b9f",
+              "test/legacy-v26-pre-consolidation-20261112": "905a5138359a867ddcbcb8ba1a92d8c5e7ea0498",
+              "test/reality-addon-firefox-nodes-20261112": "ee389fdcc9bc6acd2bdf34a32fc44a17f565c6ee",
+              "test/vless-tcp-reality": "e43b4941a0ef28c202952cc4b890b7afce13aeb1",
+              "test/wpo-3-unified-blue-v26": "85489568d0c3f9cffcb48fd138819e5bc967633e",
+              "test/wpo-vpn-diagnostic-20261112": "6630e6aa270f54e1d6b68e723933858e35afdd09",
+          }
+          assert "main" not in branches
+          # Verify EVERY branch is unchanged before the destructive step.
+          for name, expected in branches.items():
+              status, info = request("GET", f"{api}/ref/heads/{name}")
+              if status == 404:
+                  print("Already absent:", name)
+                  continue
+              current = info["object"]["sha"]
+              if current != expected:
+                  raise RuntimeError(f"Branch changed; cleanup halted before deletion: {name} {current}")
+          status, archived = request("GET", f"{api}/ref/tags/archive/precleanup-2026-11-14")
+          if status == 404:
+              request("POST", f"{api}/refs", {"ref": archive_tag, "sha": archive_commit})
+              print("Archived divergent histories:", archive_tag)
+          elif archived["object"]["sha"] != archive_commit:
+              raise RuntimeError("Archive tag points to unexpected commit")
+          else:
+              print("Archive tag already exists")
+          # Remove ONLY the explicitly reviewed branch names.
+          for name in branches:
+              status, _ = request("DELETE", f"{api}/refs/heads/{name}")
+              if status not in (204, 404):
+                  raise RuntimeError(f"Could not remove {name}: {status}")
+              print("Removed" if status == 204 else "Already removed", name)
+          print("Cleaned 11 legacy branches; only main remains.")
+          PY
