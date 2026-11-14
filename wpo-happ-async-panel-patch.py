@@ -53,14 +53,17 @@ BODY='''            # wpo-happ-fast-feed-v1: no remote POST in the Happ HTTP thr
                             node_api,node,remote_id,node_api.location_prefix(node),wanted)
                 # Never wait beyond 2.5s even when the node is applying Xray
                 # for the first time. Happ's default request limit is 9s.
-                deadline=time.monotonic()+2.5
-                while time.monotonic()<deadline:
-                    if all(not n.get("enabled",True) or
-                           wpo_happ_async_feed.enqueue(
-                               node_api,n,remote_id,node_api.location_prefix(n),wanted)[0]
-                           for n in remotes):
-                        break
-                    time.sleep(0.05)
+                # Only wait when the controller has ALREADY provisioned all
+                # remote profiles. Otherwise return valid local links promptly,
+                # while Node API workers continue in the background.
+                if wpo_happ_async_feed.prewarmed(remotes,remote_id,wanted):
+                    deadline=time.monotonic()+2.5
+                    while time.monotonic()<deadline:
+                        if all(wpo_happ_async_feed.enqueue(
+                                node_api,n,remote_id,node_api.location_prefix(n),wanted)[0]
+                               for n in remotes):
+                            break
+                        time.sleep(0.05)
                 for node in remotes:
                     if not node.get("enabled",True):
                         pending_count+=1
