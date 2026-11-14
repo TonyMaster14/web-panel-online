@@ -86,6 +86,7 @@ class HappSubscription(unittest.TestCase):
         helper=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=="happ_profile_title")
         exec(compile(ast.Module(body=[helper],type_ignores=[]),"title-helper.py","exec"),namespace)
         exec(compile(module,"subscription-http-test.py","exec"),namespace)
+        self.namespace=namespace
         cls=namespace["Handler"]
         cls.log_message=lambda *args: None
         # The HTTP test mounts only the public subscription route; do_GET in
@@ -118,10 +119,57 @@ class HappSubscription(unittest.TestCase):
         self.assertEqual(h["profile-title"],"base64:"+base64.b64encode(b"Global VPN").decode())
         self.assertEqual(h["subscription-userinfo"],"upload=120; download=340; total=0; expire=0")
         result=json.loads(body)
-        self.assertGreaterEqual(len(result),2)
-        self.assertEqual(result[0]["remarks"],"🇪🇺 Автовыбор")
-        self.assertEqual(result[1]["remarks"],"🇳🇱 Нидерланды")
-        self.assertTrue(any(x["protocol"]=="vless" for x in result[1]["outbounds"]))
+        self.assertEqual(len(result),1)
+        self.assertEqual(result[0]["remarks"],"🇳🇱 Нидерланды")
+        self.assertTrue(any(x["protocol"]=="vless" for x in result[0]["outbounds"]))
+        self.assertFalse(any(x.get("routing",{}).get("balancers") for x in result))
+        self.assertFalse(any("Автовыбор" in x.get("remarks","") for x in result))
+
+    def test_two_protocols_on_one_node_never_generate_auto_balancer(self):
+        second={**self.user,"id":"v"*16,"protocol":"hysteria",
+                "connection_id":"hysteria-primary","backend_port":8443,
+                "secret":"another-valid-hysteria-secret"}
+        self.manager["users"]=[self.user.copy(),second]
+        status,_,body=self.fetch()
+        self.assertEqual(status,200)
+        configs=json.loads(body)
+        self.assertEqual(len(configs),2)
+        self.assertEqual([cfg["remarks"] for cfg in configs],
+                         ["🇳🇱 Нидерланды","🇳🇱 Нидерланды"])
+        self.assertFalse(any(cfg.get("routing",{}).get("balancers") for cfg in configs))
+
+    def remote_node(self):
+        remote_link=("vless://11111111-1111-4111-8111-111111111111"
+                     "@node2.example:443?encryption=none&security=tls"
+                     "&sni=node2.example&type=xhttp"
+                     "&path=%2Fvless-test%2Fstream&mode=auto#"
+                     +quote("🇸🇪 Швеция",safe=""))
+        self.namespace["node_api"].load_nodes=lambda path:[
+            {"id":"a"*16,"enabled":True,"url":"https://node2.example"}
+        ]
+        self.namespace["node_api"].sync_profile=lambda *args,**kwargs:{
+            "profiles":[{"link":remote_link}]
+        }
+
+    def test_multi_node_subscription_keeps_auto_balancer(self):
+        self.remote_node()
+        status,_,body=self.fetch()
+        self.assertEqual(status,200)
+        configs=json.loads(body)
+        self.assertEqual(len(configs),3)
+        self.assertEqual(configs[0]["remarks"],"🇪🇺 Автовыбор")
+        self.assertEqual(configs[1]["remarks"],"🇳🇱 Нидерланды")
+        self.assertEqual(configs[2]["remarks"],"🇸🇪 Швеция")
+        self.assertTrue(configs[0]["routing"]["balancers"])
+
+    def test_disabling_failover_keeps_only_node_profiles(self):
+        self.sub["failover_enabled"]=False
+        self.remote_node()
+        status,_,body=self.fetch()
+        self.assertEqual(status,200)
+        configs=json.loads(body)
+        self.assertEqual(len(configs),2)
+        self.assertFalse(any("Автовыбор" in cfg.get("remarks","") for cfg in configs))
 
     def test_generic_client_receives_base64_vless_subscription(self):
         status,headers,body=self.fetch(ua="GenericVPN/1.0")
