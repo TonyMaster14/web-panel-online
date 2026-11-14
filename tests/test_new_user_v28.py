@@ -79,7 +79,8 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("new URLSearchParams(new FormData(createForm))",fixed)
         for name,script in (("new wizard",wpo_user_v28.LEGACY_CREATE_JS),
                             ("date picker",wpo_user_v28.SCRIPT),
-                            ("complete clients JS",fixed.replace("<script>","").replace("</script>",""))):
+                            ("complete clients JS",fixed.replace("<script>","").replace("</script>","")
+                             .replace("@@PATH@@",'"/panel-demo"').replace("@@CSRF@@",'"token-demo"'))):
             with self.subTest(name=name):
                 res=subprocess.run(["node","--check"],input=script,text=True,
                                     capture_output=True,timeout=8)
@@ -90,7 +91,11 @@ class NewUserFormTests(unittest.TestCase):
 
     def test_patch_wires_new_js_on_both_fresh_and_existing_panels(self):
         raw=(ROOT/"wpp_ui.py").read_text(encoding="utf-8")
-        updated=wpo_v28_apply.patch_ui(raw)
+        # v28 is applied AFTER the embedded Nodes Lab v26 patch,
+        # which contributes the node-picker insertion anchor.
+        staged=raw.replace("    client_script=CLIENTS_JS.replace(",
+                           wpo_v28_apply.PICKER+"\n    client_script=CLIENTS_JS.replace(",1)
+        updated=wpo_v28_apply.patch_ui(staged)
         self.assertIn("wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)",updated)
         self.assertIn("＋ Новый пользователь",updated)
         self.assertEqual(wpo_v28_apply.patch_ui(updated),updated)
