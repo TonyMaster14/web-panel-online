@@ -308,14 +308,18 @@ RESULT="$(mktemp /run/wpo-ui-result.XXXXXXXX)"
 chmod 0600 "$PROGRESS" "$RESULT"
 printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 
-# Cosmetic progress follows the ~4-minute successful VPS installation.
-# It is deliberately independent of backend stage jumps. A slow download
-# may hold 99%, but 100% is never displayed before verified success.
-WPO_PROGRESS_TARGET_SECONDS="${WPO_PROGRESS_TARGET_SECONDS:-240}"
-if ! [[ "$WPO_PROGRESS_TARGET_SECONDS" =~ ^[0-9]+$ ]] ||
-   (( WPO_PROGRESS_TARGET_SECONDS < 10 || WPO_PROGRESS_TARGET_SECONDS > 3600 )); then
-    WPO_PROGRESS_TARGET_SECONDS=240
+# Adaptive progress combines real verified backend checkpoints with an
+# elastic ETA. The display never jumps to a new milestone and never shows
+# 100% until the backend succeeds and its access card is available.
+# Runtime differs across VPS networks and builds, so intermediate % is an
+# estimate, not a guarantee of exact remaining seconds.
+WPO_PROGRESS_REFERENCE_SECONDS="${WPO_PROGRESS_REFERENCE_SECONDS:-240}"
+if ! [[ "$WPO_PROGRESS_REFERENCE_SECONDS" =~ ^[0-9]+$ ]] ||
+   (( WPO_PROGRESS_REFERENCE_SECONDS < 30 || WPO_PROGRESS_REFERENCE_SECONDS > 3600 )); then
+    WPO_PROGRESS_REFERENCE_SECONDS=240
 fi
+WPO_CONFIRMED=1
+WPO_LAST_INCREMENT_SECOND=-1
 # Three rows only: status, blank row, progress bar with elapsed time.
 DRAW_LAST="" DRAW_READY=0 DRAW_RESIZED=0
 trap 'DRAW_RESIZED=1' WINCH
@@ -353,12 +357,31 @@ draw(){
         "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
     printf '%s' "$packet"
 }
-# At most one integer percentage per tick: never 1 -> 14 or 14 -> 36.
+# A new backend checkpoint corrects the estimate, not the visible percent.
+# The denominator scales dynamically: slow phases extend the ETA instead of
+# pinning the bar to 99% after four minutes.
 wpo_progress_tick(){
-    local elapsed="$((SECONDS-started))" expected
-    expected=$((1 + elapsed * 98 / WPO_PROGRESS_TARGET_SECONDS))
-    (( expected > 99 )) && expected=99
-    if (( shown < expected )); then shown=$((shown+1)); fi
+    local elapsed="$((SECONDS-started))" real_percent="" real_stage="" remaining wanted floor
+    if [[ -f "$PROGRESS" ]] && IFS=$'\t' read -r real_percent real_stage < "$PROGRESS"; then
+        if [[ "$real_percent" =~ ^[0-9]+$ ]] &&
+           (( real_percent > WPO_CONFIRMED && real_percent <= 100 )); then
+            WPO_CONFIRMED="$real_percent"
+        fi
+    fi
+    remaining=$((WPO_PROGRESS_REFERENCE_SECONDS * (100-WPO_CONFIRMED) / 100))
+    (( remaining < 15 )) && remaining=15
+    wanted=$((1 + elapsed * 98 / (elapsed+remaining)))
+    # Confirmed milestones provide a lower bound, but a 99% backend
+    # checkpoint merely STARTS the final validation and is not completion.
+    floor=$WPO_CONFIRMED
+    (( floor > 94 )) && floor=94
+    (( wanted < floor )) && wanted=$floor
+    (( wanted > 98 )) && wanted=98
+    # At most one integer step per real second, even if backend jumps 5->55.
+    if (( shown < wanted && elapsed > WPO_LAST_INCREMENT_SECOND )); then
+        shown=$((shown+1))
+        WPO_LAST_INCREMENT_SECOND=$elapsed
+    fi
     draw "$shown" "$elapsed"
 }
 printf '\033[?25l'
