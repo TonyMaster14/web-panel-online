@@ -346,9 +346,36 @@ WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"
 rm -f -- "$EIGHT_SETUP"
 # Refuse to enroll unless the AUTHENTICATED agent reports the exact expected
 # set; component files alone do not prove that the serving API is ready.
-if ! NODE_STATUS="$(curl -4fsS --connect-timeout 5 --max-time 15 \
-      -H "Authorization: Bearer $API_KEY" \
-      "https://$DOMAIN/wpp-api/v1/status")"; then
+# wpo-eight-agent-ready-retry-v1: systemd Type=simple may report active
+# before Python binds port 9088. Caddy then briefly emits HTTP 502. Verify
+# local agent readiness first, then authenticated public HTTPS, allowing
+# systemd restarts and Caddy reload to settle without reinstalling anything.
+NODE_STATUS=""
+NODE_API_READY=0
+for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  if systemctl is-active --quiet wpp-node-agent.service &&
+     curl -4fsS --noproxy '*' --connect-timeout 1 --max-time 3 \
+       http://127.0.0.1:9088/healthz >/dev/null 2>&1 &&
+     NODE_STATUS="$(curl -4fsS --connect-timeout 5 --max-time 12 \
+       -H "Authorization: Bearer $API_KEY" \
+       "https://$DOMAIN/wpp-api/v1/status" 2>/dev/null)"; then
+    NODE_API_READY=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$NODE_API_READY" != 1 ]]; then
+  echo 'Node Agent не готов после запуска протоколов. Диагностика:' >&2
+  systemctl is-active wpp-node-agent.service caddy.service 2>&1 || true
+  echo 'Локальная проверка API (9088):' >&2
+  curl -4sS --noproxy '*' -o /dev/null -w 'HTTP %{http_code}\\n' \
+    --connect-timeout 2 --max-time 3 http://127.0.0.1:9088/healthz >&2 || true
+  echo 'Публичная проверка API через Caddy (без раскрытия токена):' >&2
+  curl -4sS -o /dev/null -w 'HTTP %{http_code}\\n' \
+    --connect-timeout 3 --max-time 8 \
+    -H "Authorization: Bearer $API_KEY" \
+    "https://$DOMAIN/wpp-api/v1/status" >&2 || true
+  journalctl -u wpp-node-agent.service --no-pager -n 20 >&2 || true
   report error 'Node Agent не отвечает после установки восьми протоколов.'
   echo 'Не удалось проверить Node Agent: нода не будет зарегистрирована.' >&2
   exit 4
