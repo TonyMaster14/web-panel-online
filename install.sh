@@ -156,6 +156,100 @@ ask_password(){
     done
 }
 
+# A version file and systemd units may exist before Nodes Lab completes.
+# Never treat them alone as proof that the WPO setup succeeded.
+wpo_install_state() {
+    local data=/var/lib/tproxy-panel/data.json
+    local unit=/etc/systemd/system/tproxy-panel.service
+    local completed=/var/lib/tproxy-panel/.wpo-install-complete
+    local pending=/var/lib/tproxy-panel/.wpo-install-in-progress
+    if [[ -e "$completed" ]]; then
+        if [[ -s "$data" && -s "$unit" ]]; then printf 'installed'
+        else printf 'protected'; fi
+        return
+    fi
+    if [[ -e "$pending" ]]; then printf 'partial'; return; fi
+    # Legacy successful v26 installations predate this marker. Protect an
+    # intact panel even if it is offline; do not judge by service activity.
+    if [[ -s "$data" ]]; then
+        if [[ -s "$unit" ]] &&
+           grep -Eq '^Environment=WEBPROXY_PANEL_PATH=/panel-[a-z0-9-]{3,64}$' "$unit" &&
+           [[ -s /etc/web-proxy-panel/version &&
+              -s /opt/tproxy-panel/wpp_ui.py &&
+              -s /opt/tproxy-panel/panel.py ]] &&
+           grep -Fq '/* wpo-node-spinner-center-v26 */' /opt/tproxy-panel/wpp_ui.py; then
+            printf 'installed'
+        else
+            printf 'protected'
+        fi
+        return
+    fi
+    if [[ -e /etc/web-proxy-panel/version ||
+          -e /etc/systemd/system/tproxy-panel.service ||
+          -e /opt/tproxy-panel/panel.py ||
+          -e /usr/local/sbin/web-panel-proxy-uninstall ||
+          -e /etc/web-proxy-panel/caddy-owned ||
+          -e /etc/tproxy-server/config.json ]]; then
+        printf 'partial'
+    else
+        printf 'clean'
+    fi
+}
+
+wpo_clean_partial() {
+    local removal_script="" temporary_script="" after
+    # Refuse cleanup while another installation or update holds the lock.
+    command -v flock >/dev/null 2>&1 || error 'Не найден flock (util-linux).'
+    exec 7>/run/lock/web-panel-proxy.lock
+    if ! flock -n 7; then
+        error 'Установка или обновление WPO уже выполняется. Второй запуск остановлен.'
+    fi
+    flock -u 7
+    exec 7>&-
+
+    printf '\n%sОбнаружена незавершённая установка WPO.%s\n' "$cyan" "$reset"
+    printf '%sОчищаю компоненты WPO перед новой установкой...%s\n' "$ice" "$reset"
+    if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/uninstall-web-proxy.sh" ]]; then
+        removal_script="$LOCAL_BASE/uninstall-web-proxy.sh"
+    elif [[ -s /usr/local/sbin/web-panel-proxy-uninstall ]]; then
+        removal_script=/usr/local/sbin/web-panel-proxy-uninstall
+    else
+        temporary_script="$(mktemp /tmp/wpo-partial-uninstall.XXXXXXXX.sh)"
+        if ! curl -4fsSL --connect-timeout 12 --max-time 60 \
+           "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${RELEASE_REF}/uninstall-web-proxy.sh" \
+           -o "$temporary_script"; then
+            rm -f -- "$temporary_script"
+            error 'Не удалось загрузить очистку WPO. Файлы не изменены.'
+        fi
+        removal_script="$temporary_script"
+    fi
+    if ! bash -n "$removal_script" || ! bash "$removal_script"; then
+        [[ -z "$temporary_script" ]] || rm -f -- "$temporary_script"
+        error 'Очистка незавершённой установки не удалась. Новая установка не запущена.'
+    fi
+    [[ -z "$temporary_script" ]] || rm -f -- "$temporary_script"
+    after="$(wpo_install_state)"
+    [[ "$after" == clean ]] || error "После очистки остались файлы WPO ($after). Новая установка не запущена."
+    printf '%sОстатки WPO очищены. Начинаю новую установку.%s\n\n' "$success" "$reset"
+}
+
+# Run BEFORE the classic installer or wizard. A completed panel must
+# never be silently updated or overwritten by a second install.sh.
+WPO_INSTALL_STATE="$(wpo_install_state)"
+case "$WPO_INSTALL_STATE" in
+    installed)
+        printf '\n%sWEB PANEL ONLINE уже установлена на этом VPS.%s\n' "$cyan" "$reset"
+        printf 'Установка не запущена, существующая панель и данные сохранены.\n'
+        exit 0
+        ;;
+    protected)
+        error 'Обнаружены данные прежней WPO с неизвестным состоянием. Автоматическая очистка отменена, чтобы не потерять данные.'
+        ;;
+    partial) wpo_clean_partial ;;
+    clean) ;;
+    *) error 'Неизвестное состояние установленной панели.' ;;
+esac
+
 # Classic mode remains compatible with previous invocation patterns.
 if (( ! USE_WIZARD )); then
     if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
@@ -191,26 +285,19 @@ while true; do
 done
 
 UPDATE=0
-if [[ -s /var/lib/tproxy-panel/data.json && -f /etc/systemd/system/tproxy-panel.service ]] &&
-   grep -Eq 'Environment=WEBPROXY_PANEL_PATH=/panel-[a-z0-9-]{3,64}' /etc/systemd/system/tproxy-panel.service; then
-    UPDATE=1
-    printf '\n%s  Найдена установленная панель: обновляем код, учётные данные сохраняем.%s\n' "$cyan" "$reset"
-    DOMAIN="" EMAIL=""
-else
-    ask_domain
-    printf '\n'
-    ask_email
-    printf '\n'
-    ask_admin
-    printf '\n'
-    ask_password
-    CREDENTIALS="$(mktemp /run/wpo-ui-credentials.XXXXXXXX)"
-    chmod 0600 "$CREDENTIALS"
-    printf '%s\n%s\n' "$ADMIN" "$PASS" > "$CREDENTIALS"
-    DISPLAY_ADMIN="$ADMIN"
-    unset PASS ADMIN
-fi
-
+# A new install always asks for credentials. Existing panels are blocked above.
+ask_domain
+printf '\n'
+ask_email
+printf '\n'
+ask_admin
+printf '\n'
+ask_password
+CREDENTIALS="$(mktemp /run/wpo-ui-credentials.XXXXXXXX)"
+chmod 0600 "$CREDENTIALS"
+printf '%s\n%s\n' "$ADMIN" "$PASS" > "$CREDENTIALS"
+DISPLAY_ADMIN="$ADMIN"
+unset PASS ADMIN
 
 install -d -o root -g root -m 0700 /var/log/web-panel-online
 LOG="/var/log/web-panel-online/install-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
