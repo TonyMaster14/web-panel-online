@@ -29,6 +29,7 @@ class NodeSiteTemplateBridgeTests(unittest.TestCase):
         self.assertIn("bind 127.0.0.1", SCRIPT)
         self.assertIn("file_server", SCRIPT)
         self.assertIn("try_files {path} /index.html", SCRIPT)
+        self.assertIn('header Cache-Control "no-store"',SCRIPT)
         self.assertIn('COMMITTED=0',SCRIPT)
         self.assertIn('cp -a "$WORK/Caddyfile.old" "$CADDY"',SCRIPT)
         self.assertIn('cp -a "$WORK/relay.old" "$RELAY"',SCRIPT)
@@ -65,7 +66,7 @@ class NodeSiteTemplateBridgeTests(unittest.TestCase):
             caddyfile.write_text(
                 "{\n  admin off\n}\n"
                 +f":{local} {{\n bind 127.0.0.1\n root * {site}\n"
-                +" try_files {path} /index.html\n file_server\n}\n"
+                +" header Cache-Control \"no-store\"\n try_files {path} /index.html\n file_server\n}\n"
             )
             validation=subprocess.run([str(target),"validate","--config",str(caddyfile),
                                        "--adapter","caddyfile"],capture_output=True,text=True,timeout=10)
@@ -106,6 +107,7 @@ class NodeSiteTemplateBridgeTests(unittest.TestCase):
                         time.sleep(0.12)
                 self.assertEqual(body,first,
                     "WEB relay must return exact site HTML via Caddy upstream")
+                self.assertEqual(headers.get("Cache-Control"),"no-store")
                 self.assertNotIn("style-src 'self'",headers.get("Content-Security-Policy",""),
                     "CSP from upstream relay may not block inline template styles")
                 index.write_bytes(second)
