@@ -7,7 +7,12 @@ import unittest
 from types import SimpleNamespace
 
 import wpo_node_selection_v2 as exact
-import wpo_multinode_feed_fix as fast
+import importlib.util
+from pathlib import Path
+_file=Path(__file__).resolve().parents[1]/"wpo-multinode-feed-fix.py"
+_spec=importlib.util.spec_from_file_location("wpo_multinode_feed_fix",_file)
+fast=importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(fast)
 from test_subscription_happ_http import HappSubscription, panel as exact_panel
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import quote
