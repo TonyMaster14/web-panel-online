@@ -339,9 +339,9 @@ if (( code == 0 )); then
         draw "$shown" "$label" "$((SECONDS-started))"
         if (( shown < 100 )); then sleep 1; fi
     done
-    # Keep verified completion visible before replacing it with access details.
-    sleep 4
-    # One final screen transition after the four-second success hold.
+    # Show verified access details two seconds after the 100% milestone.
+    sleep 2
+    # One final screen transition after the two-second success hold.
     # Clear the visible screen only; do not erase terminal scrollback.
     printf '\033[0m\033[2J\033[H'
     terminal_size
