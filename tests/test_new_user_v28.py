@@ -87,7 +87,9 @@ class NewUserFormTests(unittest.TestCase):
             'curl -4fsS --max-time 3',
             'cp -a "$BACKUP" "$MODULE"',
             'Закройте старую вкладку панели',
-            "if(expiry.value!=='0')calendar.open=false;",
+            "if(popover.hidden)openCalendar();",
+            "else closeCalendar();",
+            "document.getElementById('wpoV28Until2099')",
         )
         for needle in required:
             self.assertIn(needle,launcher,needle)
@@ -141,34 +143,57 @@ class NewUserFormTests(unittest.TestCase):
         compile(updated,"wpp_ui_patched.py","exec")
 
     def test_time_zone_and_calendar_constraints(self):
-        # The original native datetime-local control rendered as a tiny
-        # square on Safari. The calendar now renders every date itself.
         self.assertNotIn('type="datetime-local"',self.html)
         self.assertIn('id="wpoV28Date" type="hidden"',self.html)
         self.assertIn('id="wpoV28DayGrid"',self.html)
-        self.assertIn('id="wpoV28CurrentDateTime"',self.html)
         self.assertIn('id="wpoV28Month"',self.html)
         self.assertIn('id="wpoV28Year"',self.html)
-        self.assertIn('id="wpoV28Hour"',self.html)
-        self.assertIn('id="wpoV28Minute"',self.html)
-        self.assertIn('id="wpoV28Apply"',self.html)
         self.assertIn('id="wpoV28PrevMonth"',self.html)
         self.assertIn('id="wpoV28NextMonth"',self.html)
         self.assertIn('class="wpo-v28-calendar-icon"',self.html)
+        self.assertIn('id="wpoV28CalendarToggle"',self.html)
+        self.assertIn('aria-expanded="false"',self.html)
+        self.assertIn('id="wpoV28CalendarBody" hidden',self.html)
+        self.assertNotIn('<details',self.html)
+        self.assertNotIn('<summary>',self.html)
+        for removed in ('id="wpoV28Hour"','id="wpoV28Minute"',
+                        'id="wpoV28Apply"','id="wpoV28Today"',
+                        'id="wpoV28CurrentDateTime"','Время окончания',
+                        'Часы<select','Минуты<select','Сегодня:'):
+            self.assertNotIn(removed,self.html,removed)
         self.assertIn("Intl.DateTimeFormat().resolvedOptions().timeZone",self.html)
-        self.assertIn("setInterval(refreshClock,1000)",self.html)
+        self.assertIn("atEndOfDay",self.html)
         self.assertIn("selected.getTime()/1000",self.html)
         self.assertIn("year<=2099",self.html)
         self.assertNotIn("2090",self.html)
-        self.assertNotIn("d.getUTCFullYear()<=2099",self.html)
         self.assertIn("sameDay(date,current)",self.html)
-        self.assertIn('class="wpo-v28-live-dot"',self.html)
         self.assertIn("@keyframes wpo-v28-pulse",self.html)
         self.assertIn("prefers-reduced-motion:reduce",self.html)
         self.assertIn('class="wpo-v28-limit-field"',self.html)
         self.assertIn('height:40px',self.html)
         for n in ("1","2","3","6","12"):
             self.assertIn(f'data-wpo-months="{n}"',self.html)
+        self.assertIn('data-wpo-2099="1"',self.html)
+        self.assertIn("До 2099",self.html)
+
+    def test_calendar_closes_reliably_with_trigger_and_escape(self):
+        self.assertIn("toggle.addEventListener('click',event=>{",self.html)
+        self.assertIn("if(popover.hidden)openCalendar();",self.html)
+        self.assertIn("else closeCalendar();",self.html)
+        self.assertIn("popover.hidden=true;",self.html)
+        self.assertIn("popover.hidden=false;",self.html)
+        self.assertIn("toggle.setAttribute('aria-expanded','false');",self.html)
+        self.assertIn("toggle.setAttribute('aria-expanded','true');",self.html)
+        self.assertIn("if(!popover.hidden&&!calendar.contains(event.target))closeCalendar();",self.html)
+        self.assertIn("event.key==='Escape'",self.html)
+        self.assertIn("chooseDate(date);",self.html)
+        self.assertIn("chooseDate(new Date(2099,11,31),'2099');",self.html)
+        self.assertIn('wpo-v28-calendar-body[hidden]{display:none!important}',self.html)
+        self.assertIn('.wpo-v28-cal-days button.is-today',self.html)
+        self.assertIn('border:1.5px solid var(--red)!important',self.html)
+        self.assertIn('.wpo-v28-dialog .wpo-v28-section h3{color:#fff!important',self.html)
+        self.assertIn('placeholder="Например, Home VPN"',self.html)
+
     def test_selected_node_and_protocol_has_pulsing_green_dot(self):
         self.assertIn('wpo-v28-radio" aria-hidden="true"><i></i>',self.html)
         self.assertIn("background:var(--green)",self.html)
