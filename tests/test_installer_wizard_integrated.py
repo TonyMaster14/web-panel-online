@@ -56,7 +56,7 @@ def run_case(case):
         # Only privilege/host paths and timing are substituted; real rendering runs.
         source=SOURCE.replace('[[ $EUID -eq 0 ]]', 'true').replace('/run/', str(directory)+'/').replace('/var/log/web-panel-online', str(directory)+'/logs')
         source=source.replace('-o root -g root ', '').replace('</dev/tty','<&0')
-        source=source.replace('sleep 1', 'sleep .01').replace('sleep 2', 'sleep .02')
+        source=source.replace('sleep 1', 'sleep .01').replace('sleep 2', 'sleep .02').replace('sleep 0.10', 'sleep .002')
         (directory / "install.sh").write_text(source, encoding="utf-8")
         (directory / "install-final.sh").write_text(MOCK_BACKEND, encoding="utf-8")
         (directory / "node-install.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
@@ -131,7 +131,12 @@ def run_case(case):
                 assert rc == 0, (rc, decoded[-4000:])
                 assert "УСТАНОВКА ЗАВЕРШЕНА!" in decoded, decoded[-4000:]
                 assert "100%" in decoded, decoded[-4000:]
-                assert "Этап:" in plain, plain[-4000:]
+                assert "Этап:" not in plain, plain[-4000:]
+                # Real backend leaps between milestones, while the wizard
+                # must animate each integer percentage in order.
+                percentages=[int(p) for p in re.findall(r'(?:^|\s)(\d{1,3})%', plain)]
+                assert percentages and percentages[0]==1 and percentages[-1]==100, percentages
+                assert all(y>=x and y-x<=1 for x,y in zip(percentages,percentages[1:])), percentages
                 # After 1 sec, the cursor returns to the wizard header, then
                 # everything below it is erased, leaving only the real access card.
                 parts = raw.split(b"\x1b[H")
@@ -164,7 +169,7 @@ def run_case(case):
                     left=len(interior)-len(interior.lstrip(' '))
                     right=len(interior)-len(interior.rstrip(' '))
                     assert abs(left-right)<=1, (heading,left,right)
-                for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "УСТАНОВКА ЗАВЕРШЕНА!", "100%", "◷ 00:"):
+                for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "Этап:", "УСТАНОВКА ЗАВЕРШЕНА!", "100%", "◷ 00:"):
                     assert unwanted not in final_plain, (unwanted, final_plain)
             elif case == "failed":
                 assert rc == 27, (rc, decoded[-2000:])
