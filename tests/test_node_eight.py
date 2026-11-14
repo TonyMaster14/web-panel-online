@@ -157,6 +157,13 @@ class EightEngineTests(unittest.TestCase):
         self.assertIn("wpo-node-eight-enable.sh",agent)
         self.assertIn('WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"',agent)
         self.assertIn("ENGINE_REV=ab1e7978bf56de6629b4958f591a126eea031174",agent)
+        # A background Ubuntu dist-upgrade must not be interrupted by WPO
+        # or make the user enter node data just to fail on dpkg lock.
+        self.assertIn("fuser -s /var/lib/dpkg/lock-frontend",agent)
+        self.assertIn("pgrep -x 'apt-get|dpkg'",agent)
+        self.assertIn("exit 75",agent)
+        self.assertLess(agent.index('fuser -s /var/lib/dpkg/lock-frontend'),
+                        agent.index("read -r -p 'Домен ноды"))
         self.assertIn("Node API lacks live engines:",agent)
         self.assertIn("download_prebuilt mtproto-proxy-linux-amd64",installer)
         self.assertIn("download_prebuilt tproxy-server-linux-amd64",installer)
