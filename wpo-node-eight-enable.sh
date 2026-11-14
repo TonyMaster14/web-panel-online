@@ -49,7 +49,11 @@ if [[ ! -x /opt/MTProxy/objs/bin/mtproto-proxy ]]; then
     install -d -m 0755 /opt/MTProxy/objs/bin
     install -m 0755 "$TEMP/mtproxy-build/objs/bin/mtproto-proxy" /opt/MTProxy/objs/bin/mtproto-proxy
 fi
-install -d -m 0750 -o root -g root /etc/mtproxy
+if ! getent group mtproxy >/dev/null 2>&1; then groupadd --system mtproxy; fi
+if ! id mtproxy >/dev/null 2>&1; then
+    useradd --system --gid mtproxy --home-dir /nonexistent --shell /usr/sbin/nologin mtproxy
+fi
+install -d -m 0750 -o root -g mtproxy /etc/mtproxy
 # The same bootstrap files shipped with the tested WPO installer.
 curl -4fLsS --proto '=https' --proto-redir '=https' --retry 3 \
     "$BASE/assets/mtproxy-bootstrap/proxy-secret" -o "$TEMP/proxy-secret"
@@ -58,8 +62,8 @@ curl -4fLsS --proto '=https' --proto-redir '=https' --retry 3 \
 [[ "$(wc -c < "$TEMP/proxy-secret")" == 128 ]] || exit 4
 grep -q '^default ' "$TEMP/proxy-multi.conf" || exit 4
 grep -q '^proxy_for ' "$TEMP/proxy-multi.conf" || exit 4
-install -m 0600 "$TEMP/proxy-secret" /etc/mtproxy/proxy-secret
-install -m 0600 "$TEMP/proxy-multi.conf" /etc/mtproxy/proxy-multi.conf
+install -o root -g mtproxy -m 0640 "$TEMP/proxy-secret" /etc/mtproxy/proxy-secret
+install -o root -g mtproxy -m 0640 "$TEMP/proxy-multi.conf" /etc/mtproxy/proxy-multi.conf
 
 # Pinned browser HTTPS transport relay for Telegram WEB Proxy and public site.
 GO=/opt/go1.26.5/bin/go
@@ -358,9 +362,37 @@ caddy validate --config /etc/caddy/Caddyfile.eight-caddy-test --adapter caddyfil
     exit 4
 }
 
+# The official MTProxy binary binds on all interfaces, even for WEB-only
+# backends. Drop external WEB backends and both protocols' stats ports.
+# Direct Telegram MTProto :25000-25949 remains reachable by design.
+cat >/usr/local/sbin/wpo-node-mt-firewall <<'FIREWALL'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+nft list table inet wpo_node_mt_guard >/dev/null 2>&1 &&
+    nft delete table inet wpo_node_mt_guard
+nft add table inet wpo_node_mt_guard
+nft 'add chain inet wpo_node_mt_guard input { type filter hook input priority -150; policy accept; }'
+nft add rule inet wpo_node_mt_guard input iifname != "lo" tcp dport 24000-24949 drop
+nft add rule inet wpo_node_mt_guard input iifname != "lo" tcp dport 27000-28949 drop
+FIREWALL
+chmod 0755 /usr/local/sbin/wpo-node-mt-firewall
+cat >/etc/systemd/system/wpo-node-mt-firewall.service <<'UNIT'
+[Unit]
+Description=WPO restrict external MTProxy WEB and stats ports
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/wpo-node-mt-firewall
+RemainAfterExit=true
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 # Switch the localhost-only authenticated VPN API to the eight-engine backend
 # after the verified binaries and services have been installed.
 systemctl daemon-reload
+systemctl enable --now wpo-node-mt-firewall.service
 systemctl enable --now wpo-node-awg-nat.service
 systemctl enable wpo-node-relay.service
 systemctl restart wpo-node-relay.service
@@ -372,6 +404,10 @@ mv -f /etc/caddy/Caddyfile.eight-caddy-test /etc/caddy/Caddyfile
 systemctl reload caddy.service
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
     ufw route allow from 10.80.0.0/14 to any >/dev/null
+    ufw allow 25000:25949/tcp >/dev/null
+    ufw allow 52000:52999/udp >/dev/null
+    ufw allow 53000/tcp >/dev/null
+    ufw allow 54000/tcp >/dev/null
 fi
 # Inform the API server to dynamically import the existing native backends.
 systemctl restart wpo-node-vpn.service
