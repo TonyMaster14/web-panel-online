@@ -27,6 +27,11 @@ cleanup() {
         cp -a "$BACKUP/wpp_ui.py" "$APP/wpp_ui.py" || true
         cp -a "$BACKUP/wpp_subscriptions.py" "$APP/wpp_subscriptions.py" || true
         cp -a "$BACKUP/web-proxy-panelctl" "$MANAGER" || true
+        if [[ -f "$BACKUP/wpp-node-agent-install.sh" ]]; then
+            cp -a "$BACKUP/wpp-node-agent-install.sh" "$APP/wpp-node-agent-install.sh" || true
+        else
+            rm -f "$APP/wpp-node-agent-install.sh"
+        fi
         if [[ -f "$BACKUP/wpo_user_v28.py" ]]; then
             cp -a "$BACKUP/wpo_user_v28.py" "$APP/wpo_user_v28.py" || true
         else
@@ -38,17 +43,25 @@ cleanup() {
     exit "$rc"
 }
 trap cleanup EXIT
-for name in wpo_v28_apply.py wpo_user_v28.py; do
+for name in wpo_v28_apply.py wpo_user_v28.py wpo-node-controller-vpn.sh wpo-node-agent-install-v2.sh; do
     curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
         --connect-timeout 12 --max-time 60 "$BASE/$name" -o "$TMP/$name"
 done
 python3 -m py_compile "$TMP/wpo_v28_apply.py" "$TMP/wpo_user_v28.py"
+bash -n "$TMP/wpo-node-controller-vpn.sh" "$TMP/wpo-node-agent-install-v2.sh"
 for name in panel.py wpp_ui.py wpp_subscriptions.py; do
     cp -a "$APP/$name" "$BACKUP/$name"
 done
 cp -a "$MANAGER" "$BACKUP/web-proxy-panelctl"
+if [[ -e "$APP/wpp-node-agent-install.sh" ]]; then
+    cp -a "$APP/wpp-node-agent-install.sh" "$BACKUP/wpp-node-agent-install.sh"
+fi
 [[ ! -e "$APP/wpo_user_v28.py" ]] || cp -a "$APP/wpo_user_v28.py" "$BACKUP/wpo_user_v28.py"
 ROLLBACK=1
+# Upgrade the controller federation bridge and the installer supplied by the
+# panel itself. New nodes will now bootstrap VPN automatically on the first run.
+WPO_NODES_VPN_DURING_INSTALL=1 WPO_NODES_BATCH_RESTART=1 bash "$TMP/wpo-node-controller-vpn.sh"
+install -o root -g root -m 0700 "$TMP/wpo-node-agent-install-v2.sh" "$APP/wpp-node-agent-install.sh"
 python3 "$TMP/wpo_v28_apply.py" --app "$APP" --manager "$MANAGER" --helper "$TMP/wpo_user_v28.py"
 python3 -m py_compile "$APP/panel.py" "$APP/wpp_ui.py" "$APP/wpp_subscriptions.py" "$APP/wpo_user_v28.py" "$MANAGER"
 systemctl restart "$SERVICE"
@@ -66,5 +79,6 @@ done
 (( HEALTHY )) || { echo 'Панель не ответила после обновления; выполняю откат.' >&2; exit 3; }
 ROLLBACK=0
 echo '✓ WPO: форма «Новый пользователь» обновлена. Существующие данные сохранены.'
+echo '✓ Установщик новых нод обновлён: VPN-службы устанавливаются до регистрации.'
 echo '✓ Путь тестового обновления не изменяет ветку GitHub main.'
 echo "Резервная копия: $BACKUP"
