@@ -175,6 +175,10 @@ class EightEngineTests(unittest.TestCase):
 
         self.assertIn("wpo-node-agent-install-v2.sh",core)
         self.assertIn("systemctl is-active --quiet wpo-node-relay.service",installer)
+        self.assertIn("http://127.0.0.1:8080/",installer)
+        self.assertIn("RELAY_READY=0",installer)
+        self.assertIn("journalctl -u wpo-node-relay.service",installer)
+        self.assertIn("if missing: raise SystemExit('Missing WPO node backends:",installer)
 
 
 if __name__=="__main__":
