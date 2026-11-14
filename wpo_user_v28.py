@@ -239,7 +239,7 @@ STYLE = """
 .wpo-v28-cal-days button,.wpo-v28-cal-days>span{height:33px;width:100%;
  border-radius:8px;padding:0;font-size:11px;position:relative}
 .wpo-v28-cal-days button{border:1px solid transparent;background:transparent}
-.wpo-v28-cal-days button:hover:not(:disabled){border-color:var(--accent);background:var(--tint)}
+.wpo-v28-cal-days button:hover:not(:disabled){border-color:transparent;background:transparent}
 .wpo-v28-cal-days button:disabled{opacity:.22;cursor:not-allowed}
 .wpo-v28-cal-days button.is-today{font-weight:600}
 .wpo-v28-cal-days button.is-today::after{content:"";position:absolute;width:5px;height:5px;
