@@ -91,8 +91,7 @@ def validate_expiry(value):
                "'max_devices': limits(request.get('max_devices', 0)),\n"
                "               'expires_at':validate_expiry(request.get('expires_at',0)),",
                "persist expiry")
-    src = swap(src, "        if operation == 'update':\n            limit = limits(request.get('max_devices', sub['max_devices']))",
-               "        if operation == 'update':\n"
+    src = swap(src, "            limit = limits(request.get('max_devices', sub['max_devices']))",
                "            if 'expires_at' in request: sub['expires_at']=validate_expiry(request['expires_at'])\n"
                "            limit = limits(request.get('max_devices', sub['max_devices']))",
                "update expiry")
