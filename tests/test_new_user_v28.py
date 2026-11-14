@@ -225,17 +225,23 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn('#subscriptionFields .unavailable{opacity:1',css)
 
     def test_calendar_opens_on_current_month_not_default_expiry_month(self):
-        # A subscription expires in December after the default +1 month,
-        # but on November 14 the calendar must first show NOVEMBER 14, today.
+        # Every open presents the browser-local current month/day regardless of
+        # a previous 12-month or 2099 expiry chosen and saved in the form.
         script=wpo_user_v28.SCRIPT
         self.assertIn("function openCalendar(){",script)
-        self.assertIn("const current=now();\n  highlightedDate=null;\n  viewYear=current.getFullYear();\n  viewMonth=current.getMonth();\n  refreshLiveClock();\n  renderCalendar();",script)
-        # Reopening resets only the red outline to today. It must not reset
-        # the previously stored expiry or the quick-period selection.
         open_handler=script.split("function openCalendar(){",1)[1].split("function chooseDate(",1)[0]
-        self.assertIn("highlightedDate=null;",open_handler)
+        self.assertIn("highlightedDate=new Date(current.getFullYear(),current.getMonth(),current.getDate());",open_handler)
+        self.assertIn("viewYear=current.getFullYear();",open_handler)
+        self.assertIn("viewMonth=current.getMonth();",open_handler)
+        self.assertIn("calendar.querySelectorAll('[data-wpo-months],[data-wpo-2099]')",open_handler)
+        self.assertIn("button.classList.remove('is-selected');",open_handler)
+        self.assertIn("button.setAttribute('aria-pressed','false');",open_handler)
+        self.assertIn("popover.hidden=false;",open_handler)
+        self.assertLess(open_handler.index("popover.hidden=false;"),open_handler.index("renderCalendar();"))
+        # Visual reset must never silently change the selected expiration.
         self.assertNotIn("selected=",open_handler)
         self.assertNotIn("syncDate()",open_handler)
+        self.assertNotIn("expiry.value=",open_handler)
         self.assertIn("sameDay(date,highlightedDate||current)",script)
         self.assertIn("selected=atEndOfDay(date);",script)
         self.assertIn("document.getElementById('wpoV28Now')",script)
@@ -248,6 +254,7 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("Текущие дата и время",self.html)
         self.assertIn("id=\"wpoV28TimeZone\"",self.html)
         self.assertNotIn("Время окончания",self.html)
+        self.assertIn("font-weight:700;opacity:1!important",wpo_user_v28.STYLE)
 
     def test_date_outline_and_quick_period_close_after_selection(self):
         script=wpo_user_v28.SCRIPT
