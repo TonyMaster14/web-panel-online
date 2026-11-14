@@ -311,7 +311,7 @@ printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 # Cosmetic progress follows the ~4-minute successful VPS installation.
 # It is deliberately independent of backend stage jumps. A slow download
 # may hold 99%, but 100% is never displayed before verified success.
-WPO_PROGRESS_TARGET_SECONDS="\${WPO_PROGRESS_TARGET_SECONDS:-240}"
+WPO_PROGRESS_TARGET_SECONDS="${WPO_PROGRESS_TARGET_SECONDS:-240}"
 if ! [[ "$WPO_PROGRESS_TARGET_SECONDS" =~ ^[0-9]+$ ]] ||
    (( WPO_PROGRESS_TARGET_SECONDS < 10 || WPO_PROGRESS_TARGET_SECONDS > 3600 )); then
     WPO_PROGRESS_TARGET_SECONDS=240
@@ -324,7 +324,7 @@ draw(){
     key="$pct|$elapsed"
     [[ "$key" != "$DRAW_LAST" || "$DRAW_RESIZED" == 1 ]] || return 0
     DRAW_LAST="$key"
-    local previous_cols="$UI_COLS" previous_rows="\${UI_ROWS:-24}"
+    local previous_cols="$UI_COLS" previous_rows="${UI_ROWS:-24}"
     terminal_size
     if [[ "$UI_COLS" != "$previous_cols" || "$UI_ROWS" != "$previous_rows" ]]; then DRAW_RESIZED=1; fi
     if (( DRAW_RESIZED )); then
@@ -342,13 +342,13 @@ draw(){
     (( width > 40 )) && width=40
     (( width < 1 )) && width=1
     filled=$((pct*width/100)); empty=$((width-filled))
-    printf -v bar '%*s' "$filled" ''; bar="\${bar// /█}"
-    printf -v rest '%*s' "$empty" ''; rest="\${rest// /░}"
+    printf -v bar '%*s' "$filled" ''; bar="${bar// /█}"
+    printf -v rest '%*s' "$empty" ''; rest="${rest// /░}"
     maxtext=$((UI_COLS-3))
     status='УСТАНОВКА …'
     if (( pct == 100 )); then status='УСТАНОВКА ЗАВЕРШЕНА!'; fi
     printf -v packet '%s\033[2K  %s%s%s\n\r\033[2K\n\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s' \
-        "$prefix" "$bold$success" "\${status:0:maxtext}" "$reset" \
+        "$prefix" "$bold$success" "${status:0:maxtext}" "$reset" \
         "$cyan" "$bar" "$blue" "$rest" "$reset" "$pct" \
         "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
     printf '%s' "$packet"
