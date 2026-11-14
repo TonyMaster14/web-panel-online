@@ -5186,11 +5186,11 @@ fi
     card_cols="${WPO_CARD_COLUMNS:-80}"
     [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
     (( card_cols < 28 )) && card_cols=28
-    # Keep the access card the same compact width as the wizard header.
-    # The full URL is displayed separately BELOW the closed frame, never
-    # printed between the side borders (where terminal wrapping tears them).
-    card_width=$((card_cols-5))
-    (( card_width > 60 )) && card_width=60
+    # Expand the whole card to contain the full URL on one line when the
+    # terminal is wide enough; for narrow SSH windows, wrap INSIDE the frame.
+    card_width=${#card_url}
+    (( card_width < 60 )) && card_width=60
+    (( card_width > card_cols-6 )) && card_width=$((card_cols-6))
     card_indent=""
     printf -v card_rule '%*s' "$((card_width+2))" ''
     card_rule="${card_rule// /─}"
@@ -5212,6 +5212,9 @@ fi
         card_line 'WPO 3.0 — УСТАНОВЛЕНО' "$card_bold"
     fi
     card_line ''
+    card_line 'Ссылка на панель:'
+    card_line "$card_url" "$card_value"
+    card_line ''
     card_line "Логин: $ADMIN"
     card_line ''
     if [[ "$UPDATING" == 1 ]]; then
@@ -5223,9 +5226,5 @@ fi
     card_line ''
     card_line 'Сохраните данные, чтобы не потерять!' "$card_warning"
     card_line ''
-    printf "${card_indent}"'%s╰%s╯%s\n' "$card_blue" "$card_rule" "$card_reset"
-    # URL outside the border: one complete link, unbroken by script newlines.
-    # A narrow terminal may soft-wrap normally without damaging the frame.
-    printf '\n  %sСсылка на панель:%s\n  %s%s%s\n\n' \
-        "$card_label" "$card_reset" "$card_value" "$card_url" "$card_reset"
+    printf "${card_indent}"'%s╰%s╯%s\n\n' "$card_blue" "$card_rule" "$card_reset"
 } > "${WPO_UI_RESULT_FILE:-/dev/stdout}"
