@@ -7,7 +7,7 @@ umask 077
 APP=/opt/tproxy-panel/panel.py
 SERVICE=tproxy-panel.service
 [[ -s "$APP" ]] || { echo 'WPO controller is not installed.' >&2; exit 2; }
-if [[ "\${WPO_NODES_VPN_DURING_INSTALL:-0}" != 1 ]]; then
+if [[ "${WPO_NODES_VPN_DURING_INSTALL:-0}" != 1 ]]; then
     exec 8>/run/lock/web-panel-proxy.lock
     flock -n 8 || { echo 'Another WPO installation/update is active.' >&2; exit 2; }
 fi
@@ -23,7 +23,7 @@ rollback(){
     trap - EXIT
     if (( rc != 0 && RESTORE == 1 )); then
         cp -a "$BACKUP" "$APP" || true
-        if [[ "\${WPO_NODES_BATCH_RESTART:-0}" != 1 ]]; then
+        if [[ "${WPO_NODES_BATCH_RESTART:-0}" != 1 ]]; then
             systemctl restart "$SERVICE" || true
         fi
         echo "Controller restored from $BACKUP" >&2
@@ -89,7 +89,7 @@ temp.chmod(0o755)
 temp.replace(path)
 PY_PATCH
 python3 -m py_compile "$APP"
-if [[ "\${WPO_NODES_BATCH_RESTART:-0}" != 1 ]]; then
+if [[ "${WPO_NODES_BATCH_RESTART:-0}" != 1 ]]; then
     systemctl restart "$SERVICE"
     systemctl is-active --quiet "$SERVICE" || {
         echo 'Controller did not restart with VPN patch.' >&2; exit 3; }
