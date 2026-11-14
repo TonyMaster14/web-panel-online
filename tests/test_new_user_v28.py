@@ -122,12 +122,40 @@ class NewUserFormTests(unittest.TestCase):
         compile(updated,"wpp_ui_patched.py","exec")
 
     def test_time_zone_and_calendar_constraints(self):
-        self.assertIn('type="datetime-local"',self.html)
-        self.assertIn('max="2090-12-31T23:59"',self.html)
+        # The original native datetime-local control rendered as a tiny
+        # square on Safari. The calendar now renders every date itself.
+        self.assertNotIn('type="datetime-local"',self.html)
+        self.assertIn('id="wpoV28Date" type="hidden"',self.html)
+        self.assertIn('id="wpoV28DayGrid"',self.html)
+        self.assertIn('id="wpoV28CurrentDateTime"',self.html)
+        self.assertIn('id="wpoV28Month"',self.html)
+        self.assertIn('id="wpoV28Year"',self.html)
+        self.assertIn('id="wpoV28Hour"',self.html)
+        self.assertIn('id="wpoV28Minute"',self.html)
+        self.assertIn('id="wpoV28Apply"',self.html)
+        self.assertIn('id="wpoV28PrevMonth"',self.html)
+        self.assertIn('id="wpoV28NextMonth"',self.html)
+        self.assertIn('class="wpo-v28-calendar-icon"',self.html)
         self.assertIn("Intl.DateTimeFormat().resolvedOptions().timeZone",self.html)
-        self.assertIn("Math.floor(d.getTime()/1000)",self.html)
+        self.assertIn("setInterval(refreshClock,1000)",self.html)
+        self.assertIn("selected.getTime()/1000",self.html)
+        self.assertIn("year<=2090",self.html)
+        self.assertIn("sameDay(date,current)",self.html)
+        self.assertIn('class="wpo-v28-live-dot"',self.html)
+        self.assertIn("@keyframes wpo-v28-pulse",self.html)
+        self.assertIn("prefers-reduced-motion:reduce",self.html)
+        self.assertIn('class="wpo-v28-limit-field"',self.html)
+        self.assertIn('height:40px',self.html)
         for n in ("1","2","3","6","12"):
             self.assertIn(f'data-wpo-months="{n}"',self.html)
+    def test_selected_node_and_protocol_has_pulsing_green_dot(self):
+        self.assertIn('wpo-v28-radio" aria-hidden="true"><i></i>',self.html)
+        self.assertIn("background:var(--green)",self.html)
+        self.assertIn(".wpo-v28-node:has(input:checked) .wpo-v28-radio i",self.html)
+        self.assertIn(".wpo-v28-option:has(input:checked) .wpo-v28-radio i",self.html)
+        self.assertIn("animation:wpo-v28-pulse",self.html)
+        self.assertIn('aria-pressed',self.html)
+
     def test_escaping_and_no_injected_html(self):
         escaped=wpo_user_v28.form("/panel-demo",'<input bad>',self.conns,
                                   [{**self.nodes[0],"name":'<script>alert(1)</script>'}],
