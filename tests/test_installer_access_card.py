@@ -19,10 +19,14 @@ with tempfile.TemporaryDirectory() as folder:
             assert url in text, 'Installer must never split URL with a hard newline'
             assert '╭' in text and '╰' in text
             assert 'Логин: TestAdmin' in text
-            assert text.index(url)<text.index('Логин:')<text.index('Пароль:')<text.index('Сохраните')
+            assert text.index('Логин:')<text.index('Пароль:')<text.index('Сохраните')<text.index(url)
+            # The URL is physically after the closed frame, not inside a side border.
+            card_end=text.index('╰', text.index('WPO 3.0 — '))
+            assert card_end < text.index('Ссылка на панель:') < text.index(url)
+            assert not any(url in line and '│' in line for line in text.splitlines())
             assert ('TestSecret123' in text)==(updating=='0')
 boot=Path('install.sh').read_text()
-assert 'sleep 4' in boot
-assert boot.index('if [[ ! -s "$RESULT" ]]')<boot.index('sleep 4')<boot.index('cat -- "$RESULT"')
+assert 'sleep 2' in boot and 'sleep 4' not in boot
+assert boot.index('if [[ ! -s "$RESULT" ]]')<boot.index('sleep 2')<boot.index('cat -- "$RESULT"')
 assert 'WEB_PANEL_PROXY_REF:-main' in boot
-print('PASS: final card, intact URL, private secrets, upgrade preservation, verified completion hold')
+print('PASS: final card, intact URL, private secrets, upgrade preservation, two-second completion hold')
