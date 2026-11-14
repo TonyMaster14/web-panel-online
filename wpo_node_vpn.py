@@ -260,7 +260,15 @@ class API(BaseHTTPRequestHandler):
         protocols = sorted(installed.available()) if (online and installed) else (
             ["vless", "hysteria"] if online else [])
         if self.path == "/healthz":
-            self.respond({"ok": online and (not installed or installed.full_ready()),
+            # This is the BASE XHTTP/Hysteria readiness probe. During an
+            # interrupted 8-engine upgrade, wpo_node_eight.py may already
+            # exist but WEB relay/AWG/Naive/Mieru are not yet enabled. Do
+            # not deadlock a retry by requiring all eight engines *before*
+            # the eight-engine installer is allowed to run.
+            # Full readiness is still mandatory in Node Agent /status before
+            # registering the node with WPO.
+            all_ready = bool(online and installed and installed.full_ready())
+            self.respond({"ok": online, "all_protocols_ready": all_ready,
                           "capabilities": (["federation"] + protocols) if online else []})
         elif self.path == "/wpp-api/v1/federation/status":
             if not self.authorized():
