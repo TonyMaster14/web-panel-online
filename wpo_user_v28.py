@@ -126,8 +126,8 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<aside class="wpo-v28-cal-aside" aria-label="Быстрый выбор срока">'
         '<b>Быстрый срок</b><div class="wpo-v28-months">'
         + "".join(f'<button type="button" data-wpo-months="{m}">{m} '
-                  f'{"месяц" if m == 1 else "месяца" if m in (2, 3) else "месяцев"}</button>'
-                  for m in (1, 2, 3, 6, 12))
+                  f'{"месяц" if m == 1 else "месяца" if m == 3 else "месяцев"}</button>'
+                  for m in (1, 3, 6, 9, 12))
         + '<button type="button" id="wpoV28Until2099" data-wpo-2099="1">До 2099</button>'
         '</div></aside>'
         '<div class="wpo-v28-cal-main">'
@@ -241,10 +241,10 @@ STYLE = """
 .wpo-v28-cal-days button{border:1px solid transparent;background:transparent}
 .wpo-v28-cal-days button:hover:not(:disabled){border-color:var(--accent);background:var(--tint)}
 .wpo-v28-cal-days button:disabled{opacity:.22;cursor:not-allowed}
-.wpo-v28-cal-days button.is-today{color:var(--red);font-weight:700}
+.wpo-v28-cal-days button.is-today{font-weight:600}
 .wpo-v28-cal-days button.is-today::after{content:"";position:absolute;width:5px;height:5px;
  background:var(--red);border-radius:50%;bottom:2px;left:calc(50% - 2.5px)}
-.wpo-v28-cal-days button.is-selected{background:var(--tint);border:1px solid var(--accent);color:var(--text)}
+.wpo-v28-cal-days button.is-selected{color:var(--text)}
 .wpo-v28-cal-live{display:flex;gap:8px;align-items:center;padding:8px 9px;border:1px solid var(--line);
  border-radius:8px;background:var(--surface);font-size:10px;color:var(--muted)}
 .wpo-v28-live-dot{width:7px;height:7px;flex:0 0 7px;border-radius:50%;background:var(--red);
@@ -306,7 +306,7 @@ STYLE = """
 .wpo-v28-calendar-trigger .wpo-v28-calendar-icon{pointer-events:none}
 .wpo-v28-calendar-body[hidden]{display:none!important}
 .wpo-v28-calendar-body:not([hidden]){display:grid}
-.wpo-v28-cal-days button.is-today,.wpo-v28-cal-days button.is-selected.is-today{
+.wpo-v28-cal-days button.is-highlighted{
  color:var(--red);border:1.5px solid var(--red)!important;
  box-shadow:inset 0 0 0 1px var(--red);font-weight:700}
 .wpo-v28-cal-days button.is-today::after{display:none!important}
@@ -352,6 +352,9 @@ const pad=n=>String(n).padStart(2,'0');
 const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
 const atEndOfDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,0,0);
 let selected=null;
+// Before manual selection, the single red outline follows the current day.
+// After a day or quick period is chosen, it follows that chosen date instead.
+let highlightedDate=null;
 let viewYear=now().getFullYear();
 let viewMonth=now().getMonth();
 function addMonths(base,count){
@@ -390,8 +393,9 @@ function openCalendar(){
   toggle.setAttribute('aria-expanded','true');
   calendar.classList.add('is-open');
 }
-function chooseDate(date,preset=''){
+function chooseDate(date,preset='',highlight=true){
   selected=atEndOfDay(date);
+  if(highlight)highlightedDate=selected;
   viewYear=selected.getFullYear();
   viewMonth=selected.getMonth();
   syncDate();
@@ -435,6 +439,7 @@ function renderCalendar(){
     const end=atEndOfDay(date);
     button.disabled=end.getTime()<=current.getTime()+59000;
     button.classList.toggle('is-today',sameDay(date,current));
+    button.classList.toggle('is-highlighted',sameDay(date,highlightedDate||current));
     button.classList.toggle('is-selected',selected!==null&&sameDay(date,selected));
     button.setAttribute('aria-pressed',String(selected!==null&&sameDay(date,selected)));
     button.setAttribute('aria-label',date.toLocaleDateString(undefined,{
@@ -443,7 +448,6 @@ function renderCalendar(){
     button.addEventListener('click',event=>{
       event.preventDefault();
       chooseDate(date);
-      if(expiry.value!=='0')closeCalendar();
     });
     grid.appendChild(button);
   }
@@ -469,12 +473,10 @@ yearSelect.addEventListener('change',()=>{viewYear=Number(yearSelect.value);rend
 document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',event=>{
   event.preventDefault();
   chooseDate(addMonths(now(),Number(button.dataset.wpoMonths)),button.dataset.wpoMonths);
-  if(expiry.value!=='0')closeCalendar();
 }));
 document.getElementById('wpoV28Until2099').addEventListener('click',event=>{
   event.preventDefault();
   chooseDate(new Date(2099,11,31),'2099');
-  closeCalendar();
 });
 document.addEventListener('pointerdown',event=>{
   if(!popover.hidden&&!calendar.contains(event.target))closeCalendar();
@@ -486,18 +488,14 @@ document.addEventListener('keydown',event=>{
 });
 document.getElementById('createAccount')?.addEventListener('close',closeCalendar);
 refreshLiveClock();
+let lastLiveDay=now().toDateString();
 setInterval(()=>{
   if(!popover.hidden){
     refreshLiveClock();
-    const current=now();
-    // At local midnight, refresh the red today outline if the month is visible.
-    if(viewYear===current.getFullYear()&&viewMonth===current.getMonth()){
-      for(const button of grid.querySelectorAll('button')){
-        const day=Number(button.textContent);
-        if(Number.isInteger(day)&&day>0){
-          button.classList.toggle('is-today',day===current.getDate());
-        }
-      }
+    const dayKey=now().toDateString();
+    if(dayKey!==lastLiveDay){
+      lastLiveDay=dayKey;
+      renderCalendar();
     }
   }
 },1000);
@@ -519,9 +517,15 @@ function summary(){
 }
 f.addEventListener('change',()=>queueMicrotask(summary));
 f.addEventListener('input',()=>queueMicrotask(summary));
-document.getElementById('newAccount')?.addEventListener('click',()=>{
+function resetCalendarSelection(){
   closeCalendar();
-  chooseDate(addMonths(now(),1),'1');
+  highlightedDate=null;
+  // A newly opened form starts at today's date, with no preset highlighted.
+  chooseDate(now(),'',false);
+}
+document.addEventListener('wpo-v28-reset-calendar',resetCalendarSelection);
+document.getElementById('newAccount')?.addEventListener('click',()=>{
+  resetCalendarSelection();
   queueMicrotask(summary);
 });
 document.addEventListener('submit',e=>{
@@ -555,8 +559,7 @@ document.addEventListener('submit',e=>{
     connection.value='';
   }
 },true);
-closeCalendar();
-chooseDate(addMonths(now(),1),'1');
+resetCalendarSelection();
 summary();
 })();"""
 
@@ -579,9 +582,9 @@ function showCreateError(message){
 openCreate.addEventListener('click',()=>{
   createForm.reset();
   createError.hidden=true;
-  // Reapply an actual current date after the reset, not a stale default.
-  document.querySelector('[data-wpo-months="1"]')?.click();
-  // The calendar listener refreshes the preview after a reset.
+  // The form reset clears hidden inputs; restore today's expiration
+  // without automatically selecting a quick-period button.
+  document.dispatchEvent(new Event('wpo-v28-reset-calendar'));
   createDialog.showModal();
   setTimeout(()=>document.getElementById('accountName').focus(),30);
 });
