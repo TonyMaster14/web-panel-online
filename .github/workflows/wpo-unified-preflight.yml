@@ -41,8 +41,12 @@ jobs:
               'vless':str(uuid.uuid4()), 'hysteria':str(uuid.uuid4())}}}
           settings={'domain':'se.example.net','xhttp_path':'/wpo-xhttp-1234567890abcdef12345678'}
           (root/'config.json').write_text(json.dumps(vpn.render_xray(data,settings)))
+          # New nodes have no clients yet: their empty configuration must
+          # still allow the Xray service to start before registration.
+          (root/'config-empty.json').write_text(json.dumps(vpn.render_xray({},settings)))
           PY
           chmod +x "$tmp/xray"
+          "$tmp/xray" run -test -config "$tmp/config-empty.json"
           "$tmp/xray" run -test -config "$tmp/config.json"
       - name: Exercise terminal success and failure paths
         run: python3 tests/test_installer_wizard_integrated.py
