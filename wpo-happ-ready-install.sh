@@ -18,7 +18,7 @@ flock -n 9 || { echo 'WPO уже выполняет обновление. Нич
 WORK="$(mktemp -d /tmp/wpo-happ-ready.XXXXXXXX)"
 BACKUP="/var/lib/tproxy-panel/happ-ready-backup-$(date -u +%Y%m%dT%H%M%SZ)"
 ROLLBACK=0
-FILES="panel.py wpp_subscriptions.py wpo_happ_async_feed.py wpo_happ_preparer.py"
+FILES="panel.py wpp_subscriptions.py wpo_happ_async_feed.py wpo_happ_preparer.py wpp-node-agent-install.sh"
 rollback(){
   echo 'Проверка WPO не прошла. Возвращаю прежние файлы.' >&2
   for file in $FILES; do
@@ -47,6 +47,16 @@ for file in wpo_happ_async_feed.py wpo_happ_preparer.py wpo-happ-preallocate-pat
     --connect-timeout 15 --max-time 90 "$BASE/$file" -o "$WORK/$file"
   python3 -m py_compile "$WORK/$file"
 done
+# New nodes must inherit the VLESS/Hysteria-only federation fix as well.
+# This updates the MAIN WPO's installer file, not any registered remote VPS.
+NODE_INSTALL_REV=a3bcb61506c9813c473a01cd968238c667857a23
+curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
+  --connect-timeout 15 --max-time 90 \
+  "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$NODE_INSTALL_REV/wpo-node-agent-install-v2.sh" \
+  -o "$WORK/wpp-node-agent-install.sh"
+bash -n "$WORK/wpp-node-agent-install.sh"
+grep -Fqx 'ENGINE_REV=5f497290fe041149521b7d6006a1dd5b2e833885' "$WORK/wpp-node-agent-install.sh"
+grep -Fq 'wpo-node-site-template-fix.sh' "$WORK/wpp-node-agent-install.sh"
 python3 "$WORK/wpo-happ-preallocate-patch.py" --input "$SUBS" --output "$WORK/wpp_subscriptions.py"
 python3 "$WORK/wpo-happ-async-panel-patch.py" --panel "$PANEL" --output "$WORK/panel.py"
 python3 -m py_compile "$WORK/wpp_subscriptions.py" "$WORK/panel.py"
@@ -63,7 +73,11 @@ for file in $FILES; do
 done
 ROLLBACK=1
 for file in $FILES; do
-  install -o root -g root -m 0644 "$WORK/$file" "$APP/$file"
+  if [[ "$file" == wpp-node-agent-install.sh ]]; then
+    install -o root -g root -m 0755 "$WORK/$file" "$APP/$file"
+  else
+    install -o root -g root -m 0644 "$WORK/$file" "$APP/$file"
+  fi
 done
 rm -f "$APP"/__pycache__/panel.*.pyc "$APP"/__pycache__/wpp_subscriptions.*.pyc
 systemctl restart tproxy-panel.service
@@ -86,6 +100,7 @@ ROLLBACK=0
 echo '✓ Основная WPO работает; одиночные подключения и работающие VPN-службы не тронуты.'
 echo '✓ Happ не ждёт долгих перезапусков Xray на дополнительных VPS.'
 echo '✓ Новые многонодовые подписки заранее резервируют первый профиль устройства.'
+echo '✓ Установщик будущих дополнительных нод обновлён; уже действующие VPS не затронуты.'
 cat >/etc/systemd/system/wpo-happ-prepare.service <<'UNIT'
 [Unit]
 Description=WPO pre-provision selected remote Happ VPN profiles
