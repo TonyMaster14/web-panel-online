@@ -234,10 +234,11 @@ def _mt_unit(record):
         "After=network-online.target wpo-node-mt-firewall.service\n"
         "Wants=network-online.target\nRequires=wpo-node-mt-firewall.service\n"
         "[Service]\nType=simple\nUser=mtproxy\nGroup=mtproxy\n"
-        "ExecStart=%s -u mtproxy -p %d -H %d -S %s --aes-pwd %s %s -M 1\n"
+        "EnvironmentFile=/etc/wpp-node-vpn/mtproxy-%s.env\n"
+        "ExecStart=%s -u mtproxy -p %d -H %d -S ${WPO_MTPROTO_SECRET} --aes-pwd %s %s -M 1\n"
         "Restart=always\nRestartSec=3\nNoNewPrivileges=true\nPrivateTmp=true\n"
         "[Install]\nWantedBy=multi-user.target\n"
-    ) % (proto, uid, MT_BIN, stats, port, record["secret"], MT_AES, MT_CONF)
+    ) % (proto, uid, uid, MT_BIN, stats, port, MT_AES, MT_CONF)
 
 
 def _native_connections():
@@ -257,10 +258,24 @@ def _update_mtproxy(users, domain):
         if uid not in current:
             _call("systemctl", "disable", "--now", name.name)
             name.unlink(missing_ok=True)
+            Path("/etc/wpp-node-vpn/mtproxy-" + uid + ".env").unlink(missing_ok=True)
     for uid, record in current.items():
         unit = MT_SERVICE_PREFIX + uid + ".service"
         path = MT_UNIT_DIR / unit
         desired = _mt_unit(record)
+        # Never write a Telegram secret to a world-readable unit file.
+        import grp
+        secret_file = Path("/etc/wpp-node-vpn") / ("mtproxy-" + uid + ".env")
+        if not secret_file.is_file() or secret_file.read_text(encoding="ascii").strip() != (
+                "WPO_MTPROTO_SECRET=" + record["secret"]):
+            fd, tmp = __import__("tempfile").mkstemp(dir=str(secret_file.parent))
+            with os.fdopen(fd, "w", encoding="ascii") as output:
+                output.write("WPO_MTPROTO_SECRET=" + record["secret"] + "\n")
+                output.flush()
+                os.fsync(output.fileno())
+            os.chown(tmp, 0, grp.getgrnam("mtproxy").gr_gid)
+            os.chmod(tmp, 0o640)
+            os.replace(tmp, secret_file)
         if not path.is_file() or path.read_text() != desired:
             fd, tmp = __import__("tempfile").mkstemp(dir=str(MT_UNIT_DIR))
             with os.fdopen(fd, "w") as f:
