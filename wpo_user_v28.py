@@ -36,31 +36,28 @@ def form(path, csrf, connections, nodes=None, local=None):
     """
     h = lambda value: escape(str(value), quote=True)
     valid = [c for c in (connections or []) if isinstance(c, dict) and
-             c.get("enabled", True) and c.get("protocol") in VPN_SUPPORTED]
+             c.get("enabled", True) and c.get("protocol") in {v[0] for v in CATALOG}]
     choices = []
     for protocol, title, description, _kind in CATALOG:
-        if protocol in VPN_SUPPORTED:
-            conn = next((item for item in valid if item.get("protocol") == protocol), None)
-            if conn:
-                cid = str(conn.get("id", ""))
-                if not (3 <= len(cid) <= 64):
-                    continue
-                choices.append(
-                    f'<label class="wpo-v28-option"><input class="wpo-v28-protocol" type="checkbox" '
-                    f'name="connection_{h(cid)}" value="1" data-protocol="{h(protocol)}" '
-                    f'data-label="{h(title)}" checked><span class="wpo-v28-radio">✓</span>'
-                    f'<span><strong>{h(title)}</strong><small>{h(description)}</small></span></label>'
-                )
-            else:
-                choices.append(f'<label class="wpo-v28-option unavailable"><input type="checkbox" disabled>'
-                               f'<span class="wpo-v28-radio">—</span><span><strong>{h(title)}</strong>'
-                               '<small>Сначала добавьте подключение в разделе «Подключения»</small></span></label>')
+        conn = next((item for item in valid if item.get("protocol") == protocol), None)
+        if conn:
+            cid = str(conn.get("id", ""))
+            if not (3 <= len(cid) <= 64):
+                continue
+            native = protocol not in VPN_SUPPORTED
+            subtitle = description + (" · только основная нода" if native else " · выбранные ноды")
+            choices.append(
+                f'<label class="wpo-v28-option"><input class="wpo-v28-protocol" type="checkbox" '
+                f'name="connection_{h(cid)}" value="1" data-connection-id="{h(cid)}" '
+                f'data-protocol="{h(protocol)}" data-label="{h(title)}" '
+                f'{"checked" if not native else ""}><span class="wpo-v28-radio">✓</span>'
+                f'<span><strong>{h(title)}</strong><small>{h(subtitle)}</small></span></label>'
+            )
         else:
             choices.append(
-                f'<label class="wpo-v28-option unavailable" title="Протокол ещё не поддерживается удалёнными нодами">'
-                '<input type="checkbox" disabled><span class="wpo-v28-radio">—</span><span>'
-                f'<strong>{h(title)}</strong><small>{h(description)} · подключим следующим этапом</small>'
-                '</span></label>'
+                f'<label class="wpo-v28-option unavailable"><input type="checkbox" disabled>'
+                f'<span class="wpo-v28-radio">—</span><span><strong>{h(title)}</strong>'
+                '<small>Сначала добавьте подключение в разделе «Подключения»</small></span></label>'
             )
     location = local if isinstance(local, dict) else {}
     local_label = str(location.get("name") or location.get("country_name") or "Основная нода")
@@ -105,6 +102,8 @@ def form(path, csrf, connections, nodes=None, local=None):
         f'<input type="hidden" name="csrf" value="{h(csrf)}">'
         '<div id="createError" class="create-error" role="alert" hidden></div>'
         '<input type="hidden" id="accountKind" name="kind" value="subscription">'
+        '<input type="hidden" id="wpoV28DirectConnection" name="connection_id" value="">'
+        '<input type="hidden" id="wpoV28DirectDevices" name="direct_devices" value="1">'
         '<input type="hidden" name="nodes_selector_present" value="1">'
         '<input type="hidden" name="expires_at" id="wpoV28Expiry" value="0">'
         '<label for="accountName" class="wpo-v28-label">Имя конфигурации</label>'
@@ -131,7 +130,8 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<div class="wpo-v28-grid">' + "".join(node_cards) + '</div></div>'
         '<div class="wpo-v28-section"><h3>Протоколы</h3><p>Happ и остальные поддерживаемые приложения</p>'
         '<div id="subscriptionConnections" class="wpo-v28-grid">' + "".join(choices) +
-        '</div></div></section>'
+        '</div><p>Happ объединяет выбранные ноды. Telegram, Amnezia, Naive и Mieru '
+        'пока создаются отдельным подключением на основной ноде.</p></div></section>'
         + hidden_compat +
         '<div class="create-summary"><span>Будет создано</span>'
         '<b id="createSummary">Подписка для Happ</b><small id="wpoV28Count"></small></div>'
