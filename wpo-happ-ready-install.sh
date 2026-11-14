@@ -97,11 +97,21 @@ User=root
 Group=root
 UMask=0077
 ExecStart=/usr/bin/python3 /opt/tproxy-panel/wpo_happ_preparer.py
+TimeoutStartSec=240
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ProtectSystem=strict
 ReadWritePaths=/var/lib/tproxy-panel /run/lock
+UNIT
+cat >/etc/systemd/system/wpo-happ-prepare.path <<'UNIT'
+[Unit]
+Description=Prepare WPO remote VPN profiles when subscriptions change
+[Path]
+PathChanged=/etc/web-proxy-panel/users.json
+Unit=wpo-happ-prepare.service
+[Install]
+WantedBy=multi-user.target
 UNIT
 cat >/etc/systemd/system/wpo-happ-prepare.timer <<'UNIT'
 [Unit]
@@ -116,9 +126,9 @@ Unit=wpo-happ-prepare.service
 [Install]
 WantedBy=timers.target
 UNIT
-chmod 0644 /etc/systemd/system/wpo-happ-prepare.service /etc/systemd/system/wpo-happ-prepare.timer
+chmod 0644 /etc/systemd/system/wpo-happ-prepare.service /etc/systemd/system/wpo-happ-prepare.timer /etc/systemd/system/wpo-happ-prepare.path
 systemctl daemon-reload
-systemctl enable --now wpo-happ-prepare.timer
+systemctl enable --now wpo-happ-prepare.path wpo-happ-prepare.timer
 echo '✓ Автоматическая подготовка дополнительных нод включена.'
 echo '=== Подготовка VPN-профилей существующих подписок ==='
 if python3 "$APP/wpo_happ_preparer.py"; then
