@@ -29,7 +29,9 @@ cleanup(){
   exit "$rc"
 }
 trap cleanup EXIT
-URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/test/wpo-smooth-progress-v1/wpo_user_v28.py"
+# Fetch an immutable commit, not a branch-ref URL that can be cached by the CDN.
+MODULE_COMMIT=ebe8f35d32a407dcb8b62792f5d3d7c3dfcda7ee
+URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${MODULE_COMMIT}/wpo_user_v28.py"
 curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
   --connect-timeout 15 --max-time 90 "$URL" -o "$TMP/new.py"
 python3 -m py_compile "$TMP/new.py"
@@ -50,6 +52,12 @@ required=[
     "refreshLiveClock();",
     "const calendar=document.getElementById('wpoV28Calendar');",
     'id="wpoV28DayGrid"',
+    "highlightedDate=new Date(current.getFullYear(),current.getMonth(),current.getDate());",
+    "calendar.querySelectorAll('[data-wpo-months],[data-wpo-2099]').forEach(button=>{",
+    "button.classList.remove('is-selected');",
+    "button.setAttribute('aria-pressed','false');",
+    "font-weight:700;opacity:1!important",
+    "for m in (1, 3, 6, 9, 12))",
 ]
 for token in required:
     if token not in src:
@@ -95,7 +103,11 @@ assert 'id="wpoV28Now"' in html
 assert 'viewYear=current.getFullYear();' in html
 assert 'viewMonth=current.getMonth();' in html
 assert 'button[data-wpo-2099].is-selected' in html
-print('✓ Установленный модуль выдаёт Home VPN')
+assert "highlightedDate=new Date(current.getFullYear(),current.getMonth(),current.getDate());" in html
+assert "button.classList.remove('is-selected');" in html
+assert "button.setAttribute('aria-pressed','false');" in html
+assert "font-weight:700;opacity:1!important" in html
+print('✓ Установлен календарь: повторное открытие — сегодня, без активного периода')
 PY_TEST
 systemctl restart "$SERVICE"
 PANEL_PATH="$(sed -n 's/^Environment=WEBPROXY_PANEL_PATH=//p' /etc/systemd/system/tproxy-panel.service | head -n1)"
@@ -114,9 +126,12 @@ for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
   sleep 1
 done
 (( OK == 1 )) || { echo 'Панель не ответила после перезапуска.' >&2; exit 3; }
+cmp -s "$TMP/new.py" "$MODULE" || { echo 'Загруженный модуль не совпал с установленным.' >&2; exit 3; }
 SAVED=0
 echo '✓ WPO перезапущена, новая форма установлена и проверена.'
+echo "✓ Календарь, версия: ${MODULE_COMMIT}"
 echo '✓ Подсказка: Например, Home VPN'
 echo '✓ Календарь открывается на текущем месяце и показывает живые дату/время.'
-echo '✓ «До 2099» подсвечивается только при выборе.'
+echo '✓ При повторном открытии видны текущий месяц, красная рамка сегодня и неактивные кнопки периодов.'
+echo '✓ Выбранная дата окончания сохраняется; быстрые сроки закрывают календарь.'
 echo 'Закройте старую вкладку панели, откройте её заново и нажмите «Новый пользователь».'
