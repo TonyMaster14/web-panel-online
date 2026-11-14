@@ -109,14 +109,19 @@ class RelayBootstrapRegression(unittest.TestCase):
                                 break
                     except (OSError,ValueError):
                         time.sleep(.12)
-                if not success:
-                    self.fail("Real precompiled WEB relay did not start with "
-                              "the installer bootstrap: "+str(process.poll()))
+                exit_code=process.poll()
             finally:
-                process.terminate()
-                try: process.communicate(timeout=3)
+                if process.poll() is None:
+                    process.terminate()
+                try: stdout,stderr=process.communicate(timeout=3)
                 except subprocess.TimeoutExpired:
-                    process.kill();process.communicate(timeout=3)
+                    process.kill()
+                    stdout,stderr=process.communicate(timeout=3)
+            if not success:
+                self.fail("Real precompiled WEB relay did not start with "
+                          "the installer bootstrap (exit "+str(exit_code)+"): "
+                          +stderr.decode("utf-8","replace")[-1500:]
+                          +stdout.decode("utf-8","replace")[-1500:])
 
     def test_repeated_initialization_keeps_bootstrap_credential(self):
         self.run_bootstrap()
