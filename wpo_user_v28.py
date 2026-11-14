@@ -12,8 +12,8 @@ import json
 CATALOG = (
     ("vless", "VLESS XHTTP", "Happ · HTTPS 443", "happ"),
     ("hysteria", "Hysteria2", "Happ · QUIC/UDP 8443", "happ"),
-    ("web", "WEB Proxy", "Telegram · отдельная ссылка", "telegram"),
-    ("mtproto", "MTProto", "Telegram · отдельная ссылка", "telegram"),
+    ("web", "WEB Proxy", "Telegram", "telegram"),
+    ("mtproto", "MTProto", "Telegram", "telegram"),
     ("awg20", "AmneziaWG 2.0", "Amnezia · конфигурация", "amnezia"),
     ("awg31", "AmneziaWG 3.1", "Amnezia · конфигурация", "amnezia"),
     ("naive", "NaiveProxy", "Naive · отдельный профиль", "other"),
@@ -45,7 +45,7 @@ def form(path, csrf, connections, nodes=None, local=None):
             if not (3 <= len(cid) <= 64):
                 continue
             native = protocol not in VPN_SUPPORTED
-            subtitle = description + (" · одна выбранная нода" if native else " · выбранные ноды")
+            subtitle = "Telegram" if protocol in ("web", "mtproto") else description + (" · одна выбранная нода" if native else " · выбранные ноды")
             choices.append(
                 f'<label class="wpo-v28-option"><input class="wpo-v28-protocol" type="checkbox" '
                 f'name="connection_{h(cid)}" value="1" data-connection-id="{h(cid)}" '
