@@ -369,7 +369,12 @@ def links(entry, settings):
                            "filename": "WPO-" + protocol + "-" + record["id"] + ".conf"})
         elif protocol in ("naive", "mieru"):
             connection = GROUPED_CONNECTIONS[protocol]
-            link = extras.client_link(record, connection, domain, name)
+            # Mieru's *official* application imports a full protobuf
+            # ClientConfig via mieru://. The shorter mierus:// form is for
+            # Shadowrocket and cannot initialize the native Mieru CLI.
+            link = (extras.native_client_link(record, connection, domain)
+                    if protocol == "mieru" else
+                    extras.client_link(record, connection, domain, name))
             result.append({"protocol": protocol, "link": link})
     return result
 
