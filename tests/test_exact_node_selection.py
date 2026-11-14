@@ -48,6 +48,20 @@ class ExactNodeSelection(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"Nodes Lab"):
             patch.patch_panel(base)
 
+    def test_eight_engine_enrollment_token_last_two_hours(self):
+        source=installed_panel().replace(
+            "def traffic():",
+            'def test_bootstrap_ttl():\n'
+            '    if path==PANEL_PATH+"/node-bootstrap":\n'
+            '        pending={"expires_at":now+900}\n'
+            '        answer={"expires_in":900}\n'
+            'def traffic():',1)
+        result=patch.patch_panel(source)
+        ast.parse(result)
+        self.assertIn('"expires_at":now+7200',result)
+        self.assertIn('"expires_in":7200',result)
+        self.assertNotIn('"expires_at":now+900',result)
+
     def test_validation_rejects_unsaved_node_ids(self):
         with self.assertRaisesRegex(ValueError,"persist"):
             patch.verify_subscriptions('def mutate(data, request): pass')
