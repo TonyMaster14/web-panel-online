@@ -317,7 +317,19 @@ bash -n "$VPN_SETUP"
 WPO_NODE_VPN_REF='test/wpo-smooth-progress-v1' bash "$VPN_SETUP"
 rm -f -- "$VPN_SETUP"
 trap fail ERR
-report registration 'VPN и HTTPS готовы. Регистрация в основной панели.'
+# All eight server engines are mandatory: do NOT enroll a partly provisioned
+# node. Install MTProxy/WEB relay, AWG 2/3, Naive and Mieru automatically.
+report installing 'Установка всех 8 VPN-протоколов на ноду.'
+EIGHT_SETUP="$(mktemp /tmp/wpo-node-eight.XXXXXXXX.sh)"
+trap 'rm -f -- "${EIGHT_SETUP:-}" "${VPN_SETUP:-}"' EXIT
+curl -4fsSL --proto '=https' --proto-redir '=https' \
+    --retry 3 --connect-timeout 15 --max-time 90 \
+    'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/test/wpo-smooth-progress-v1/wpo-node-eight-enable.sh' \
+    -o "$EIGHT_SETUP"
+bash -n "$EIGHT_SETUP"
+WPO_NODE_VPN_REF='test/wpo-smooth-progress-v1' bash "$EIGHT_SETUP"
+rm -f -- "$EIGHT_SETUP"
+report registration 'Все 8 протоколов и HTTPS готовы. Регистрация ноды в панели.'
 if ENROLL_RESULT="$(python3 - "$ENROLL_URL" "$TOKEN" "$DOMAIN" "$API_KEY" <<'PY_ENROLL'
 import json,sys,urllib.request,urllib.error
 url,token,domain,key=sys.argv[1:]
