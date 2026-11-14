@@ -45,7 +45,7 @@ def form(path, csrf, connections, nodes=None, local=None):
             if not (3 <= len(cid) <= 64):
                 continue
             native = protocol not in VPN_SUPPORTED
-            subtitle = description + (" · только основная нода" if native else " · выбранные ноды")
+            subtitle = description + (" · одна выбранная нода" if native else " · выбранные ноды")
             choices.append(
                 f'<label class="wpo-v28-option"><input class="wpo-v28-protocol" type="checkbox" '
                 f'name="connection_{h(cid)}" value="1" data-connection-id="{h(cid)}" '
@@ -131,8 +131,8 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<div class="wpo-v28-section"><h3>Протоколы</h3><p>Happ и остальные поддерживаемые приложения</p>'
         '<div id="subscriptionConnections" class="wpo-v28-grid">' + "".join(choices) +
         '</div><p>Happ объединяет выбранные ноды. Telegram, Amnezia, Naive и Mieru '
-        'пока создаются отдельным подключением на основной ноде. Для этих отдельных '
-        'профилей срок действия пока не применяется автоматически.</p></div></section>'
+        'создаются отдельными профилями на одной выбранной ноде. '
+        'Лимит срока для отдельных профилей пока нужно проверять отдельно.</p></div></section>'
         + hidden_compat +
         '<div class="create-summary"><span>Будет создано</span>'
         '<b id="createSummary">Подписка для Happ</b><small id="wpoV28Count"></small></div>'
@@ -198,9 +198,9 @@ function choice(){
 function summary(){
  const {selected,native,checkedNodes}=choice();
  const text=native.length
-   ? (native.length===1&&selected.length===1&&checkedNodes.length===1&&checkedNodes[0].name==='node_local'
-      ? '1 отдельный профиль · основная нода · '+native[0].dataset.label
-      : 'Отдельные протоколы создаются только по одному на основной ноде')
+   ? (native.length===1&&selected.length===1&&checkedNodes.length===1
+      ? '1 отдельный профиль · выбранная нода · '+native[0].dataset.label
+      : 'Отдельные протоколы создаются по одному на выбранной ноде')
    : checkedNodes.length+' нод × '+selected.length+' протокола = '+(checkedNodes.length*selected.length)+' подключений Happ';
  document.getElementById('wpoV28Count').textContent=text;
  document.getElementById('createSummary').textContent=native.length?'Отдельная конфигурация':'Подписка для Happ';
@@ -222,8 +222,8 @@ const devices=document.getElementById('wpoV28DirectDevices');
 let message='';
 if(!selected.length) message='Выберите хотя бы один доступный протокол.';
 else if(!checkedNodes.length) message='Выберите хотя бы одну доступную ноду.';
-else if(native.length && (selected.length!==1||checkedNodes.length!==1||checkedNodes[0].name!=='node_local'))
-  message='WEB Proxy, Telegram, Amnezia, Naive и Mieru сейчас создаются отдельным профилем только на основной ноде. Для Happ выбирайте VLESS и Hysteria2.';
+else if(native.length && (selected.length!==1||checkedNodes.length!==1))
+  message='WEB Proxy, Telegram, Amnezia, Naive и Mieru создаются по одному на одной ноде. Для общей подписки Happ выберите VLESS или Hysteria2.';
 else if(!Number(expiry.value)) message='Выберите будущую дату окончания.';
 else if(!Number.isFinite(traffic)||traffic!==0)
   message='Общий лимит трафика пока не активирован. Укажите 0 ГБ.';
