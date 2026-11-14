@@ -27,7 +27,7 @@ import wpo_happ_async_feed as feed
 USERS=Path("/etc/web-proxy-panel/users.json")
 NODES=Path("/var/lib/tproxy-panel/nodes.json")
 READY=Path("/var/lib/tproxy-panel/happ-node-ready.json")
-RECHECK_AFTER=12*3600
+RECHECK_AFTER=600
 MAX_IDENTITIES=2000
 
 def domain():
