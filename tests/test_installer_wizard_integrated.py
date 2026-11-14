@@ -63,7 +63,7 @@ def run_case(case):
         (directory / "wpp_subscriptions.py").write_text("# mock dependency\n", encoding="utf-8")
 
         master, slave = pty.openpty()
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 38, 90, 0, 0))
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 38, 130, 0, 0))
         env = dict(os.environ, TERM="xterm-256color", WPO_TEST_CASE=case)
         process = subprocess.Popen(
             ["bash", str(directory / "install.sh")],
