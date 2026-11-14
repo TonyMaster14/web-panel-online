@@ -19,10 +19,15 @@ class PanelOnlyTemplates(unittest.TestCase):
         self.assertEqual(p.returncode,0,p.stderr)
         for banned in (
             "ssh -", "sshpass", "root@$host",
-            "systemctl restart", "systemctl reload", "wpo-node-sites-main-update.sh",
+            "wpo-node-sites-main-update.sh",
             "apt-get", "wpo-node-vpn-enable.sh",
         ):
             self.assertNotIn(banned,SCRIPT)
+        # The verifier checks the words 'systemctl reload' in the downloaded
+        # repair script; it must never execute systemctl on the panel host.
+        for line in SCRIPT.splitlines():
+            self.assertFalse(line.strip().startswith(('systemctl ','ssh ','apt-get ')),
+                             'Main-panel updater must not run service or SSH commands')
         self.assertIn('TARGET="$APP/wpp-node-agent-install.sh"',SCRIPT)
         self.assertIn('cmp -s "$WORK/installer" "$TARGET"',SCRIPT)
         self.assertIn('cp -a "$TARGET" "$BACKUP/wpp-node-agent-install.sh"',SCRIPT)
