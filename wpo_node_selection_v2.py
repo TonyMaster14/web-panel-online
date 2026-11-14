@@ -92,9 +92,11 @@ def patch_panel(source):
     body, after = remainder.split(NEXT_METHOD,1)
     if MARKER in body:
         return source
-    if body.count(BEGIN)!=1 or body.count(END)!=1:
+    # The handler has a first labels assignment for HTML/QR dashboard;
+    # replace only the second assignment in its VPN feed branch.
+    if body.count(BEGIN)<2 or body.count(END)!=1:
         raise ValueError("Unexpected subscription body: cannot safely patch")
-    prefix, remainder = body.split(BEGIN,1)
+    prefix, remainder = body.rsplit(BEGIN,1)
     old_block, suffix = remainder.split(END,1)
     if "node_api.sync_profile(" not in old_block:
         raise ValueError("Controller lacks the federation sync bridge")
