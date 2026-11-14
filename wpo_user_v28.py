@@ -320,62 +320,62 @@ const dt=document.getElementById('wpoV28Date');
 const expiry=document.getElementById('wpoV28Expiry');
 const display=document.getElementById('wpoV28DateDisplay');
 const calendar=document.getElementById('wpoV28Calendar');
+const toggle=document.getElementById('wpoV28CalendarToggle');
+const popover=document.getElementById('wpoV28CalendarBody');
 const grid=document.getElementById('wpoV28DayGrid');
 const monthSelect=document.getElementById('wpoV28Month');
 const yearSelect=document.getElementById('wpoV28Year');
-const hourSelect=document.getElementById('wpoV28Hour');
-const minuteSelect=document.getElementById('wpoV28Minute');
-const apply=document.getElementById('wpoV28Apply');
-if(!f||!dt||!expiry||!calendar||!grid||!monthSelect||!yearSelect||!hourSelect||!minuteSelect)return;
-const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Локальное время браузера';
+if(!f||!dt||!expiry||!calendar||!toggle||!popover||!grid||!monthSelect||!yearSelect)return;
+const tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'Локальное время';
 const zoneLabel=document.getElementById('wpoV28TimeZone');
-zoneLabel.textContent=tz;
+if(zoneLabel)zoneLabel.textContent='Часовой пояс: '+tz;
 const now=()=>new Date();
 const pad=n=>String(n).padStart(2,'0');
-const fmt=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
 const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+const atEndOfDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,0,0);
 let selected=null;
 let viewYear=now().getFullYear();
 let viewMonth=now().getMonth();
 function addMonths(base,count){
-  const result=new Date(base.getFullYear(),base.getMonth()+count,1,base.getHours(),base.getMinutes(),0,0);
+  const result=new Date(base.getFullYear(),base.getMonth()+count,1);
   result.setDate(Math.min(base.getDate(),new Date(result.getFullYear(),result.getMonth()+1,0).getDate()));
+  if(result.getFullYear()>2099)return new Date(2099,11,31);
   return result;
 }
-function formatSelected(d){
-  return d.toLocaleString(undefined,{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-function refreshClock(){
-  const clock=document.getElementById('wpoV28CurrentDateTime');
-  if(clock)clock.textContent=now().toLocaleString(undefined,{
-    day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'
-  });
-}
 function validDate(d){
-  const current=now();
   return d instanceof Date&&Number.isFinite(d.getTime())&&
-    d.getTime()>current.getTime()+59000&&d.getFullYear()>=current.getFullYear()&&
-    d.getFullYear()<=2099;
+    d.getTime()>now().getTime()+59000&&d.getFullYear()<=2099;
 }
 function syncDate(){
-  if(!selected){expiry.value='0';display.textContent='Выберите дату окончания';apply.disabled=true;return;}
   const good=validDate(selected);
-  dt.value=fmt(selected);
+  dt.value=good?selected.getFullYear()+'-'+pad(selected.getMonth()+1)+'-'+pad(selected.getDate()):'';
   expiry.value=good?String(Math.floor(selected.getTime()/1000)):'0';
-  display.textContent=good?formatSelected(selected):'Выберите будущую дату и время';
+  display.textContent=good?selected.toLocaleDateString(undefined,{
+    year:'numeric',month:'long',day:'numeric'
+  }):'Выберите будущую дату';
   display.style.color=good?'':'var(--red)';
-  apply.disabled=!good;
-  hourSelect.value=String(selected.getHours());
-  minuteSelect.value=String(selected.getMinutes());
 }
-function setDate(d,preset=0){
-  selected=d;
-  viewYear=d.getFullYear();
-  viewMonth=d.getMonth();
+function closeCalendar(){
+  popover.hidden=true;
+  toggle.setAttribute('aria-expanded','false');
+  calendar.classList.remove('is-open');
+}
+function openCalendar(){
+  renderCalendar();
+  popover.hidden=false;
+  toggle.setAttribute('aria-expanded','true');
+  calendar.classList.add('is-open');
+}
+function chooseDate(date,preset=''){
+  selected=atEndOfDay(date);
+  viewYear=selected.getFullYear();
+  viewMonth=selected.getMonth();
   syncDate();
-  document.querySelectorAll('[data-wpo-months]').forEach(button=>{
-    button.classList.toggle('is-selected',Number(button.dataset.wpoMonths)===preset);
-    button.setAttribute('aria-pressed',String(Number(button.dataset.wpoMonths)===preset));
+  document.querySelectorAll('[data-wpo-months],[data-wpo-2099]').forEach(button=>{
+    const active=button.dataset.wpoMonths===preset||
+      (preset==='2099'&&button.hasAttribute('data-wpo-2099'));
+    button.classList.toggle('is-selected',active);
+    button.setAttribute('aria-pressed',String(active));
   });
   renderCalendar();
 }
@@ -388,12 +388,12 @@ function renderCalendar(){
       yearSelect.appendChild(option);
     }
   }
-  viewYear=Math.max(current.getFullYear(),Math.min(2099,viewYear));
-  monthSelect.value=String(viewMonth);
-  yearSelect.value=String(viewYear);
+  let index=viewYear*12+viewMonth;
   const minIndex=current.getFullYear()*12+current.getMonth();
   const maxIndex=2099*12+11;
-  const index=viewYear*12+viewMonth;
+  index=Math.max(minIndex,Math.min(maxIndex,index));
+  viewYear=Math.floor(index/12);viewMonth=index%12;
+  monthSelect.value=String(viewMonth);yearSelect.value=String(viewYear);
   document.getElementById('wpoV28PrevMonth').disabled=index<=minIndex;
   document.getElementById('wpoV28NextMonth').disabled=index>=maxIndex;
   grid.replaceChildren();
@@ -408,72 +408,59 @@ function renderCalendar(){
     const button=document.createElement('button');
     button.type='button';button.textContent=String(day);
     const date=new Date(viewYear,viewMonth,day);
-    const endOfDay=new Date(viewYear,viewMonth,day,23,59,59,999);
-    button.disabled=endOfDay.getTime()<=current.getTime();
+    const end=atEndOfDay(date);
+    button.disabled=end.getTime()<=current.getTime()+59000;
     button.classList.toggle('is-today',sameDay(date,current));
     button.classList.toggle('is-selected',selected!==null&&sameDay(date,selected));
     button.setAttribute('aria-pressed',String(selected!==null&&sameDay(date,selected)));
     button.setAttribute('aria-label',date.toLocaleDateString(undefined,{
       weekday:'long',day:'numeric',month:'long',year:'numeric'
     }));
-    button.addEventListener('click',()=>{
-      let d=new Date(viewYear,viewMonth,day,
-        selected?selected.getHours():current.getHours(),
-        selected?selected.getMinutes():current.getMinutes(),0,0);
-      if(d.getTime()<=now().getTime()+59000){
-        const next=now();next.setMinutes(next.getMinutes()+2,0,0);
-        d=next;
-      }
-      setDate(d);
-      // Selecting a day completes the choice: collapse the calendar.
-      if(expiry.value!=='0')calendar.open=false;
+    button.addEventListener('click',event=>{
+      event.preventDefault();
+      chooseDate(date);
+      if(expiry.value!=='0')closeCalendar();
     });
     grid.appendChild(button);
   }
 }
 function changeMonth(direction){
   const index=viewYear*12+viewMonth+direction;
-  const min=now().getFullYear()*12+now().getMonth();
+  const current=now();
+  const min=current.getFullYear()*12+current.getMonth();
   if(index<min||index>2099*12+11)return;
-  viewYear=Math.floor(index/12);
-  viewMonth=index%12;
+  viewYear=Math.floor(index/12);viewMonth=index%12;
   renderCalendar();
 }
+toggle.addEventListener('click',event=>{
+  event.preventDefault();
+  event.stopPropagation();
+  if(popover.hidden)openCalendar();
+  else closeCalendar();
+});
 document.getElementById('wpoV28PrevMonth').addEventListener('click',()=>changeMonth(-1));
 document.getElementById('wpoV28NextMonth').addEventListener('click',()=>changeMonth(1));
 monthSelect.addEventListener('change',()=>{viewMonth=Number(monthSelect.value);renderCalendar();});
 yearSelect.addEventListener('change',()=>{viewYear=Number(yearSelect.value);renderCalendar();});
-function changeTime(){
-  if(!selected)return;
-  const d=new Date(selected.getFullYear(),selected.getMonth(),selected.getDate(),
-    Number(hourSelect.value),Number(minuteSelect.value),0,0);
-  setDate(d);
-}
-hourSelect.addEventListener('change',changeTime);
-minuteSelect.addEventListener('change',changeTime);
-document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',()=>{
-  setDate(addMonths(now(),Number(button.dataset.wpoMonths)),Number(button.dataset.wpoMonths));
-  // Quick month selection also closes the popover.
-  if(expiry.value!=='0')calendar.open=false;
+document.querySelectorAll('[data-wpo-months]').forEach(button=>button.addEventListener('click',event=>{
+  event.preventDefault();
+  chooseDate(addMonths(now(),Number(button.dataset.wpoMonths)),button.dataset.wpoMonths);
+  if(expiry.value!=='0')closeCalendar();
 }));
-document.getElementById('wpoV28Today').addEventListener('click',()=>{
-  const d=now();d.setHours(d.getHours()+1,0,0,0);
-  setDate(d);
+document.getElementById('wpoV28Until2099').addEventListener('click',event=>{
+  event.preventDefault();
+  chooseDate(new Date(2099,11,31),'2099');
+  closeCalendar();
 });
-apply.addEventListener('click',()=>{
-  syncDate();
-  if(expiry.value!=='0')calendar.open=false;
+document.addEventListener('pointerdown',event=>{
+  if(!popover.hidden&&!calendar.contains(event.target))closeCalendar();
 });
-calendar.addEventListener('toggle',()=>{if(calendar.open){refreshClock();renderCalendar();}});
-document.addEventListener('click',e=>{
-  if(calendar.open&&!calendar.contains(e.target))calendar.open=false;
-});
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'&&calendar.open){
-    e.preventDefault();e.stopPropagation();calendar.open=false;
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&!popover.hidden){
+    event.preventDefault();event.stopPropagation();closeCalendar();toggle.focus();
   }
 });
-setInterval(refreshClock,1000);
+document.getElementById('createAccount')?.addEventListener('close',closeCalendar);
 function choice(){
   const selectedProtocols=[...f.querySelectorAll('.wpo-v28-protocol:checked')];
   const native=selectedProtocols.filter(el=>!['vless','hysteria'].includes(el.dataset.protocol));
@@ -493,8 +480,8 @@ function summary(){
 f.addEventListener('change',()=>queueMicrotask(summary));
 f.addEventListener('input',()=>queueMicrotask(summary));
 document.getElementById('newAccount')?.addEventListener('click',()=>{
-  calendar.open=false;
-  setDate(addMonths(now(),1),1);
+  closeCalendar();
+  chooseDate(addMonths(now(),1),'1');
   queueMicrotask(summary);
 });
 document.addEventListener('submit',e=>{
@@ -528,8 +515,8 @@ document.addEventListener('submit',e=>{
     connection.value='';
   }
 },true);
-refreshClock();
-setDate(addMonths(now(),1),1);
+closeCalendar();
+chooseDate(addMonths(now(),1),'1');
 summary();
 })();"""
 
