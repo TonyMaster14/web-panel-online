@@ -206,3 +206,85 @@ const message=!protocols?'Выберите хотя бы один доступн
 if(message){e.preventDefault();e.stopImmediatePropagation();err.textContent=message;err.hidden=false;}},true);
 setDate(new Date(current().getTime()+30*86400000));summary();
 })();"""
+
+
+# The old Clients JS assumes the "one key / subscription" wizard and its
+# removed CDN/MTProto fields. Running that code against the new form breaks
+# event registration BEFORE the Create button is usable. Replace only the
+# obsolete wizard section while preserving client edit, QR and delete actions.
+LEGACY_CREATE_JS = r"""
+const createDialog=document.getElementById('createAccount');
+const createForm=document.getElementById('createClientForm');
+const createError=document.getElementById('createError');
+const createSubmit=document.getElementById('createClientSubmit');
+const openCreate=document.getElementById('newAccount');
+function showCreateError(message){
+  createError.textContent=message||'Не удалось создать пользователя.';
+  createError.hidden=false;
+  createError.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+openCreate.addEventListener('click',()=>{
+  createForm.reset();
+  createError.hidden=true;
+  // Reapply an actual current date after the reset, not a stale default.
+  document.querySelector('[data-wpo-months="1"]')?.click();
+  document.getElementById('wpoV28Count')?.replaceChildren();
+  createDialog.showModal();
+  setTimeout(()=>document.getElementById('accountName').focus(),30);
+});
+createForm.querySelectorAll('[data-close-dialog]').forEach(button=>
+  button.addEventListener('click',()=>createDialog.close()));
+document.querySelectorAll('[data-open-client]').forEach(button=>
+  button.addEventListener('click',()=>document.getElementById('client-'+button.dataset.openClient).showModal()));
+createForm.addEventListener('input',()=>{createError.hidden=true;});
+createForm.addEventListener('submit',async event=>{
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const chosen=createForm.querySelectorAll('.wpo-v28-protocol:checked').length;
+  const nodes=createForm.querySelectorAll('.wpo-v28-node input:checked').length;
+  const expiry=Number(document.getElementById('wpoV28Expiry').value);
+  const traffic=Number(document.getElementById('wpoV28Traffic').value);
+  if(!chosen){showCreateError('Выберите хотя бы один доступный протокол.');return;}
+  if(!nodes){showCreateError('Выберите хотя бы одну ноду.');return;}
+  if(!expiry || expiry<=Math.floor(Date.now()/1000)+59){
+    showCreateError('Укажите будущую дату окончания.');return;
+  }
+  if(!Number.isFinite(traffic)||traffic!==0){
+    showCreateError('Общий лимит трафика пока не готов: укажите 0 ГБ.');return;
+  }
+  createError.hidden=true;
+  createDialog.classList.add('is-submitting');
+  createSubmit.disabled=true;
+  createSubmit.textContent='Создаём…';
+  try{
+    const response=await fetch(createForm.action,{
+      method:'POST',headers:{'X-WPP-Async':'1'},
+      body:new URLSearchParams(new FormData(createForm))
+    });
+    if(response.redirected)throw Error('Сессия завершена. Войдите снова.');
+    let result;
+    try{result=await response.json();}
+    catch(_){throw Error('Панель вернула некорректный ответ.');}
+    if(!response.ok||!result.ok)throw Error(result.message||'Не удалось создать пользователя.');
+    location.href=clientPath+'/users';
+  }catch(error){showCreateError(error.message);}
+  finally{
+    createDialog.classList.remove('is-submitting');
+    createSubmit.disabled=false;
+    createSubmit.textContent='Создать пользователя';
+  }
+},true);
+"""
+
+
+def replace_legacy_create_js(source):
+    """Keep every other WPO client-page action and use only the new form JS."""
+    start_token = "const createDialog=document.getElementById('createAccount')"
+    end_token = "async function requestClient(fields)"
+    if source.count(start_token) != 1 or source.count(end_token) != 1:
+        raise ValueError("The WPO Clients JS changed; refusing partial UI patch")
+    start = source.index(start_token)
+    end = source.index(end_token)
+    if end <= start:
+        raise ValueError("Old wizard boundaries are reversed")
+    return source[:start] + LEGACY_CREATE_JS + "\n" + source[end:]
