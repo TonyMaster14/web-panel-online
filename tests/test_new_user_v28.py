@@ -223,6 +223,30 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn('color:#fff!important;opacity:1!important',css)
         self.assertIn('#subscriptionFields .unavailable{opacity:1',css)
 
+    def test_calendar_opens_on_current_month_not_default_expiry_month(self):
+        # A subscription expires in December after the default +1 month,
+        # but on November 14 the calendar must first show NOVEMBER 14, today.
+        script=wpo_user_v28.SCRIPT
+        self.assertIn("function openCalendar(){",script)
+        self.assertIn("const current=now();\n  viewYear=current.getFullYear();\n  viewMonth=current.getMonth();\n  refreshLiveClock();\n  renderCalendar();",script)
+        self.assertIn("selected=atEndOfDay(date);",script)
+        self.assertIn("document.getElementById('wpoV28Now')",script)
+        self.assertIn("setInterval(()=>{",script)
+        self.assertIn("day===current.getDate()",script)
+        self.assertIn("now().toLocaleString('ru-RU'",script)
+        self.assertIn("id=\"wpoV28Now\"",self.html)
+        self.assertIn("Текущие дата и время",self.html)
+        self.assertIn("id=\"wpoV28TimeZone\"",self.html)
+        self.assertNotIn("Время окончания",self.html)
+
+    def test_until_2099_button_only_accented_when_selected(self):
+        css=wpo_user_v28.STYLE
+        self.assertIn("button[data-wpo-2099]{font-weight:600;margin-top:6px;border:1px solid var(--line)}",css)
+        self.assertIn("button[data-wpo-2099].is-selected{background:var(--tint);color:var(--accent);border-color:var(--accent)}",css)
+        self.assertNotIn("button[data-wpo-2099]{font-weight:700;margin-top:6px;border:1px solid var(--accent)}",css)
+        self.assertIn("button.classList.toggle('is-selected',active)",wpo_user_v28.SCRIPT)
+        self.assertIn("chooseDate(new Date(2099,11,31),'2099');",wpo_user_v28.SCRIPT)
+
     def test_selected_node_and_protocol_has_pulsing_green_dot(self):
         self.assertIn('wpo-v28-radio" aria-hidden="true"><i></i>',self.html)
         self.assertIn("background:var(--green)",self.html)
