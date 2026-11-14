@@ -15,7 +15,7 @@ exec 9>/run/lock/web-panel-proxy.lock
 flock -n 9 || { echo 'Уже выполняется обновление WPO.' >&2; exit 2; }
 
 # Both revisions are immutable commits tested in the WPO test branch.
-INSTALL_REV=c339beaa3702af5c48769c688833b09268427b2c
+INSTALL_REV=7ed37e1fb07bacc163f06b68c165846bdafcc062
 ENGINE_REV=c7a026d48cf928b5f10b988199baff433cc36698
 BASE=https://raw.githubusercontent.com/TonyMaster14/web-panel-online
 WORK="$(mktemp -d /tmp/wpo-node-templates.XXXXXXXX)"
@@ -45,6 +45,9 @@ grep -Fq 'bash "$TEMP/site-template-fix.sh"' "$WORK/engines"
 grep -Fq "doc['public_upstream']='http://127.0.0.1:18082'" "$WORK/site"
 grep -Fq 'header Cache-Control "no-store"' "$WORK/site"
 grep -Fq 'systemctl reload caddy.service' "$WORK/site"
+grep -Fq '# wpo-eight-agent-ready-retry-v1:' "$WORK/installer"
+grep -Fq 'http://127.0.0.1:9088/healthz' "$WORK/installer"
+grep -Fq 'journalctl -u wpp-node-agent.service' "$WORK/installer"
 
 # The controller already serves this script from disk for each installer
 # request. Replace just that file; do not restart panel, Xray, Caddy or Happ.
