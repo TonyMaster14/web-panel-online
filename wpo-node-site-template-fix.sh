@@ -74,6 +74,7 @@ if ! grep -Fq '# WPO NODE SITE BRIDGE BEGIN' "$WORK/Caddyfile.next"; then
 :18082 {
     bind 127.0.0.1
     root * /var/www/wpp-node-site
+    header Cache-Control "no-store"
     try_files {path} /index.html
     file_server
 }
