@@ -5186,9 +5186,11 @@ fi
     card_cols="${WPO_CARD_COLUMNS:-80}"
     [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
     (( card_cols < 28 )) && card_cols=28
-    # Expand the whole card to contain the full URL on one line when the
-    # terminal is wide enough; for narrow SSH windows, wrap INSIDE the frame.
-    card_width=${#card_url}
+    # Expand to fit the entire URL on the same line as its label when possible.
+    # Only narrow terminal windows wrap the URL inside both side borders.
+    card_url_label='Ссылка на панель: '
+    card_url_text="${card_url_label}${card_url}"
+    card_width=${#card_url_text}
     (( card_width < 60 )) && card_width=60
     (( card_width > card_cols-6 )) && card_width=$((card_cols-6))
     card_indent=""
@@ -5204,6 +5206,22 @@ fi
         printf -v padding '%*s' "$((card_width-${#text}))" ''
         printf "${card_indent}"'%s│ %s%s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$text" "$link_close$card_reset" "$padding" "$card_blue" "$card_reset"
     }
+    card_url_line(){
+        local remaining="$card_url" chunk padding available
+        available=$((card_width-${#card_url_label}))
+        (( available > 0 )) || return 1
+        chunk="${remaining:0:available}"
+        remaining="${remaining:available}"
+        printf -v padding '%*s' "$((available-${#chunk}))" ''
+        # The prefix stays ice; the whole URL stays cyan on the same line.
+        printf '%s│ %s%s%s%s%s %s│%s\n' \
+            "$card_blue" "$card_label" "$card_url_label" "$card_value" "$chunk" "$card_reset" \
+            "$padding$card_blue" "$card_reset"
+        # Narrow windows wrap only the URL, and only INSIDE the frame.
+        if [[ -n "$remaining" ]]; then
+            card_line "$remaining" "$card_value"
+        fi
+    }
     printf '%s\n'"$card_indent"'%s╭%s╮%s\n' "$card_reset" "$card_blue" "$card_rule" "$card_reset"
     card_line ''
     if [[ "$UPDATING" == 1 ]]; then
@@ -5212,9 +5230,7 @@ fi
         card_line 'WPO 3.0 — УСТАНОВЛЕНО' "$card_bold"
     fi
     card_line ''
-    card_line 'Ссылка на панель:'
-    card_line ''
-    card_line "$card_url" "$card_value"
+    card_url_line
     card_line ''
     card_line "Логин: $ADMIN"
     card_line ''
