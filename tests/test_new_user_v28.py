@@ -96,6 +96,17 @@ class V28ExpiryTests(unittest.TestCase):
                     '# wpo-vpn-controller-v27: no phantom remote connections')
         # Verify the bundled node installer has the required pre-patch anchor.
         self.assertIn('if subscription is None:',p)
+    def test_short_controller_patch_preserves_existing_data_and_can_rollback(self):
+        launcher=(ROOT/"wpo-v28-patch.sh").read_text(encoding="utf-8")
+        for required in ("flock -n 9", "wpo_v28_apply.py", "wpo_user_v28.py",
+                         'ROLLBACK=1', 'ROLLBACK=0',
+                         'cp -a "$BACKUP/panel.py" "$APP/panel.py"',
+                         'cp -a "$BACKUP/wpp_ui.py" "$APP/wpp_ui.py"',
+                         "systemctl restart", "curl -4fsS --max-time 3"):
+            self.assertIn(required,launcher,required)
+        self.assertNotIn("rm -rf /var/lib/tproxy-panel",launcher)
+        self.assertNotIn("web-panel-proxy-uninstall",launcher)
+
     def test_full_install_path_includes_v28_after_v26(self):
         node=(ROOT/"node-install.sh").read_text(encoding="utf-8")
         self.assertIn("python3 \"$PACKAGE_DIR/wpo_v28_apply.py\"",node)
