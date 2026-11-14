@@ -20,22 +20,29 @@ with tempfile.TemporaryDirectory() as folder:
             assert 'Логин: TestAdmin' in text
             assert text.index('Ссылка на панель:')<text.index('Логин:')<text.index('Пароль:')<text.index('Сохраните')
             assert text.index('Ссылка на панель:') < text.index('╰', text.index('WPO 3.0 — '))
-            # An ordinary terminal has a full, uninterrupted URL inside the frame.
-            if width >= len(url)+6:
-                assert url in text, 'Full URL must remain on one row in a wide SSH window'
-                assert any(url in line and line.count('│') == 2 for line in text.splitlines())
-                # Each final-card field is separated by exactly one empty row.
-                rows=text.splitlines()
-                markers=['WPO 3.0 — ', 'Ссылка на панель:', url, 'Логин: TestAdmin',
-                         'Пароль:', 'Сохраните данные, чтобы не потерять!']
-                indices=[next(i for i,row in enumerate(rows) if marker in row) for marker in markers]
+            rows=text.splitlines()
+            linkrow=next(i for i,row in enumerate(rows) if 'Ссылка на панель:' in row)
+            loginrow=next(i for i,row in enumerate(rows) if 'Логин: TestAdmin' in row)
+            passrow=next(i for i,row in enumerate(rows) if 'Пароль:' in row)
+            warningrow=next(i for i,row in enumerate(rows) if 'Сохраните данные' in row)
+            title_row=next(i for i,row in enumerate(rows) if 'WPO 3.0 — ' in row)
+            assert 'Ссылка на панель: https://' in rows[linkrow]
+            # When the terminal can fit label + URL, neither may wrap.
+            if width >= len('Ссылка на панель: ')+len(url)+6:
+                assert url in rows[linkrow] and rows[linkrow].count('│') == 2
+                assert len(rows[linkrow]) == len(rows[0])
+                # Exactly one empty framed row separates every value.
+                indices=[title_row, linkrow, loginrow, passrow, warningrow]
                 assert all(y-x == 2 for x,y in zip(indices,indices[1:])), indices
                 assert all(rows[x+1].startswith('│') and not rows[x+1].strip('│ ')
-                           for x in indices[:-1]), 'Every field gap must be one empty framed row'
-            # Narrow windows split only the text BETWEEN side borders.
-            section=text.split('Ссылка на панель:',1)[1].split('Логин:',1)[0]
-            pieces=[line.split('│',2)[1].strip() for line in section.splitlines() if line.count('│') == 2]
-            assert ''.join(pieces)==url, 'Complete URL must be inside the intact frame'
+                           for x in indices[:-1])
+            # On narrow windows the link is not cut off, and each wrapped
+            # piece remains inside the same two vertical frame borders.
+            pieces=[rows[linkrow].split('Ссылка на панель: ',1)[1].split('│',1)[0].strip()]
+            for row in rows[linkrow+1:loginrow]:
+                if row.count('│') == 2 and row.split('│',2)[1].strip():
+                    pieces.append(row.split('│',2)[1].strip())
+            assert ''.join(pieces)==url, 'Full URL must be preserved in order'
             lines=[line for line in text.splitlines() if line.startswith('│')]
             assert all(line.count('│') == 2 for line in lines)
             assert ('TestSecret123' in text)==(updating=='0')
