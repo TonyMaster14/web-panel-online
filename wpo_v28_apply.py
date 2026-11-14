@@ -34,16 +34,21 @@ def patch_ui(src):
     # Also upgrade an already-installed v28 form. The first revision rendered
     # HTML but kept the old wizard JavaScript, breaking Create in the browser.
     if MARKER in src:
-        if "wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)" in src:
-            return src
-        return swap(src, "client_script=CLIENTS_JS.replace(",
-                   "client_script=wpo_user_v28.replace_legacy_create_js(CLIENTS_JS).replace(",
-                   "replace incompatible old creation JS")
+        if "wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)" not in src:
+            src = swap(src, "client_script=CLIENTS_JS.replace(",
+                       "client_script=wpo_user_v28.replace_legacy_create_js(CLIENTS_JS).replace(",
+                       "replace incompatible old creation JS")
+        src = src.replace("wpo_user_v28.form(path,csrf,subscription_connections,nodes,local_node)",
+                          "wpo_user_v28.form(path,csrf,usable,nodes,local_node)")
+        return src
     src = swap(src, "import json\n", "import json\nimport wpo_user_v28\n", "import user form module")
     src = swap(src, PICKER,
                PICKER + "\n    " + MARKER + "\n"
                + "    creation=wpo_user_v28.form(path,csrf,subscription_connections,nodes,local_node)",
                "insert form after node picker")
+    src = swap(src, "wpo_user_v28.form(path,csrf,subscription_connections,nodes,local_node)",
+               "wpo_user_v28.form(path,csrf,usable,nodes,local_node)",
+               "pass all eight selectable connection templates")
     src = swap(src, '＋ Добавить клиента', '＋ Новый пользователь', "user button label")
     src = swap(src, "client_script=CLIENTS_JS.replace(",
                "client_script=wpo_user_v28.replace_legacy_create_js(CLIENTS_JS).replace(",
