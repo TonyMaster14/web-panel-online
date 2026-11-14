@@ -7,6 +7,7 @@ reconfiguration runs outside the subscription HTTP request; global workers
 are bounded. A remote-only feed with nothing ready must still report pending.
 """
 import concurrent.futures
+import hashlib
 import threading
 import time
 import sys
@@ -81,7 +82,7 @@ def enqueue(api, node, external_id, name, protocols):
     if not node.get("enabled", True):
         return [], False
     protocols = tuple(protocols)
-    key = (str(node.get("id", "")), str(node.get("url", "")), external_id, protocols)
+    key = (str(node.get("id", "")), str(node.get("url", "")),\n           hashlib.sha256(str(node.get("token", "")).encode()).hexdigest(),\n           external_id, protocols)
     now = time.monotonic()
     with LOCK:
         item = CACHE.get(key)
@@ -111,10 +112,48 @@ def enqueue(api, node, external_id, name, protocols):
         return [], True
 
 
+def collect(api, node_items, external_id, protocols, *, grace_seconds=4.5):
+    """Launch all remote setups at once; wait ≤4.5s total, never per server.
+
+    Returns (all verified links in chosen order, number of pending nodes).
+    Even when a remote fails, a local+remote subscription remains importable:
+    the next Happ refresh includes newly verified nodes.
+    """
+    items = [(n, api.location_prefix(n)) for n in node_items]
+    for node,name in items:
+        enqueue(api,node,external_id,name,protocols)
+    deadline=time.monotonic()+max(0.0,min(float(grace_seconds),6.0))
+    while items and time.monotonic()<deadline:
+        with LOCK:
+            keys=[(str(n.get("id","")),str(n.get("url","")),
+                   hashlib.sha256(str(n.get("token","")).encode()).hexdigest(),
+                   external_id,tuple(protocols)) for n,_ in items]
+            if not any(k in PENDING for k in keys):
+                break
+        time.sleep(0.075)
+    links=[]
+    pending=0
+    for node,name in items:
+        batch,waiting=enqueue(api,node,external_id,name,protocols)
+        if batch:
+            links.extend(batch)
+        else:
+            pending+=1
+    return links,pending
+
+
+def invalidate_all():
+    """Invalidate cached credentials after a subscription revocation/update."""
+    with LOCK:
+        CACHE.clear()
+        FAILURES.clear()
+
+
+
 def warm(api, node, external_id, name, protocols):
     """One-time blocking prewarm outside Happ HTTP; uses same verified cache."""
     protocols = tuple(protocols)
-    key = (str(node.get("id", "")), str(node.get("url", "")), external_id, protocols)
+    key = (str(node.get("id", "")), str(node.get("url", "")),\n           hashlib.sha256(str(node.get("token", "")).encode()).hexdigest(),\n           external_id, protocols)
     result = verified_links(api, node, external_id, name, protocols, timeout=90)
     with LOCK:
         CACHE[key] = (time.monotonic() + CACHE_TTL, tuple(result))
