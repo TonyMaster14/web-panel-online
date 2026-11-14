@@ -30,7 +30,8 @@ with tempfile.TemporaryDirectory() as folder:
             # When the terminal can fit label + URL, neither may wrap.
             if width >= len('Ссылка на панель: ')+len(url)+6:
                 assert url in rows[linkrow] and rows[linkrow].count('│') == 2
-                assert len(rows[linkrow]) == len(rows[0])
+                border=next(row for row in rows if row.startswith('╭') and row.endswith('╮'))
+                assert len(rows[linkrow]) == len(border)
                 # Exactly one empty framed row separates every value.
                 indices=[title_row, linkrow, loginrow, passrow, warningrow]
                 assert all(y-x == 2 for x,y in zip(indices,indices[1:])), indices
