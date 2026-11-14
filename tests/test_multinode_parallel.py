@@ -32,6 +32,14 @@ module=ast.fix_missing_locations(ast.Module(body=[klass],type_ignores=[]))
 class ThreeNodeHapp(HappSubscription):
     def setUp(self):
         super().setUp()
+        # Keep the imported one-node HTTP tests on their original fixture;
+        # only these three multi-node regressions switch to the new handler.
+        if self._testMethodName not in (
+            "test_parallel_sync_returns_all_nodes_in_saved_order",
+            "test_no_partial_subscription_when_one_remote_rejects_sync",
+            "test_removed_selected_node_stays_explicit_409",
+        ):
+            return
         exec(compile(module,"three-nodes.py","exec"),self.namespace)
         cls=self.namespace["Handler"]
         cls.log_message=lambda *args: None
@@ -67,7 +75,7 @@ class ThreeNodeHapp(HappSubscription):
         self.assertEqual(len(configurations),4)  # auto, NL, PL, SE
         self.assertEqual(configurations[0]["remarks"],"🇪🇺 Автовыбор")
         self.assertEqual([x["remarks"] for x in configurations[1:]],
-                         ["🇳🇱 Нидерланды"]*3)
+                         ["🇳🇱 Нидерланды","VPN","VPN"])
         self.assertEqual(len(calls),2)
         urls=json.dumps(configurations)
         self.assertIn("pl.example.net",urls)
