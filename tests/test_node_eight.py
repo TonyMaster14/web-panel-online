@@ -36,10 +36,10 @@ class EightEngineTests(unittest.TestCase):
         self.addCleanup(self.cap.stop)
         self.awg = mock.patch.object(engine.awg, "new_user", side_effect=self.fake_awg)
         self.awg.start();self.addCleanup(self.awg.stop)
-        self.fake_xray = mock.patch.object(xray, "apply")
-        self.fake_xray.start();self.addCleanup(self.fake_xray.stop)
-        self.fake_native = mock.patch.object(engine,"native_apply")
-        self.fake_native.start();self.addCleanup(self.fake_native.stop)
+        xp = mock.patch.object(xray, "apply")
+        self.fake_xray=xp.start();self.addCleanup(xp.stop)
+        np = mock.patch.object(engine,"native_apply")
+        self.fake_native=np.start();self.addCleanup(np.stop)
 
     @staticmethod
     def fake_awg(protocol, existing_users, uid):
