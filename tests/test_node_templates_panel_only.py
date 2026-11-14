@@ -37,8 +37,7 @@ class PanelOnlyTemplates(unittest.TestCase):
         self.assertIn("doc['public_upstream']='http://127.0.0.1:18082'",SITE)
         self.assertIn('header Cache-Control "no-store"',SITE)
         self.assertIn('bind 127.0.0.1',SITE)
-        self.assertIn("expected={\\"federation\\",\\"vless\\",\\"hysteria\\"",SCRIPT)
-        self.assertIn('"capabilities":[', INSTALLER) if False else None
+        self.assertIn('expected={"federation","vless","hysteria"',SCRIPT)
 
     def test_main_panel_serves_installer_from_disk(self):
         # No tproxy-panel restart is needed after replacing this source file.
