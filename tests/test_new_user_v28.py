@@ -102,7 +102,10 @@ class V28ExpiryTests(unittest.TestCase):
                          'ROLLBACK=1', 'ROLLBACK=0',
                          'cp -a "$BACKUP/panel.py" "$APP/panel.py"',
                          'cp -a "$BACKUP/wpp_ui.py" "$APP/wpp_ui.py"',
-                         "systemctl restart", "curl -4fsS --max-time 3"):
+                         "systemctl restart", "curl -4fsS --max-time 3",
+                         "wpo-node-agent-install-v2.sh", "wpo-node-controller-vpn.sh",
+                         'WPO_NODES_VPN_DURING_INSTALL=1 WPO_NODES_BATCH_RESTART=1',
+                         'cp -a "$BACKUP/wpp-node-agent-install.sh" "$APP/wpp-node-agent-install.sh"'):
             self.assertIn(required,launcher,required)
         self.assertNotIn("rm -rf /var/lib/tproxy-panel",launcher)
         self.assertNotIn("web-panel-proxy-uninstall",launcher)
