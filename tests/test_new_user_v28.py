@@ -229,7 +229,14 @@ class NewUserFormTests(unittest.TestCase):
         # but on November 14 the calendar must first show NOVEMBER 14, today.
         script=wpo_user_v28.SCRIPT
         self.assertIn("function openCalendar(){",script)
-        self.assertIn("const current=now();\n  viewYear=current.getFullYear();\n  viewMonth=current.getMonth();\n  refreshLiveClock();\n  renderCalendar();",script)
+        self.assertIn("const current=now();\n  highlightedDate=null;\n  viewYear=current.getFullYear();\n  viewMonth=current.getMonth();\n  refreshLiveClock();\n  renderCalendar();",script)
+        # Reopening resets only the red outline to today. It must not reset
+        # the previously stored expiry or the quick-period selection.
+        open_handler=script.split("function openCalendar(){",1)[1].split("function chooseDate(",1)[0]
+        self.assertIn("highlightedDate=null;",open_handler)
+        self.assertNotIn("selected=",open_handler)
+        self.assertNotIn("syncDate()",open_handler)
+        self.assertIn("sameDay(date,highlightedDate||current)",script)
         self.assertIn("selected=atEndOfDay(date);",script)
         self.assertIn("document.getElementById('wpoV28Now')",script)
         self.assertIn("setInterval(()=>{",script)
