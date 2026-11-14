@@ -250,13 +250,23 @@ class API(BaseHTTPRequestHandler):
         return bearer.startswith("Bearer ") and hmac.compare_digest(bearer[7:].strip(), key)
 
     def do_GET(self):
+        installed = None
+        try:
+            import wpo_node_eight
+            installed = wpo_node_eight
+        except ImportError:
+            pass
+        online = live()
+        protocols = sorted(installed.available()) if (online and installed) else (
+            ["vless", "hysteria"] if online else [])
         if self.path == "/healthz":
-            self.respond({"ok": live()})
+            self.respond({"ok": online and (not installed or installed.full_ready()),
+                          "capabilities": (["federation"] + protocols) if online else []})
         elif self.path == "/wpp-api/v1/federation/status":
             if not self.authorized():
                 self.respond({"ok": False}, 401)
             else:
-                self.respond({"ok": live(), "capabilities": ["federation", "vless", "hysteria"] if live() else []})
+                self.respond({"ok": online, "capabilities": (["federation"] + protocols) if online else []})
         else:
             self.respond({"ok": False}, 404)
 
@@ -279,7 +289,20 @@ class API(BaseHTTPRequestHandler):
                 self.respond({"ok": False, "message": "VPN service is not ready"}, 503)
                 return
             operation = self.path.rsplit("/", 1)[-1]
-            self.respond(mutate(operation, data))
+            try:
+                import wpo_node_eight
+            except ImportError:
+                self.respond(mutate(operation, data))
+            else:
+                # Real all-engine provisioning; no fabricated native links.
+                if operation == "sync":
+                    self.respond(wpo_node_eight.sync(data))
+                elif operation == "delete":
+                    self.respond(wpo_node_eight.remove(data))
+                elif operation == "purge":
+                    self.respond(wpo_node_eight.purge())
+                else:
+                    self.respond({"ok": False}, 404)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self.respond({"ok": False, "message": str(exc)[:180]}, 400)
         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
