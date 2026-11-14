@@ -364,3 +364,45 @@ missing=sorted(wpo_node_eight.KNOWN-set(caps))
 if missing: raise SystemExit('Missing WPO node backends: '+', '.join(missing))
 print('✓ Eight installed and available engine backends: '+', '.join(sorted(caps)))
 PY_VERIFY
+# Authenticate the real capability list through the existing node agent API.
+# Never advertise all eight until the actual binaries/services pass checks.
+python3 - <<'PY_AGENT'
+from pathlib import Path
+import json,os,tempfile
+p=Path('/opt/wpp-node-agent/agent.py')
+s=p.read_text()
+old="['federation','vless','hysteria'] if vpn_ready() else []"
+if "vpn_capabilities()" not in s:
+    if s.count(old)!=1: raise SystemExit('Unexpected Node Agent status implementation')
+    anchor='class H(BaseHTTPRequestHandler):'
+    helper="""def vpn_capabilities():
+    try:
+        import urllib.request
+        with urllib.request.urlopen('http://127.0.0.1:9089/healthz',timeout=3) as result:
+            data=__import__('json').loads(result.read(8192))
+        if not data.get('ok'): return []
+        caps=data.get('capabilities',[])
+        if not isinstance(caps,list): return []
+        return [str(v) for v in caps if isinstance(v,str)][:16]
+    except Exception:
+        return []
+
+"""
+    if s.count(anchor)!=1: raise SystemExit('Unexpected agent source; no change made')
+    s=s.replace(anchor,helper+anchor).replace(old,"vpn_capabilities()")
+    compile(s,str(p),'exec')
+    p.write_text(s)
+settings=Path('/etc/wpp-node-agent/config.json')
+config=json.loads(settings.read_text())
+config['version']='0.4.0'
+fd,tmp=tempfile.mkstemp(dir=str(settings.parent))
+with os.fdopen(fd,'w') as stream:
+    json.dump(config,stream);stream.write('\n')
+os.chmod(tmp,0o600);os.replace(tmp,settings)
+PY_AGENT
+systemctl restart wpp-node-agent.service
+systemctl is-active --quiet wpp-node-agent.service || {
+    echo 'Node Agent failed to advertise all eight working engines.' >&2
+    exit 4
+}
+echo '✓ Node Agent 0.4: all eight engine capabilities available for registration.'
