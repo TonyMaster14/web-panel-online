@@ -8,6 +8,7 @@ timestamps, never remote VLESS/Hysteria secrets. Uses authenticated Node API
 and verifies every returned link before marking its selected node ready.
 """
 import concurrent.futures
+import fcntl
 import hashlib
 import json
 import os
@@ -156,7 +157,13 @@ def prepare():
 
 if __name__=="__main__":
     try:
-        sys.exit(0 if prepare() else 6)
+        with open("/run/lock/wpo-happ-preparer.lock","a+") as lock:
+            try:
+                fcntl.flock(lock.fileno(),fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                print("Подготовка нод уже выполняется, запуск не дублируется.")
+                sys.exit(0)
+            sys.exit(0 if prepare() else 6)
     except (OSError,RuntimeError,ValueError,TypeError,subprocess.SubprocessError) as exc:
         print("Подготовка нод остановлена:",type(exc).__name__,file=sys.stderr)
         sys.exit(6)
