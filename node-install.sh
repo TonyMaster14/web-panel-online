@@ -3359,6 +3359,12 @@ if [[ -s "$PACKAGE_DIR/wpo_v28_apply.py" && -s "$PACKAGE_DIR/wpo_user_v28.py" ]]
     python3 "$PACKAGE_DIR/wpo_v28_apply.py" --app "$APP" \
         --manager /usr/local/sbin/web-proxy-panelctl \
         --helper "$PACKAGE_DIR/wpo_user_v28.py"
+    if [[ -s "$PACKAGE_DIR/wpo_node_remote_patch.py" && -s "$PACKAGE_DIR/wpo_node_remote.py" ]]; then
+        python3 "$PACKAGE_DIR/wpo_node_remote_patch.py" --app "$APP" \
+            --helper "$PACKAGE_DIR/wpo_node_remote.py"
+    else
+        die 'Тестовый пакет не содержит поддержку удалённых пользовательских профилей.'
+    fi
 else
     die 'В тестовом пакете отсутствует интерфейс пользователей v28.'
 fi
