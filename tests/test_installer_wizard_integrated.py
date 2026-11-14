@@ -26,7 +26,7 @@ ADMIN="$(sed -n '1p' "$WPO_UI_CREDENTIALS_FILE")"
 PASS="$(sed -n '2p' "$WPO_UI_CREDENTIALS_FILE")"
 [[ "$ADMIN" == WPOAdmin && "$PASS" == Secret-6789 ]] || exit 32
 DOMAIN=panel.example.com
-PANEL_PATH=/panel-test-install
+PANEL_PATH=/panel-1234567890abcdef1234567890abcdef
 UPDATING=0
 printf '58\tУстановка панели\n' > "$WPO_UI_PROGRESS_FILE"
 sleep .4
@@ -143,13 +143,27 @@ def run_case(case):
                 assert "WPO 3.0 — УСТАНОВЛЕНО" in final_plain
                 assert "Сохраните данные, чтобы не потерять!" in final_plain
                 assert "Ссылка на панель:" in final_plain
-                assert "https://panel.example.com/panel-test-install/login" in final_plain
+                assert "https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login" in final_plain
                 # The full link appears INSIDE the frame, before its bottom border.
                 card_tail=final_plain.split('WPO 3.0 — УСТАНОВЛЕНО',1)[1]
                 assert card_tail.index('Ссылка на панель:') < card_tail.index('╰')
-                assert any('https://panel.example.com/panel-test-install/login' in line and line.count('│') == 2 for line in final_plain.splitlines())
+                assert any('https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login' in line and line.count('│') == 2 for line in final_plain.splitlines())
                 assert "Логин: WPOAdmin" in final_plain
                 assert "Пароль: Secret-6789" in final_plain
+                # Final title banner and credentials frame have exactly the
+                # same horizontal length; both headings are centered in it.
+                final_rows=final_plain.splitlines()
+                opening_frames=[line for line in final_rows if line.startswith('╭') and line.endswith('╮')]
+                assert len(opening_frames)==2, opening_frames
+                assert opening_frames[0]==opening_frames[1], opening_frames
+                assert len(opening_frames[0])>64, "Long URLs must extend the banner past its old 62-column limit"
+                for heading in ("WEB PANEL ONLINE 3.0", "МАСТЕР УСТАНОВКИ"):
+                    row=next(line for line in final_rows if heading in line and line.startswith('│'))
+                    assert len(row)==len(opening_frames[0]), (heading,len(row),len(opening_frames[0]))
+                    interior=row[1:-1]
+                    left=len(interior)-len(interior.lstrip(' '))
+                    right=len(interior)-len(interior.rstrip(' '))
+                    assert abs(left-right)<=1, (heading,left,right)
                 for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "УСТАНОВКА ЗАВЕРШЕНА!", "100%", "◷ 00:"):
                     assert unwanted not in final_plain, (unwanted, final_plain)
             elif case == "failed":
