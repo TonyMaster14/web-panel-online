@@ -20,9 +20,13 @@ from urllib.request import Request, urlopen
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 import wpp_routing as routing_store
+import wpo_node_selection_v2 as exact_nodes
 
 source=(ROOT/"install-panel.sh").read_text(encoding="utf-8")
 panel=source.split("cat > \"$APP_FILE\" <<'PY'\n",1)[1].split("\nPY\n",1)[0]
+# Recreate the tested installed Nodes Lab controller without a real VPS.
+panel=panel.replace('def traffic():','def selected_node_ids(form): return ["local"]\ndef traffic():',1)
+panel=exact_nodes.patch_panel(panel)
 tree=ast.parse(panel)
 handler=next(node for node in tree.body if isinstance(node,ast.ClassDef) and node.name=="Handler")
 methods=[node for node in handler.body if isinstance(node,ast.FunctionDef)
@@ -146,10 +150,11 @@ class HappSubscription(unittest.TestCase):
             {"id":"a"*16,"enabled":True,"url":"https://node2.example"}
         ]
         self.namespace["node_api"].sync_profile=lambda *args,**kwargs:{
-            "profiles":[{"link":remote_link}]
+            "ok":True,"profiles":[{"protocol":"vless","link":remote_link}]
         }
 
     def test_multi_node_subscription_keeps_auto_balancer(self):
+        self.sub["node_ids"]=["local","a"*16]
         self.remote_node()
         status,_,body=self.fetch()
         self.assertEqual(status,200)
@@ -162,12 +167,72 @@ class HappSubscription(unittest.TestCase):
 
     def test_disabling_failover_keeps_only_node_profiles(self):
         self.sub["failover_enabled"]=False
+        self.sub["node_ids"]=["local","a"*16]
         self.remote_node()
         status,_,body=self.fetch()
         self.assertEqual(status,200)
         links=base64.b64decode(body,validate=True).decode("utf-8").strip().splitlines()
         self.assertEqual(len(links),2)
         self.assertFalse(any("Автовыбор" in link for link in links))
+
+    def test_remote_registered_but_not_selected_is_not_synced(self):
+        self.sub["node_ids"]=["local"]
+        self.remote_node()
+        calls=[]
+        self.namespace["node_api"].sync_profile=lambda *args,**kw:calls.append(args)
+        status,_,body=self.fetch()
+        self.assertEqual(status,200)
+        self.assertEqual(calls,[])
+        self.assertEqual(len(base64.b64decode(body).decode().splitlines()),1)
+
+    def test_remote_only_publishes_no_local_node(self):
+        self.sub["node_ids"]=["a"*16]
+        self.remote_node()
+        status,_,body=self.fetch()
+        self.assertEqual(status,200)
+        lines=base64.b64decode(body).decode().strip().splitlines()
+        self.assertEqual(len(lines),1)
+        self.assertIn("node2.example",lines[0])
+        self.assertNotIn("vpn.example",lines[0])
+
+    def test_failed_remote_is_not_silently_dropped(self):
+        self.sub["node_ids"]=["local","a"*16]
+        self.remote_node()
+        def failed(*args,**kw):
+            raise self.namespace["node_api"].NodeError("Node unreachable")
+        self.namespace["node_api"].NodeError=type("NodeError",(ValueError,),{})
+        self.namespace["node_api"].sync_profile=failed
+        status,_,body=self.fetch()
+        self.assertEqual(status,503)
+        self.assertIn("не обновлена",body.decode())
+
+    def test_wrong_node_host_is_rejected(self):
+        self.sub["node_ids"]=["local","a"*16]
+        self.remote_node()
+        self.namespace["node_api"].NodeError=type("NodeError",(ValueError,),{})
+        self.namespace["node_api"].sync_profile=lambda *args,**kw:{
+            "ok":True,"profiles":[{"protocol":"vless",
+                                  "link":"vless://uuid@wrong.example:443?type=xhttp"}]
+        }
+        status,_,body=self.fetch()
+        self.assertEqual(status,503)
+        self.assertIn("не обновлена",body.decode())
+
+    def test_removed_node_is_an_explicit_error(self):
+        self.sub["node_ids"]=["a"*16]
+        status,_,body=self.fetch()
+        self.assertEqual(status,409)
+        self.assertIn("удалена",body.decode())
+
+    def test_legacy_subscription_stays_on_main_node(self):
+        self.sub.pop("node_ids",None)
+        self.remote_node()
+        calls=[]
+        self.namespace["node_api"].sync_profile=lambda *args,**kw:calls.append(args)
+        status,_,body=self.fetch()
+        self.assertEqual(status,200)
+        self.assertEqual(calls,[])
+        self.assertIn("vpn.example",base64.b64decode(body).decode())
 
     def test_explicit_xray_format_still_returns_single_node_json(self):
         status,h,body=self.fetch("?format=xray")
