@@ -15,8 +15,8 @@ exec 9>/run/lock/web-panel-proxy.lock
 flock -n 9 || { echo 'Уже выполняется обновление WPO.' >&2; exit 2; }
 
 # Both revisions are immutable commits tested in the WPO test branch.
-INSTALL_REV=7ed37e1fb07bacc163f06b68c165846bdafcc062
-ENGINE_REV=c7a026d48cf928b5f10b988199baff433cc36698
+INSTALL_REV=a3bcb61506c9813c473a01cd968238c667857a23
+ENGINE_REV=5f497290fe041149521b7d6006a1dd5b2e833885
 BASE=https://raw.githubusercontent.com/TonyMaster14/web-panel-online
 WORK="$(mktemp -d /tmp/wpo-node-templates.XXXXXXXX)"
 BACKUP="/var/lib/tproxy-panel/node-template-installer-backup-$(date -u +%Y%m%dT%H%M%SZ)"
