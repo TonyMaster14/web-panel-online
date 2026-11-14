@@ -299,11 +299,9 @@ fi
 chmod 0700 "$SOURCE"/*.sh
 printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
 label='Проверка установочного пакета'
-while (( shown < 7 )); do
-    shown=$((shown+1))
-    draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 1
-done
+# Show the actual verified milestone immediately, not one extra second per %.
+shown=7
+draw "$shown" "$label" "$((SECONDS-started))"
 confirmed=7
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
@@ -320,7 +318,9 @@ while kill -0 "$INSTALL_PID" 2>/dev/null; do
             [[ -n "$current_label" ]] && label="$current_label"
         fi
     fi
-    if (( shown < confirmed )); then shown=$((shown+1)); fi
+    # The backend writes only verified milestones. Never artificially lag
+    # behind it by one percent per second on fast VPS installations.
+    if (( shown < confirmed )); then shown=$confirmed; fi
     draw "$shown" "$label" "$((SECONDS-started))"
     sleep 1
 done
@@ -333,12 +333,10 @@ if (( code == 0 )); then
         printf '\n'
         error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     fi
-    # Complete the animation only after a successful exit and a valid access card.
-    while (( shown < 100 )); do
-        shown=$((shown+1))
-        draw "$shown" "$label" "$((SECONDS-started))"
-        if (( shown < 100 )); then sleep 1; fi
-    done
+    # A successful backend and valid result permit 100% immediately: no
+    # artificial 1-second-per-percent countdown before the finished screen.
+    shown=100
+    draw "$shown" "$label" "$((SECONDS-started))"
     # Show verified access details two seconds after the 100% milestone.
     sleep 2
     # One final screen transition after the two-second success hold.
