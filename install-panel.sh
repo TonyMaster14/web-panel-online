@@ -4263,9 +4263,11 @@ class Handler(BaseHTTPRequestHandler):
                     auto_config=routing_store.failover_xray_config(lines,merged_remote,"🇪🇺 Автовыбор")
                     xray_configs.insert(0,auto_config)
                 except routing_store.RoutingError: pass
-            # Happ always receives importable Xray JSON, including for one
-            # VLESS/Hysteria node; do not downgrade single-node feeds to URLs.
-            if requested_format in ("xray","xray-json","json") or (happ and bool(xray_configs)):
+            # A plain single-node Happ feed is best served as standard
+            # VLESS/Hysteria links. Keep Xray JSON for explicit format requests,
+            # custom connection routing, or a real multi-node auto-balancer.
+            # This avoids an unnecessary JSON core/profile for one VPN server.
+            if requested_format in ("xray","xray-json","json") or (happ and (selected_routing or failover)):
                 if not xray_configs:
                     self.send_data("В подписке нет VLESS или Hysteria2 для Xray-маршрутизации.",409,headers=headers); return
                 self.send_data(json.dumps(xray_configs,ensure_ascii=False,separators=(",",":")),mime="application/json; charset=utf-8",headers=headers); return
