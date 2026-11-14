@@ -445,6 +445,15 @@ if ! systemctl reload caddy.service; then
     exit 4
 fi
 rm -f "$CADDY_BACKUP"
+# WEB relay is the browser carrier, not the static-site renderer. The old
+# relay public_dir snapshots HTML and blocks inline template CSS/JS. Keep
+# public transport paths on relay and send ordinary site traffic to local
+# Caddy's live file_server. Also repairs existing Node Agent 0.4 installs.
+curl -4fLsS --proto '=https' --proto-redir '=https' --retry 3 \
+    --connect-timeout 12 --max-time 90 \
+    "$BASE/wpo-node-site-template-fix.sh" -o "$TEMP/site-template-fix.sh"
+bash -n "$TEMP/site-template-fix.sh"
+bash "$TEMP/site-template-fix.sh"
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; then
     ufw route allow from 10.80.0.0/14 to any >/dev/null
     ufw allow 25000:25949/tcp >/dev/null
