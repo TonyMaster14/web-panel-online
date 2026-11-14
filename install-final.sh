@@ -69,6 +69,16 @@ echo "434198ea0558bc440379e9a0a97f6904ba8dd6b213dd6fb9d578388eba7d2f12  $BASE/as
 command -v flock >/dev/null 2>&1 || die "flock is required (package: util-linux)."
 exec 9>/run/lock/web-panel-proxy.lock
 flock -n 9 || die "Another WEB PANEL ONLINE install, update or removal is already running."
+# The version file alone does not prove success: it is created before the
+# panel and all 26 node setup stages are verified.
+WPO_PENDING=/var/lib/tproxy-panel/.wpo-install-in-progress
+WPO_COMPLETE=/var/lib/tproxy-panel/.wpo-install-complete
+if [[ -e "$WPO_COMPLETE" ]]; then
+    die "WEB PANEL ONLINE уже установлена. Установщик не запускается повторно."
+fi
+install -d -o root -g root -m 0700 /var/lib/tproxy-panel
+printf '3.0.0\n' > "$WPO_PENDING"
+chmod 0600 "$WPO_PENDING"
 # Keep the installer access card in root-only RAM until every service and
 # Nodes Lab check has passed. The wizard owns its own result file; classic
 # installs use a temporary file owned by this process instead.
@@ -191,6 +201,13 @@ systemctl is-active --quiet tproxy-panel.service || die 'Панель неакт
 printf '%s\n' '3.0.0' > /etc/web-proxy-panel/version
 chmod 0600 /etc/web-proxy-panel/version
 [[ -s "$WPO_UI_RESULT_FILE" ]] || die "Access card was not created by panel installer."
+# Commit completion only AFTER the proxy panel, nodes and Xray checks pass.
+# An interrupted attempt keeps the in-progress marker for safe recovery.
+WPO_SUCCESS_TMP="${WPO_COMPLETE}.tmp.$$"
+printf '3.0.0\n' > "$WPO_SUCCESS_TMP"
+chmod 0600 "$WPO_SUCCESS_TMP"
+mv -f -- "$WPO_SUCCESS_TMP" "$WPO_COMPLETE"
+rm -f -- "$WPO_PENDING"
 echo "Installation complete (WPO 3.0 + Nodes Lab v26)."
 # All critical installation checks have now passed. Release maintenance can
 # run later without delaying the access card, even if GitHub responds slowly.
