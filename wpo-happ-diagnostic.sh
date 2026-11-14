@@ -28,7 +28,7 @@ def socket_ports():
         except Exception: lines=[]
         for port in (443,8090,8443,10000,19000):
             results[(mode,port)] = any(
-                line.split()[4].rsplit(':',1)[-1]==str(port)
+                line.split()[3].rsplit(':',1)[-1]==str(port)
                 for line in lines if len(line.split())>=5)
     return results
 
