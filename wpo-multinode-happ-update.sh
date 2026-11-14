@@ -34,6 +34,13 @@ trap 'exit 130' INT TERM
 curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
   --connect-timeout 15 --max-time 90 \
   "$BASE/wpo-multinode-feed-fix.py" -o "$TMP/patch.py"
+# The warm-up runs only against already imported device IDs; it never
+# creates new users or needs the node's SSH/root password.
+curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
+  --connect-timeout 15 --max-time 90 \
+  "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/84ffe6705e2d7b21d76a95d1cb2f552a003cf972/wpo-happ-prewarm.py" \
+  -o "$TMP/prewarm.py"
+python3 -m py_compile "$TMP/prewarm.py"
 python3 -m py_compile "$TMP/patch.py"
 python3 "$TMP/patch.py" --panel "$PANEL" --output "$TMP/panel.py"
 python3 -m py_compile "$TMP/panel.py"
@@ -44,7 +51,9 @@ grep -Fq 'len(distinct_nodes)>1' "$TMP/panel.py"
 grep -Fq 'if set(by_protocol)!=set(wanted):' "$TMP/panel.py"
 if cmp -s "$TMP/panel.py" "$PANEL"; then
   echo '✓ Параллельная синхронизация VPN-нод уже включена на основной WPO.'
-  exit 0
+  echo '=== Подготовка последней импортированной многонодовой подписки ==='
+  python3 "$TMP/prewarm.py"
+  exit $?
 fi
 install -d -o root -g root -m 0700 "$BACKUP"
 cp -a "$PANEL" "$BACKUP/panel.py"
@@ -71,3 +80,9 @@ echo '✓ Автовыбор сохранён, пользователи и кл�
 echo '✓ Основной Xray, Caddy и дополнительная VPS не изменялись.'
 echo '✓ Если удалённая нода действительно не создаёт профиль, ошибка 503 остаётся явной.'
 echo "Резервная копия: $BACKUP"
+echo '=== Подготовка последней импортированной многонодовой подписки ==='
+if ! python3 "$TMP/prewarm.py"; then
+  echo 'Панель обновлена, но одна из удалённых нод не подготовила VPN-профиль.' >&2
+  echo 'Скопируйте строки проверки нод (без токенов). Исправление панели уже установлено.' >&2
+  exit 6
+fi
