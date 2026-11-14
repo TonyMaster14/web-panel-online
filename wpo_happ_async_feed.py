@@ -95,9 +95,15 @@ def enqueue(api, node, external_id, name, protocols):
             FAILURES.clear()
         if len(PENDING) >= 4:
             return [], True
-        future = WORKERS.submit(_sync_worker, key, api, dict(node),
-                                external_id, name, protocols)
-        PENDING[key] = future
+        # Reserve the slot before starting a worker: a fast completed task
+        # must not race with setting the PENDING flag afterwards.
+        PENDING[key] = True
+        try:
+            WORKERS.submit(_sync_worker, key, api, dict(node),
+                           external_id, name, protocols)
+        except RuntimeError:
+            PENDING.pop(key, None)
+            raise
         return [], True
 
 
