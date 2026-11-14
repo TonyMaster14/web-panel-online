@@ -75,7 +75,7 @@ class EightEngineTests(unittest.TestCase):
         self.assertEqual(links["awg20"]["config"],"[Interface]\nPrivateKey=xyz")
         self.assertEqual(links["awg31"]["config"],"[Interface]\nPrivateKey=xyz")
         self.assertTrue(links["naive"]["link"].startswith("naive+https://"))
-        self.assertTrue(links["mieru"]["link"].startswith("mierus://"))
+        self.assertTrue(links["mieru"]["link"].startswith("mieru://"))
         self.assertEqual(cfg.call_count,2)
         self.fake_xray.assert_called_once()
         self.fake_native.assert_called_once()
