@@ -248,6 +248,8 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("button.classList.toggle('is-highlighted',sameDay(date,highlightedDate||current));",script)
         self.assertIn("if(highlight)highlightedDate=selected;",script)
         self.assertIn(".wpo-v28-cal-days button.is-highlighted{",css)
+        self.assertIn(".wpo-v28-cal-days button:hover:not(:disabled){border-color:transparent;background:transparent}",css)
+        self.assertNotIn(".wpo-v28-cal-days button:hover:not(:disabled){border-color:var(--accent);background:var(--tint)}",css)
         self.assertNotIn(".wpo-v28-cal-days button.is-selected{background:var(--tint);border:1px solid var(--accent)",css)
         self.assertNotIn("if(expiry.value!=='0')closeCalendar();",script)
         self.assertIn("chooseDate(addMonths(now(),Number(button.dataset.wpoMonths)),button.dataset.wpoMonths);",script)
