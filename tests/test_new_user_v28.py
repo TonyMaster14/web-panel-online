@@ -139,7 +139,9 @@ class NewUserFormTests(unittest.TestCase):
         self.assertIn("Intl.DateTimeFormat().resolvedOptions().timeZone",self.html)
         self.assertIn("setInterval(refreshClock,1000)",self.html)
         self.assertIn("selected.getTime()/1000",self.html)
-        self.assertIn("year<=2090",self.html)
+        self.assertIn("year<=2099",self.html)
+        self.assertNotIn("2090",self.html)
+        self.assertNotIn("d.getUTCFullYear()<=2099",self.html)
         self.assertIn("sameDay(date,current)",self.html)
         self.assertIn('class="wpo-v28-live-dot"',self.html)
         self.assertIn("@keyframes wpo-v28-pulse",self.html)
@@ -170,12 +172,41 @@ class V28ExpiryTests(unittest.TestCase):
         funcs=backend()
         deadline=int(time.time()+3600)
         self.assertEqual(funcs["validate_expiry"](deadline),deadline)
-    def test_subscription_expiry_validator_refuses_past_and_year_2091(self):
+    def test_subscription_expiry_allows_end_of_2099_in_every_timezone(self):
         funcs=backend()
-        for deadline in (int(time.time())-1,int(time.time())+10,3825964800):
+        # Calendar dates are in the user's local timezone. In UTC-12, the
+        # last minute of 2099 becomes January 1, 2100 in UTC.
+        last_utc=int(datetime(2099,12,31,23,59,tzinfo=timezone.utc).timestamp())
+        last_utc_minus_12=int(datetime(2099,12,31,23,59,
+                                      tzinfo=timezone(timedelta(hours=-12))).timestamp())
+        self.assertEqual(last_utc_minus_12,4102487940)
+        for deadline in (last_utc,last_utc_minus_12):
+            with self.subTest(deadline=deadline):
+                self.assertEqual(funcs["validate_expiry"](deadline),deadline)
+
+    def test_subscription_expiry_validator_rejects_year_2100(self):
+        funcs=backend()
+        for deadline in (int(time.time())-1,int(time.time())+10,4102488000,4102531200):
             with self.subTest(deadline=deadline):
                 with self.assertRaises(funcs["SubscriptionError"]):
                     funcs["validate_expiry"](deadline)
+
+    def test_short_patch_upgrades_already_installed_2090_limits(self):
+        source=(ROOT/"wpp_subscriptions.py").read_text(encoding="utf-8")
+        upgraded=wpo_v28_apply.patch_subscriptions(source)
+        old=upgraded.replace("expiry>4102487999",
+                             "time.gmtime(expiry).tm_year>2090")
+        old=old.replace("до 2099 года","до 2090 года")
+        self.assertEqual(wpo_v28_apply.patch_subscriptions(old),upgraded)
+        self.assertEqual(wpo_v28_apply.patch_subscriptions(upgraded),upgraded)
+        old_panel='# wpo-v28-new-user\\nif time.gmtime(end_timestamp).tm_year>2090: message="до 2090 года"'
+        panel=wpo_v28_apply.patch_panel(old_panel)
+        self.assertIn("end_timestamp>4102487999",panel)
+        self.assertIn("до 2099 года",panel)
+        self.assertNotIn("2090",panel)
+        self.assertEqual(wpo_v28_apply.patch_panel(panel),panel)
+        native=(ROOT/"wpo_node_remote.py").read_text(encoding="utf-8")
+        self.assertIn("deadline>4102487999",native)
     def test_panel_patch_denies_stale_public_access(self):
         root=(ROOT/"install-panel.sh").read_text(encoding="utf-8")
         p=root.split('cat > "$APP_FILE" <<\'PY\'\n',1)[1].split("\nPY\n",1)[0]
