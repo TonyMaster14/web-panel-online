@@ -5213,6 +5213,7 @@ fi
     fi
     card_line ''
     card_line 'Ссылка на панель:'
+    card_line ''
     card_line "$card_url" "$card_value"
     card_line ''
     card_line "Логин: $ADMIN"
@@ -5222,7 +5223,6 @@ fi
     else
         card_line "Пароль: $PASS"
     fi
-    card_line ''
     card_line ''
     card_line 'Сохраните данные, чтобы не потерять!' "$card_warning"
     card_line ''
