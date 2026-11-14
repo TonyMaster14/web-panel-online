@@ -44,6 +44,10 @@ required=[
     "if(popover.hidden)openCalendar();",
     "else closeCalendar();",
     "document.getElementById('wpoV28Until2099')",
+    "document.getElementById('wpoV28Now')",
+    "viewYear=current.getFullYear();",
+    "viewMonth=current.getMonth();",
+    "refreshLiveClock();",
     "const calendar=document.getElementById('wpoV28Calendar');",
     'id="wpoV28DayGrid"',
 ]
@@ -59,6 +63,8 @@ required_css=(
     '#subscriptionFields .wpo-v28-option strong',
     '#subscriptionFields .wpo-v28-node strong',
     'color:#fff!important;opacity:1!important',
+    'button[data-wpo-2099]{font-weight:600;margin-top:6px;border:1px solid var(--line)}',
+    'button[data-wpo-2099].is-selected{background:var(--tint);color:var(--accent);border-color:var(--accent)}',
 )
 for token in required_css:
     if token not in src:
@@ -85,6 +91,10 @@ assert 'id="wpoV28Hour"' not in html
 assert '.wpo-v28-calendar:not([open]) .wpo-v28-calendar-body' not in html
 assert '#subscriptionFields .wpo-v28-option strong' in html
 assert '#subscriptionFields .wpo-v28-node strong' in html
+assert 'id="wpoV28Now"' in html
+assert 'viewYear=current.getFullYear();' in html
+assert 'viewMonth=current.getMonth();' in html
+assert 'button[data-wpo-2099].is-selected' in html
 print('✓ Установленный модуль выдаёт Home VPN')
 PY_TEST
 systemctl restart "$SERVICE"
@@ -107,5 +117,6 @@ done
 SAVED=0
 echo '✓ WPO перезапущена, новая форма установлена и проверена.'
 echo '✓ Подсказка: Например, Home VPN'
-echo '✓ Календарь открывается и закрывается по иконке; ноды и протоколы — белым.'
+echo '✓ Календарь открывается на текущем месяце и показывает живые дату/время.'
+echo '✓ «До 2099» подсвечивается только при выборе.'
 echo 'Закройте старую вкладку панели, откройте её заново и нажмите «Новый пользователь».'
