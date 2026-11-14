@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WEB PANEL ONLINE 3.0 — Russian interactive SSH installer.
+# WEB PANEL ONLINE 3.0 — terminal installer, consolidated Nodes Lab v26.
 # A legacy noninteractive entrypoint is retained for automation and ZIP users.
 set -Eeuo pipefail
 umask 077
@@ -19,6 +19,7 @@ error(){ printf '\n\033[1;31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
 # documented unattended workflow and all existing port/security checks.
 USE_WIZARD=0
 if [[ -t 0 && -t 1 && "${WPO_CLASSIC_INSTALL:-0}" != 1 ]]; then USE_WIZARD=1; fi
+FINAL_SCREEN=0
 WORK="" CREDENTIALS="" PROGRESS="" RESULT="" INSTALL_PID="" LOG=""
 cleanup(){
     if [[ -n "$INSTALL_PID" ]] && kill -0 "$INSTALL_PID" 2>/dev/null; then
@@ -31,6 +32,7 @@ cleanup(){
     [[ -n "$RESULT" && -f "$RESULT" ]] && { shred -u "$RESULT" 2>/dev/null || rm -f -- "$RESULT"; }
     [[ -n "$PROGRESS" && -f "$PROGRESS" ]] && rm -f -- "$PROGRESS"
     [[ -n "$WORK" && -d "$WORK" ]] && rm -rf -- "$WORK"
+    if (( USE_WIZARD )); then printf '\033[0m\033[?25h'; fi
     # EXIT traps must not turn a successful installation into exit code 1
     # just because the final optional cleanup condition was false.
     return 0
@@ -38,13 +40,66 @@ cleanup(){
 trap cleanup EXIT
 trap 'printf "\n"; exit 130' INT TERM
 
-blue=$'\033[38;5;75m' green=$'\033[38;5;85m'
-gray=$'\033[38;5;244m' bold=$'\033[1m' reset=$'\033[0m' red=$'\033[38;5;203m'
+WPO_LEFT=1
+inset='  '
+blue=$'\033[38;5;75m' cyan=$'\033[38;5;51m' ice=$'\033[38;5;153m'
+gray=$'\033[38;5;245m' bold=$'\033[1m' reset=$'\033[0m' red=$'\033[38;5;203m' success=$'\033[38;5;83m'
+# Use normal terminal flow: no full-screen canvas or saved cursor coordinates.
+terminal_size(){
+    local rows=""
+    UI_COLS=""
+    read -r rows UI_COLS < <(stty size </dev/tty 2>/dev/null) || true
+    [[ "$UI_COLS" =~ ^[0-9]+$ ]] || UI_COLS=80
+    (( UI_COLS >= 20 )) || UI_COLS=80
+    UI_ROWS="${rows:-24}"
+}
+# Boxes fit the viewport and start in the same column as the shell prompt.
+box_rule(){
+    BOX_WIDTH=$((UI_COLS-3))
+    (( BOX_WIDTH > 62 )) && BOX_WIDTH=62
+    printf -v BOX_RULE '%*s' "$BOX_WIDTH" ''
+    BOX_RULE="${BOX_RULE// /─}"
+}
+box_text(){
+    local text="$1" color="$2" chunk left right padl padr
+    while [[ -n "$text" ]]; do
+        chunk="${text:0:BOX_WIDTH}"; text="${text:BOX_WIDTH}"
+        left=$(((BOX_WIDTH-${#chunk})/2)); right=$((BOX_WIDTH-${#chunk}-left))
+        printf -v padl '%*s' "$left" ''; printf -v padr '%*s' "$right" ''
+        printf '%s│%s%s%s%s%s│%s\n' "$blue" "$color" "$padl" "$chunk" "$padr" "$reset$blue" "$reset"
+    done
+}
 banner(){
-    printf '\n%s╭────────────────────────────────────────────────────────────╮%s\n' "$blue" "$reset"
-    printf '%s│%s                 WEB PANEL ONLINE 3.0                     %s│%s\n' "$blue" "$bold" "$blue" "$reset"
-    printf '%s│%s                   МАСТЕР УСТАНОВКИ                       %s│%s\n' "$blue" "$reset" "$blue" "$reset"
-    printf '%s╰────────────────────────────────────────────────────────────╯%s\n' "$blue" "$reset"
+    box_rule
+    printf '\n%s╭%s╮%s\n' "$blue" "$BOX_RULE" "$reset"
+    box_text 'WEB PANEL ONLINE 3.0' "$bold$ice"
+    box_text 'МАСТЕР УСТАНОВКИ' "$bold$cyan"
+    printf '%s╰%s╯%s\n' "$blue" "$BOX_RULE" "$reset"
+}
+welcome(){
+    printf '\n%sДобро пожаловать в мастер установки!%s\n' "$cyan" "$reset"
+    box_rule
+    printf '%s╭%s╮%s\n' "$blue" "$BOX_RULE" "$reset"
+    box_text 'ENTER — установить   │   q — выход' "$bold$cyan"
+    printf '%s╰%s╯%s\n' "$blue" "$BOX_RULE" "$reset"
+}
+render_context(){
+    banner
+    welcome
+    printf '\n'
+    if [[ "${UPDATE:-0}" == 1 ]]; then
+        printf '%sОбновление панели: данные сохранены.%s\n' "$ice" "$reset"
+    else
+        local gap='\n\n'
+        (( UI_ROWS < 30 )) && gap='\n'
+        printf '%sДомен: %s%s' "$cyan" "${DOMAIN:-}" "$reset"
+        printf '%b' "$gap"
+        printf '%sEmail: %s%s' "$cyan" "${EMAIL:-}" "$reset"
+        printf '%b' "$gap"
+        printf '%sЛогин: %s%s' "$cyan" "${DISPLAY_ADMIN:-}" "$reset"
+        printf '%b' "$gap"
+        printf '%sПароль (не отображается)%s\n' "$cyan" "$reset"
+    fi
 }
 valid_domain(){
     local d="$1" part
@@ -58,8 +113,8 @@ valid_domain(){
 valid_email(){ [[ "$1" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; }
 ask_domain(){
     while true; do
-        printf '\n%s  1 / 4  Домен панели%s\n' "$blue" "$reset"
-        read -r -p '  Домен (например, panel.example.com): ' DOMAIN || exit 130
+        printf '%s%sДомен:%s ' "$inset" "$cyan" "$reset"
+        read -r DOMAIN || exit 130
         DOMAIN="${DOMAIN,,}"
         valid_domain "$DOMAIN" && break
         printf '%s  Укажите действительный домен без https:// и пробелов.%s\n' "$gray" "$reset"
@@ -67,38 +122,33 @@ ask_domain(){
 }
 ask_email(){
     while true; do
-        printf '\n%s  2 / 4  Электронная почта для HTTPS-сертификата%s\n' "$blue" "$reset"
-        read -r -p '  Email (латиница): ' EMAIL || exit 130
+        printf '%s%sEmail:%s ' "$inset" "$cyan" "$reset"
+        read -r EMAIL || exit 130
         valid_email "$EMAIL" && break
         printf '%s  Нужен настоящий адрес формата name@example.com.%s\n' "$gray" "$reset"
     done
 }
 ask_admin(){
-    printf '\n%s  3 / 4  Логин администратора%s\n' "$blue" "$reset"
     while true; do
-        read -r -p '  Логин [admin]: ' ADMIN || exit 130
+        printf '%s%sЛогин:%s ' "$inset" "$cyan" "$reset"
+        read -r ADMIN || exit 130
         ADMIN="${ADMIN:-admin}"
         [[ ${#ADMIN} -le 64 && "$ADMIN" =~ ^[[:alnum:]_.@-]+$ ]] && break
         printf '%s  Используйте буквы, цифры, _, точку или дефис.%s\n' "$gray" "$reset"
     done
 }
 ask_password(){
-    printf '\n%s  4 / 4  Пароль администратора%s\n' "$blue" "$reset"
     while true; do
-        read -r -s -p '  Пароль (не отображается): ' PASS || exit 130
+        # Password is entered once, invisibly at the prompt after the colon.
+        printf '%s%sПароль (не отображается):%s ' "$inset" "$cyan" "$reset"
+        read -r -s PASS || exit 130
         printf '\n'
         if (( ${#PASS} < 3 )); then
             printf '%s  Пароль должен содержать минимум 3 символа.%s\n' "$gray" "$reset"
+            unset PASS
             continue
         fi
-        read -r -s -p '  Повторите пароль: ' CONFIRM || exit 130
-        printf '\n'
-        if [[ "$PASS" == "$CONFIRM" ]]; then
-            unset CONFIRM
-            break
-        fi
-        printf '%s  Пароли не совпали. Повторите ввод.%s\n' "$gray" "$reset"
-        unset CONFIRM
+        break
     done
 }
 
@@ -122,34 +172,41 @@ if (( ! USE_WIZARD )); then
     exit $?
 fi
 
+# Start the wizard on a clean visible screen; retain terminal scrollback.
+# This runs once, never during input, progress updates or terminal resizing.
+printf '\033[0m\033[2J\033[H'
+terminal_size
 banner
-printf '\n  Добро пожаловать в мастер установки!\n'
-printf '  Панель, прокси-службы и управление нодами в одной системе.\n\n'
-printf '  %s╭────────────────────────────╮%s\n' "$green" "$reset"
-printf '  %s│%s       УСТАНОВИТЬ           %s│%s\n' "$green" "$bold" "$green" "$reset"
-printf '  %s╰────────────────────────────╯%s\n' "$green" "$reset"
-printf '  %sENTER — установить  •  q — выход%s\n\n' "$gray" "$reset"
-read -r -p '  Ваш выбор: ' choice || exit 130
-[[ "$choice" != q && "$choice" != Q ]] || exit 0
+welcome
+while true; do
+    printf '%s' "$inset"
+    read -r choice || exit 130
+    [[ "$choice" != q && "$choice" != Q ]] || exit 0
+    [[ -z "$choice" ]] && break
+    printf '%s  Нажмите Enter или q для выхода.%s\n' "$gray" "$reset"
+done
 
 UPDATE=0
 if [[ -s /var/lib/tproxy-panel/data.json && -f /etc/systemd/system/tproxy-panel.service ]] &&
    grep -Eq 'Environment=WEBPROXY_PANEL_PATH=/panel-[a-z0-9-]{3,64}' /etc/systemd/system/tproxy-panel.service; then
     UPDATE=1
-    printf '\n%s  Найдена установленная панель: обновляем код, учётные данные сохраняем.%s\n' "$green" "$reset"
+    printf '\n%s  Найдена установленная панель: обновляем код, учётные данные сохраняем.%s\n' "$cyan" "$reset"
     DOMAIN="" EMAIL=""
 else
     ask_domain
+    printf '\n'
     ask_email
+    printf '\n'
     ask_admin
+    printf '\n'
     ask_password
     CREDENTIALS="$(mktemp /run/wpo-ui-credentials.XXXXXXXX)"
     chmod 0600 "$CREDENTIALS"
     printf '%s\n%s\n' "$ADMIN" "$PASS" > "$CREDENTIALS"
+    DISPLAY_ADMIN="$ADMIN"
     unset PASS ADMIN
 fi
-printf '\n%s  Подготовка и загрузка компонентов в начале установки.%s\n' "$green" "$reset"
-printf '  %sПодробный вывод будет записан в защищённый журнал.%s\n\n' "$gray" "$reset"
+
 
 install -d -o root -g root -m 0700 /var/log/web-panel-online
 LOG="/var/log/web-panel-online/install-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
@@ -160,21 +217,58 @@ RESULT="$(mktemp /run/wpo-ui-result.XXXXXXXX)"
 chmod 0600 "$PROGRESS" "$RESULT"
 printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 
-# Display a live, accurate stage indicator: numbers come from the actual
-# installer stages. The small spinner moves while a long task is running.
+# Keep one five-row progress block: status, gap, bar, gap, current stage.
+# Reserve its rows once. Resize events rebuild the layout once on the new screen.
+DRAW_LAST="" DRAW_READY=0 DRAW_RESIZED=0
+trap 'DRAW_RESIZED=1' WINCH
 draw(){
-    local pct="$1" label="$2" frame="$3" elapsed="$4" n filled empty donebar leftbar
-    n=32
-    filled=$((pct*n/100)); empty=$((n-filled))
-    printf -v donebar '%*s' "$filled" ''
-    printf -v leftbar '%*s' "$empty" ''
-    donebar="${donebar// /━}"; leftbar="${leftbar// /─}"
-    printf '\r\033[2K  %s%s%s%s %3d%%  %s  %s%02d:%02d%s' \
-        "$green" "$donebar" "$gray" "$leftbar" "$pct" "$frame" "$label" \
-        "$((elapsed/60))" "$((elapsed%60))" "$reset"
+    local pct="$1" label="$2" elapsed="$3" width filled empty bar rest key
+    local status stage packet prefix="" maxtext
+    [[ "$label" != 'Установка нод' ]] || label='Установка ноды'
+    if (( pct >= 90 && pct < 100 )); then label='Завершение установки'; fi
+    key="$pct|$label|$elapsed"
+    [[ "$key" != "$DRAW_LAST" || "$DRAW_RESIZED" == 1 ]] || return 0
+    DRAW_LAST="$key"
+    local previous_cols="$UI_COLS" previous_rows="${UI_ROWS:-24}"
+    terminal_size
+    if [[ "$UI_COLS" != "$previous_cols" || "$UI_ROWS" != "$previous_rows" ]]; then DRAW_RESIZED=1; fi
+    if (( DRAW_RESIZED )); then
+        printf '\033[0m\033[2J\033[H'
+        render_context
+        DRAW_READY=0
+        DRAW_RESIZED=0
+    fi
+    if (( ! DRAW_READY )); then
+        # Ensure all rows exist even when the previous prompt was near the bottom.
+        printf '\n\n\n\n\n'
+        DRAW_READY=1
+    fi
+    prefix=$'\033[4A\r'
+    width=$((UI_COLS-24))
+    (( width > 40 )) && width=40
+    (( width < 1 )) && width=1
+    filled=$((pct*width/100)); empty=$((width-filled))
+    printf -v bar '%*s' "$filled" ''; bar="${bar// /█}"
+    printf -v rest '%*s' "$empty" ''; rest="${rest// /░}"
+    maxtext=$((UI_COLS-3))
+    status='УСТАНОВКА …'
+    stage="Этап: $label"
+    if (( pct == 100 )); then
+        status='УСТАНОВКА ЗАВЕРШЕНА!'
+        stage=''
+    fi
+    printf -v packet '%s\033[2K  %s%s%s\n\r\033[2K\n\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s\n\r\033[2K\n\r\033[2K  %s%s%s' \
+        "$prefix" "$bold$success" "${status:0:maxtext}" "$reset" \
+        "$cyan" "$bar" "$blue" "$rest" "$reset" "$pct" \
+        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset" \
+        "$ice" "${stage:0:maxtext}" "$reset"
+    printf '%s' "$packet"
 }
+printf '\033[?25l'
+started=$SECONDS
 shown=1
-draw 1 'Загрузка GitHub' '◐' 0
+label='Загрузка пакета'
+draw "$shown" "$label" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
     SOURCE="$LOCAL_BASE"
@@ -186,9 +280,17 @@ else
         fi
     fi
     WORK="$(mktemp -d /tmp/web-panel-proxy-install.XXXXXXXX)"
-    if ! git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$WORK/source" >> "$LOG" 2>&1; then
+    git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$WORK/source" >> "$LOG" 2>&1 &
+    INSTALL_PID=$!
+    while kill -0 "$INSTALL_PID" 2>/dev/null; do
+        draw "$shown" 'Загрузка GitHub' "$((SECONDS-started))"
+        sleep 0.2
+    done
+    if ! wait "$INSTALL_PID"; then
+        INSTALL_PID=""
         printf '\n'; error "Не удалось загрузить GitHub. Журнал: $LOG"
     fi
+    INSTALL_PID=""
     SOURCE="$WORK/source"
 fi
 [[ -s "$SOURCE/install-final.sh" && -s "$SOURCE/node-install.sh" ]] || {
@@ -196,39 +298,58 @@ fi
 }
 chmod 0700 "$SOURCE"/*.sh
 printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
+label='Проверка установочного пакета'
+while (( shown < 7 )); do
+    shown=$((shown+1))
+    draw "$shown" "$label" "$((SECONDS-started))"
+    sleep 1
+done
+confirmed=7
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
-    WPO_UI_RESULT_FILE="$RESULT" \
+    WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=0 WPO_CARD_COLUMNS="$UI_COLS" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
-frames=('◐' '◓' '◑' '◒')
-tick=0
-started=$SECONDS
-label='Проверка пакета'
+label='Проверка установочного пакета'
 while kill -0 "$INSTALL_PID" 2>/dev/null; do
     if IFS=$'\t' read -r target current_label < "$PROGRESS"; then
-        if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target <= 100 )); then
-            if (( shown < target )); then shown=$((shown+1)); fi
+        if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target < 100 )); then
+            # Animate toward confirmed progress without running ahead of the installer.
+            (( target > confirmed )) && confirmed="$target"
             [[ -n "$current_label" ]] && label="$current_label"
         fi
     fi
-    draw "$shown" "$label" "${frames[tick%4]}" "$((SECONDS-started))"
-    tick=$((tick+1))
-    sleep 0.16
+    if (( shown < confirmed )); then shown=$((shown+1)); fi
+    draw "$shown" "$label" "$((SECONDS-started))"
+    sleep 1
 done
 code=0
 wait "$INSTALL_PID" || code=$?
 INSTALL_PID=""
 if (( code == 0 )); then
-    printf '\r\033[2K'
-    draw 100 'Установка завершена' '✓' "$((SECONDS-started))"
-    printf '\n'
-    printf '\n%s  Проверки завершены. Журнал сохранён на VPS.%s\n' "$gray" "$reset"
-    # The URL, login and password remain the very last content on screen.
-    [[ -s "$RESULT" ]] && cat -- "$RESULT" || printf '\n  Готово. Данные доступа: WPP → информация о панели.\n'
+    # Never display 100% or success if the final access card is missing.
+    if [[ ! -s "$RESULT" ]]; then
+        printf '\n'
+        error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
+    fi
+    # Complete the animation only after a successful exit and a valid access card.
+    while (( shown < 100 )); do
+        shown=$((shown+1))
+        draw "$shown" "$label" "$((SECONDS-started))"
+        if (( shown < 100 )); then sleep 1; fi
+    done
+    # Keep verified completion visible before replacing it with access details.
+    sleep 4
+    # One final screen transition after the four-second success hold.
+    # Clear the visible screen only; do not erase terminal scrollback.
+    printf '\033[0m\033[2J\033[H'
+    terminal_size
+    banner
+    cat -- "$RESULT"
+    FINAL_SCREEN=1
 else
-    printf '\n\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
+    printf '\n%s  ✖ Установка прервана (код %d)%s\n' "$red" "$code" "$reset"
     hint="$(grep -Ei 'too many certificates|rateLimited|invalidContact|invalid_email|^ERROR:|^Ошибка|HTTPS.*не готов|failed|ошибка' "$LOG" | tail -n 1 || true)"
     [[ -z "$hint" ]] || printf '  %s\n' "$hint"
     printf '  Подробности: %s\n' "$LOG"

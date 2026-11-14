@@ -10,7 +10,7 @@ PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 USE_PACKAGE=0
 if [[ "${WPO_NODES_LOCAL_SOURCE:-0}" == 1 ]] &&
    [[ -s "$PACKAGE_DIR/install-final.sh" &&
-      -s "$PACKAGE_DIR/wpo-nodes-lab-v26-install.sh" &&
+      -s "$PACKAGE_DIR/node-install.sh" &&
       -s "$PACKAGE_DIR/wpo-node-agent-install-v2.sh" ]]; then
     USE_PACKAGE=1
     echo 'Nodes Lab: повторная загрузка файлов не нужна.'
@@ -51,6 +51,7 @@ cleanup(){
                 rm -f "$APP/$name" || true
             fi
         done
+        systemctl reset-failed "$SERVICE" 2>/dev/null || true
         systemctl restart "$SERVICE" || true
         echo "Код восстановлен из $BACKUP. Данные пользователей и нод не удалены." >&2
     fi
@@ -3216,6 +3217,37 @@ for version in (2,10,11,12,13,20,23):
     path.write_text(content.replace(old,new),encoding='utf-8')
 PY_PIN
 
+# The complete installation package already carries the exact helper files.
+# Never download the same Node Agent/geolocation/template files again inside
+# the legacy nested steps: use the checked local snapshot instead.
+python3 - "$STAGE" <<'PY_LOCAL_DEPS'
+from pathlib import Path
+import re, shlex, sys
+root=Path(sys.argv[1])
+assets={
+    2:'wpo-node-agent-install-v2.sh',
+    10:'wpo-node-agent-install-v2.sh',
+    11:'wpo-node-agent-install-v2.sh',
+    12:'wpo-node-agent-install-v2.sh',
+    13:'wpo-node-geo-v13.py',
+    20:'wpo-node-autotemplate-v20.py',
+    23:'wpo-node-agent-install-v2.sh',
+}
+pattern=re.compile(r'''(?m)^curl -4fsSL --retry 3 --connect-timeout \d+ (?:\\\n[ \t]*)?['"]https://raw\.githubusercontent\.com/TonyMaster14/web-panel-online/[^'"\n]+/(?P<asset>wpo-node-agent-install-v2\.sh|wpo-node-geo-v13\.py|wpo-node-autotemplate-v20\.py)['"] -o "\$TMP"$''')
+for version,asset in assets.items():
+    path=root/f'wpo-nodes-lab-v{version}-install.sh'
+    original=path.read_text(encoding='utf-8')
+    packaged=root/asset
+    if not packaged.is_file() or packaged.stat().st_size==0:
+        raise RuntimeError('Нет упакованного файла: '+asset)
+    found=list(pattern.finditer(original))
+    if len(found)!=1 or found[0].group('asset')!=asset:
+        raise RuntimeError('Неожиданная повторная загрузка: '+path.name)
+    replacement='cp -- '+shlex.quote(str(packaged))+' "$TMP"'
+    path.write_text(pattern.sub(lambda m:replacement,original),encoding='utf-8')
+print('Вспомогательные файлы Node Agent берутся из локального пакета.')
+PY_LOCAL_DEPS
+
 # A clean installation already has a healthy running controller. Apply the
 # checked source patches without restarting it after every intermediate edit.
 # The controller is restarted once when the complete final code is ready.
@@ -3254,8 +3286,19 @@ for name in panel.py wpp_ui.py wpp_nodes.py wpp_subscriptions.py wpp-node-agent-
     fi
 done
 
+# Show progress for the actual source stage being applied, not a timed guess.
+# Versions 10-12 are carried by the final combined Node Agent installer.
+wpo_node_stage(){
+    local version="$1" percent
+    [[ -n "${WPO_UI_PROGRESS_FILE:-}" && -f "$WPO_UI_PROGRESS_FILE" ]] || return 0
+    percent=$((80 + version*18/26))
+    printf '%s\tУстановка нод\n' "$percent" > "$WPO_UI_PROGRESS_FILE"
+}
 apply(){
-    local script="$1" file="$2" marker="$3"
+    local script="$1" file="$2" marker="$3" version=1
+    if [[ "$script" =~ -v([0-9]+)-install\.sh$ ]]; then
+        version="${BASH_REMATCH[1]}"
+    fi
     if grep -Fq -- "$marker" "$file" 2>/dev/null; then
         echo "✓ Уже есть: $script"
     else
@@ -3263,6 +3306,7 @@ apply(){
         TOUCHED=1
         bash "$STAGE/$script"
     fi
+    wpo_node_stage "$version"
 }
 apply wpo-nodes-lab-install.sh "$PANEL" "def wpo_pending_load"
 apply wpo-nodes-lab-v2-install.sh "$UI" "wpo-node-card-head"
@@ -3281,6 +3325,7 @@ if ! cmp -s "$STAGE/wpo-node-agent-install-v2.sh" "$AGENT"; then
     TOUCHED=1
     install -m 0700 "$STAGE/wpo-node-agent-install-v2.sh" "$AGENT"
 fi
+wpo_node_stage 12
 
 apply wpo-nodes-lab-v13-install.sh "$PANEL" "# wpo-node-country-v13"
 apply wpo-nodes-lab-v14-install.sh "$UI" "# wpo-node-visual-v14"
@@ -3317,13 +3362,26 @@ python3 -m py_compile "$PANEL" "$UI" "$GEO" "$AUTO"
 bash -n "$AGENT"
 if (( BATCH_RESTART && TOUCHED )); then
     echo '→ Перезапускаю панель один раз после всех правок Nodes Lab'
+    systemctl reset-failed "$SERVICE" 2>/dev/null || true
     systemctl restart "$SERVICE" || die 'Не удалось запустить панель после установки Nodes Lab.'
 fi
-systemctl is-active --quiet "$SERVICE" || die "Служба $SERVICE не активна."
+# A service can be reported active before Python has bound the HTTP port.
+# Only accept the finished controller after its real localhost health route responds.
+PANEL_ROUTE="$(sed -n 's/^Environment=WEBPROXY_PANEL_PATH=//p' /etc/systemd/system/tproxy-panel.service | head -n1)"
+[[ "$PANEL_ROUTE" =~ ^/panel-[a-z0-9-]{3,64}$ ]] || die 'Некорректный адрес панели.'
+READY=0
+for attempt in $(seq 1 12); do
+    if systemctl is-active --quiet "$SERVICE" &&
+       curl -fsS --max-time 3 "http://127.0.0.1:8090${PANEL_ROUTE}/__health" >/dev/null 2>&1; then
+        READY=1
+        break
+    fi
+    sleep 1
+done
+(( READY == 1 )) || die 'Панель не отвечает на локальный health-запрос после настройки Nodes Lab.'
 echo
-echo '✓ WPO Nodes Lab v26 установлен/проверен.'
+echo '✓ Компоненты ноды WPO установлены/проверены.'
 echo "✓ Фиксированная версия: $REF"
 echo "✓ Резервная копия до обновления: $BACKUP"
 echo '✓ Геолокация, флаги, индикаторы по центру и мгновенный выбор шаблонов сайтов сохранены.'
-echo '✓ Основная ветка GitHub main не затронута.'
 echo 'Важно: Node Agent 0.2 управляет HTTPS-страницей и статусом. VPN на удалённой ноде пока не активирован.'

@@ -4241,6 +4241,9 @@ class Handler(BaseHTTPRequestHandler):
             selected_routing=[item for item in local_routing if item is not None]
             subscription_agent=self.headers.get("User-Agent","").lower()
             happ="happ" in subscription_agent
+            # Preserve the tested empty-subscription error instead of an empty import.
+            if happ and not lines:
+                self.send_data("В подписке пока нет активных VLESS или Hysteria2.",409,headers=headers); return
             hiddify="hiddify" in subscription_agent
             requested_format=parse_qs(urlparse(self.path).query).get("format",[""])[0].lower()
             local_count=len(result["users"])
@@ -5167,42 +5170,66 @@ if [[ -e /etc/web-proxy-panel/naive-caddy-owned ]]; then
 fi
 
 
-# Show completion details only after the full controller/Nodes setup in the
-# integrated installer. Standalone panel installation still prints directly.
-# The integrated caller provides an already-created root-only tmpfs file.
-wpo_print_install_summary() {
-    # Final access card: rendered only after all services and Nodes Lab finish.
-    # Keep the panel's real URL and the administrator-supplied credentials.
-    printf '\n'
-    printf '%s\n' '╭──────────────────────────────────────────────────────────────╮'
-    printf '%s\n' '│                     WEB PANEL ONLINE 3.0                     │'
-    if [[ "$UPDATING" == "1" ]]; then
-        printf '%s\n' '│                     ОБНОВЛЕНИЕ ЗАВЕРШЕНО                     │'
-    else
-        printf '%s\n' '│                     УСТАНОВКА ЗАВЕРШЕНА                      │'
+# Final access card: one frame, consistent background and spaced fields.
+# Secrets go only to the private result file, never to the installation log.
+{
+    card_blue=$'\033[38;5;75m'
+    card_value=$'\033[38;5;51m'
+    card_label=$'\033[38;5;153m'
+    card_warning=$'\033[38;5;226m'
+    card_bold=$'\033[1m\033[38;5;153m'
+    card_reset=$'\033[0m'
+    if [[ "${WPO_CARD_COLOR:-1}" == 0 ]]; then
+        card_blue='' card_value='' card_label='' card_warning='' card_bold='' card_reset=''
     fi
-    printf '%s\n' '╰──────────────────────────────────────────────────────────────╯'
-    printf '\n  🌐 АДРЕС ПАНЕЛИ\n'
-    printf '%s\n' '  ──────────────────────────────────────────────────────────'
-    printf '  https://%s%s/login\n' "$DOMAIN" "$PANEL_PATH"
-    printf '\n  👤 ДАННЫЕ ДЛЯ ВХОДА\n'
-    printf '%s\n' '  ──────────────────────────────────────────────────────────'
-    printf '  Логин:  %s\n' "$ADMIN"
-    if [[ "$UPDATING" == "1" ]]; then
-        printf '  Пароль: сохранён (не изменён)\n'
+    card_url="https://${DOMAIN}${PANEL_PATH}/login"
+    card_cols="${WPO_CARD_COLUMNS:-80}"
+    [[ "$card_cols" =~ ^[0-9]+$ ]] || card_cols=80
+    (( card_cols < 28 )) && card_cols=28
+    # Expand only the final card to fit the complete URL, then center it.
+    card_width=${#card_url}
+    (( card_width < 60 )) && card_width=60
+    (( card_width > card_cols-8 )) && card_width=$((card_cols-8))
+    card_left=$(((card_cols-card_width-8)/2+1))
+    card_indent=""
+    printf -v card_rule '%*s' "$((card_width+2))" ''
+    card_rule="${card_rule// /─}"
+    card_line(){
+        local text="$1" color="${2:-$card_label}" link="${3:-}" chunk padding link_open="" link_close=""
+        while (( ${#text} > card_width )); do
+            chunk="${text:0:card_width}"
+            printf "${card_indent}"'%s│ %s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$chunk" "$link_close$card_reset" "$card_blue" "$card_reset"
+            text="${text:card_width}"
+        done
+        printf -v padding '%*s' "$((card_width-${#text}))" ''
+        printf "${card_indent}"'%s│ %s%s%s%s %s│%s\n' "$card_blue" "$color$link_open" "$text" "$link_close$card_reset" "$padding" "$card_blue" "$card_reset"
+    }
+    printf '%s\n'"$card_indent"'%s╭%s╮%s\n' "$card_reset" "$card_blue" "$card_rule" "$card_reset"
+    card_line ''
+    if [[ "$UPDATING" == 1 ]]; then
+        card_line 'WPO 3.0 — ОБНОВЛЕНО' "$card_bold"
     else
-        printf '  Пароль: %s\n' "$PASS"
+        card_line 'WPO 3.0 — УСТАНОВЛЕНО' "$card_bold"
     fi
-    printf '\n%s\n' '────────────────────────────────────────────────────────────────'
-    printf '%s\n' 'Сохраните адрес и данные доступа в надёжном месте.'
-    printf '%s\n' '────────────────────────────────────────────────────────────────'
-}
-
-if [[ -n "${WPO_FINAL_SUMMARY_FILE:-}" ]]; then
-    [[ -f "$WPO_FINAL_SUMMARY_FILE" && ! -L "$WPO_FINAL_SUMMARY_FILE" ]] ||
-        die "Missing secure installation summary file."
-    wpo_print_install_summary > "$WPO_FINAL_SUMMARY_FILE"
-    chmod 0600 "$WPO_FINAL_SUMMARY_FILE"
-else
-    wpo_print_install_summary
-fi
+    card_line ''
+    card_line 'Ссылка на панель:'
+    if (( ${#card_url} <= card_width )); then
+        card_line "$card_url" "$card_value"
+    else
+        # One complete plain URL; the terminal may soft-wrap it, never the script.
+        printf '  %s%s%s\n' "$card_value" "$card_url" "$card_reset"
+    fi
+    card_line ''
+    card_line "Логин: $ADMIN"
+    card_line ''
+    if [[ "$UPDATING" == 1 ]]; then
+        card_line 'Пароль: сохранён (без изменений)'
+    else
+        card_line "Пароль: $PASS"
+    fi
+    card_line ''
+    card_line ''
+    card_line 'Сохраните данные, чтобы не потерять!' "$card_warning"
+    card_line ''
+    printf "${card_indent}"'%s╰%s╯%s\n\n' "$card_blue" "$card_rule" "$card_reset"
+} > "${WPO_UI_RESULT_FILE:-/dev/stdout}"

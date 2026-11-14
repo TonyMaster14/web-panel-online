@@ -1,0 +1,22 @@
+name: WPO installer and node checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell and Python syntax
+        run: |
+          for script in *.sh; do bash -n "$script" || exit; done
+          python3 -m compileall -q .
+      - name: Test protocols, installer and bundled nodes without a VPS
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Exercise terminal success and failure paths
+        run: python3 tests/test_installer_wizard_integrated.py
