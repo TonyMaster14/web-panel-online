@@ -62,6 +62,43 @@ class NewUserFormTests(unittest.TestCase):
             self.assertIn(marker,self.html,marker)
         self.assertIn("Новый пользователь",self.html)
         self.assertNotIn("Один ключ",self.html)
+    def test_old_wizard_js_replaced_without_busting_other_actions(self):
+        import ast
+        import subprocess
+        raw=(ROOT/"wpp_ui.py").read_text(encoding="utf-8")
+        tree=ast.parse(raw)
+        node=next(node for node in tree.body if isinstance(node,ast.Assign)
+                  and any(getattr(target,"id","")=="CLIENTS_JS" for target in node.targets))
+        legacy=ast.literal_eval(node.value)
+        fixed=wpo_user_v28.replace_legacy_create_js(legacy)
+        self.assertIn("function showCreateError(message)",fixed)
+        self.assertIn("const createDialog=",fixed)
+        self.assertNotIn("function updateCreate(){",fixed)
+        self.assertNotIn("const vlessCdnProvider=",fixed)
+        self.assertIn("async function requestClient(fields)",fixed)
+        self.assertIn("new URLSearchParams(new FormData(createForm))",fixed)
+        for name,script in (("new wizard",wpo_user_v28.LEGACY_CREATE_JS),
+                            ("date picker",wpo_user_v28.SCRIPT),
+                            ("complete clients JS",fixed.replace("<script>","").replace("</script>",""))):
+            with self.subTest(name=name):
+                res=subprocess.run(["node","--check"],input=script,text=True,
+                                    capture_output=True,timeout=8)
+                self.assertEqual(res.returncode,0,res.stderr)
+        rendered=wpo_user_v28.form("/panel-demo","csrf",self.conns,self.nodes,{})
+        self.assertIn("const tz=Intl.DateTimeFormat()",rendered)
+        self.assertIn("name=\"expires_at\"",rendered)
+
+    def test_patch_wires_new_js_on_both_fresh_and_existing_panels(self):
+        raw=(ROOT/"wpp_ui.py").read_text(encoding="utf-8")
+        updated=wpo_v28_apply.patch_ui(raw)
+        self.assertIn("wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)",updated)
+        self.assertIn("＋ Новый пользователь",updated)
+        self.assertEqual(wpo_v28_apply.patch_ui(updated),updated)
+        previous=updated.replace("wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)","CLIENTS_JS")
+        self.assertIn("wpo_user_v28.replace_legacy_create_js(CLIENTS_JS)",
+                      wpo_v28_apply.patch_ui(previous))
+        compile(updated,"wpp_ui_patched.py","exec")
+
     def test_time_zone_and_calendar_constraints(self):
         self.assertIn('type="datetime-local"',self.html)
         self.assertIn('max="2090-12-31T23:59"',self.html)
