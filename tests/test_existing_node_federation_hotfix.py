@@ -37,6 +37,18 @@ class ExistingNodeHotfix(unittest.TestCase):
         self.assertIn('cp -a "$BACKUP/wpo_node_eight.py" "$MODULE"',S)
         self.assertIn('ROLLBACK=0',S)
 
+    def test_service_sandbox_no_longer_blocks_native_config_registries(self):
+        # The original Node Agent unit had ProtectSystem=strict with only
+        # /etc/wpp-node-vpn writable. That made the first VLESS sync fail
+        # because native_apply tried to write /etc/tproxy-server.
+        vpn_installer=(ROOT/"wpo-node-vpn-enable.sh").read_text()
+        self.assertIn("ProtectSystem=strict",vpn_installer)
+        allowlist="ReadWritePaths=/etc/wpp-node-vpn -/etc/systemd/system -/etc/tproxy-server -/etc/web-proxy-panel"
+        self.assertIn(allowlist,vpn_installer)
+        self.assertIn("ReadWritePaths=-/etc/systemd/system -/etc/tproxy-server -/etc/web-proxy-panel",S)
+        self.assertIn("systemctl daemon-reload",S)
+        self.assertIn('DROPIN=/etc/systemd/system/wpo-node-vpn.service.d/10-wpo-native-writes.conf',S)
+
     def test_engine_patch_keeps_real_xray_apply_and_skips_unrelated_services(self):
         self.assertIn('native_changed = assemble(old) != assemble(new)',ENGINE)
         self.assertIn('xray.apply(new)',ENGINE)
