@@ -126,6 +126,27 @@ class EightEngineTests(unittest.TestCase):
         self.assertIn(" -H ",unit)
         self.assertNotIn("bash -c",unit)
 
+    def test_web_relay_has_valid_private_bootstrap_profile_without_users(self):
+        install=(ROOT/"wpo-node-eight-enable.sh").read_text()
+        engine_src=(ROOT/"wpo_node_eight.py").read_text()
+        self.assertIn("relay-bootstrap-secret",install)
+        self.assertIn("'name':'node-bootstrap'",install)
+        self.assertIn('"name": "node-bootstrap"',engine_src)
+        self.assertIn('if not relay_profiles:',engine_src)
+        self.assertIn('os.chmod(RELAY_CONFIG, 0o400)',engine_src)
+
+    def test_telegram_profiles_keep_secret_out_of_public_systemd_units(self):
+        record=engine.build_profile("f"*64,"web",None)
+        unit=engine._mt_unit(record)
+        self.assertIn("WPO_MTPROTO_SECRET",unit)
+        self.assertIn("EnvironmentFile=/etc/wpp-node-vpn/",unit)
+        self.assertNotIn(record["secret"],unit)
+        self.assertIn("User=mtproxy",unit)
+        self.assertIn("wpo-node-mt-firewall.service",unit)
+        firewall=(ROOT/"wpo-node-eight-enable.sh").read_text()
+        self.assertIn("tcp dport 24000-24949 drop",firewall)
+        self.assertIn("tcp dport 27000-28949 drop",firewall)
+
     def test_installer_contains_all_pinned_real_backends_and_auto_registers(self):
         installer=(ROOT/"wpo-node-eight-enable.sh").read_text()
         agent=(ROOT/"wpo-node-agent-install-v2.sh").read_text()
