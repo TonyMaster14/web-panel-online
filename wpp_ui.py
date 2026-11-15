@@ -1204,7 +1204,7 @@ def routing_ui(connections, state, path, csrf):
 /* Visually group the two actions, flush to the right of one shared footer. */
 .routing-form .routing-actions{{
     display:flex;align-items:center;justify-content:flex-end;
-    gap:12px;min-height:76px;padding:14px 18px;
+    gap:12px;min-height:76px;padding:14px 12px 14px 18px; /* wpo-routing-buttons-shift-v7 */
     background:var(--surface);border-top:1px solid var(--line)
 }}
 .routing-form .routing-actions-primary{{
