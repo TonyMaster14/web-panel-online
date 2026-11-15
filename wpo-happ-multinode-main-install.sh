@@ -126,7 +126,7 @@ TimeoutStartSec=240
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/tproxy-panel
+ReadWritePaths=/var/lib/tproxy-panel /run/lock
 UNIT
 cat >/etc/systemd/system/wpo-happ-preparer.path <<'UNIT'
 [Unit]
