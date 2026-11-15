@@ -121,6 +121,22 @@ class TestNodeInstallState(unittest.TestCase):
             self.assertEqual(result.returncode,20,result.stderr)
             self.assertTrue(cfg.exists())
 
+    def test_legacy_provisioned_node_offline_is_not_cleared(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            cfg.write_text(json.dumps({"domain":"old.example.net","version":"0.4.0"}))
+            (root/"etc/wpp-node-vpn").mkdir(parents=True)
+            (root/"etc/wpp-node-vpn/settings.json").write_text(
+                json.dumps({"domain":"old.example.net"})
+            )
+            for name in ("wpo-node-vpn.service","wpo-node-relay.service"):
+                (root/"etc/systemd/system"/name).write_text("Service=1")
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,20,result.stderr)
+            self.assertIn("Нода уже установлена",result.stdout)
+            self.assertTrue(cfg.exists())
+            self.assertFalse((root/"backups").exists())
+
     def test_nonempty_vpn_profiles_block_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
             root,cfg,code,env=self.sandbox(temp)
