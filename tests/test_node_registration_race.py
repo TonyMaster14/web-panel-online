@@ -66,6 +66,40 @@ class TestNodeEnrollmentRace(unittest.TestCase):
             fix.patch(source.replace("node_api.save_nodes(NODES_FILE,current)",
                                      "print('unsafe change')"))
 
+    def test_controller_alternative_enrollment_handler_still_updates_status(self):
+        # Real controllers may have extra registration bookkeeping between
+        # saving a node and clearing pending status. Earlier patch rejected it.
+        source=fixture().replace(
+            'pending.pop(digest,None); wpo_pending_save(pending)',
+            'print("newer enrollment bookkeeping")\\n'
+            '                 pending.pop(digest,None); wpo_pending_save(pending)'
+        )
+        # Match a modified implementation without relying on the fixture's
+        # indentation across Python source revisions.
+        source=fixture().replace(fix.OLD_ENROLL,
+            'node_api.save_nodes(NODES_FILE,registered)\\n'
+            '                     observed=node_api.load_nodes(NODES_FILE)\\n'
+            '                 pending.pop(digest,None); wpo_pending_save(pending)')
+        source=source.replace('\\n', '\n')
+        # Exactly the mismatch encountered on the installed WPO controller.
+        self.assertEqual(source.count(fix.OLD_ENROLL),0)
+        modified,changed=fix.patch(source)
+        self.assertTrue(changed)
+        self.assertIn(fix.MARKER,modified)
+        self.assertIn('observed=node_api.load_nodes(NODES_FILE)',modified)
+        self.assertIn('current_live=node_api.load_nodes(NODES_FILE)',modified)
+        compile(modified,"installed_controller.py","exec")
+
+    def test_pending_handler_version_can_vary(self):
+        source=fixture().replace(fix.OLD_PENDING,
+              fix.OLD_PENDING.replace('payload=self.json_request(16384);',
+                                      'payload=self.json_request(32768);'))
+        self.assertNotIn(fix.OLD_PENDING,source)
+        modified,changed=fix.patch(source)
+        self.assertTrue(changed)
+        self.assertIn(fix.MARKER,modified)
+        compile(modified,"installed_controller.py","exec")
+
     def run_poll(self,scenario):
         source,_=fix.patch(fixture())
         registry=FakeRegistry()
