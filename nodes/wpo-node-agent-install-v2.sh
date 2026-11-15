@@ -60,14 +60,10 @@ if marker.exists():
     print('Нода уже установлена и зарегистрирована: '+state['domain'])
     sys.exit(20)
 
-# Existing legacy agents did not write a receipt. Do not overwrite a node
-# where all three real services are active, even if the receipt is missing.
-if (agent_cfg.is_file() and
-    all(service_active(u) for u in (
-        'wpp-node-agent.service','wpo-node-vpn.service',
-        'wpo-node-relay.service'))):
-    print('Нода уже установлена. Повторная установка не требуется.')
-    sys.exit(20)
+# Active services are NOT proof of a completed installation. A failed
+# install can leave the Agent, VPN API, Xray and WEB relay running.
+# Only the receipt written after successful controller enrollment may stop
+# a new attempt with "Нода уже установлена".
 
 if Path('/opt/tproxy-panel/panel.py').exists() or service_active('tproxy-panel.service'):
     refuse('обнаружена основная панель WPO, а не отдельный VPS ноды.')
@@ -89,15 +85,10 @@ try:
 except (OSError,ValueError,TypeError,AttributeError):
     refuse('невозможно прочитать прежнюю конфигурацию ноды.')
 
-# Protect fully provisioned pre-receipt versions even while their services
-# are stopped. The 0.4.0 version is only written after all eight engines
-# were verified by the native engine bootstrap.
-if (config.get('version') == '0.4.0'
-    and (vpn_dir/'settings.json').is_file()
-    and (units_dir/'wpo-node-vpn.service').is_file()
-    and (units_dir/'wpo-node-relay.service').is_file()):
-    print('Нода уже установлена (устаревшая версия без отметки регистрации).')
-    sys.exit(20)
+# Version 0.4.0 is written by the eight-engine installer BEFORE controller
+# enrollment, so it cannot be used to infer that the installation completed.
+# Old nodes without a receipt are treated as incomplete only if there are no
+# real user profiles. The following safeguards preserve all unknown data.
 
 # Preserve all user credentials. A valid registry with any real entries
 # makes automatic cleanup unsafe, even when its services are stopped.
@@ -132,7 +123,8 @@ if awg.exists() and any(awg.glob('*.json')):
     refuse('обнаружены сохранённые профили AmneziaWG.')
 
 if mode=='check':
-    print('Обнаружена незавершённая установка Node Agent; будет очищена перед установкой.')
+    print('Регистрация ноды не подтверждена: предыдущая установка незавершена.')
+    print('Перед новым запуском остатки WPO будут сохранены в резервную копию и очищены.')
     sys.exit(0)
 
 # Do not delete global apt packages, Caddy/ACME state, shared Unix users or
