@@ -114,7 +114,7 @@ exit 0
             wizard=source.split(BOUNDARY,1)[0]
             assert r"printf '\\n  %sДомен: %s%s" not in wizard
             assert "printf '  %sEmail: %s%s" not in wizard
-            self.assertIn(r"printf '\\n  %sУСТАНОВКА НОДЫ …%s\\n\\n'",wizard)
+            self.assertEqual(sum("УСТАНОВКА НОДЫ …" in line for line in wizard.splitlines()),1)
             self.assertIn("node-install-$(date -u +%Y%m%dT%H%M%SZ)-$$.log",wizard)
             # Verify alignment in the captured real SSH terminal, ignoring ANSI.
             plain=re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", out)
