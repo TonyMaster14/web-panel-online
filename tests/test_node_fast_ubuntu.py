@@ -38,7 +38,7 @@ class TestNodeFastUbuntu(unittest.TestCase):
             'ID='+os_id+'\n'
             'command(){ if [[ "@{1:-}" == -v && "@{2:-}" == caddy ]]; then return 1; fi; builtin command "$@"; }\n'
             'apt-get(){ printf "APT %s\\n" "$*"; }\n'
-            ('apt-cache(){ return 0; }\n' if distro_package else 'apt-cache(){ return 1; }\n')
+            +('apt-cache(){ return 0; }\n' if distro_package else 'apt-cache(){ return 1; }\n')
             +START+"\n".join(cleaned)+"\n"
         ).replace("@{","$"+"{")
         return subprocess.run(["bash","-c",script],capture_output=True,text=True,timeout=4)
