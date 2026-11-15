@@ -1,0 +1,175 @@
+"""Prove the node installer cannot destroy a registered node or user profiles.
+
+Tests run the exact embedded preflight Python logic against temporary paths
+with mocked systemd and nft; no host services or real directories touched.
+"""
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+
+ROOT=Path(__file__).resolve().parents[1]
+AGENT=ROOT/"nodes/wpo-node-agent-install-v2.sh"
+BEGIN="python3 - \"$1\" <<'PY_WPO_NODE_STATE'\n"
+END="\nPY_WPO_NODE_STATE"
+
+
+class TestNodeInstallState(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        content=AGENT.read_text(encoding="utf-8")
+        assert content.count(BEGIN)==1
+        assert content.count(END)==1
+        cls.logic=content.split(BEGIN,1)[1].split(END,1)[0]
+        cls.content=content
+        assert content.index('PY_WPO_NODE_REGISTERED')>content.index('if ENROLL_RESULT=')
+        assert content.index('wpo_node_install_state cleanup')<content.index('apt-get update')
+
+    def sandbox(self,location,active=()):
+        root=Path(location)
+        (root/"bin").mkdir()
+        (root/"etc/wpp-node-agent").mkdir(parents=True)
+        (root/"opt/wpp-node-agent").mkdir(parents=True)
+        (root/"etc/systemd/system").mkdir(parents=True)
+        (root/"etc/caddy").mkdir(parents=True)
+        (root/"etc/caddy/Caddyfile").write_text("node-old.example.net { respond OK }\n")
+        script=root/"bin/systemctl"
+        script.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$1\" = is-active ]; then\n"
+            "  case \"$3\" in "+ "|".join("'"+x+"'" for x in active)+") exit 0;; esac\n"
+            "  exit 3\n"
+            "fi\n"
+            "exit 0\n"
+        )
+        script.chmod(0o755)
+        nft=root/"bin/nft"
+        nft.write_text("#!/bin/sh\nexit 0\n")
+        nft.chmod(0o755)
+        cfg=root/"etc/wpp-node-agent/config.json"
+        cfg.write_text(json.dumps({"domain":"old.example.net","version":"0.2.0"}))
+        (root/"opt/wpp-node-agent/agent.py").write_text("# mock WPO Agent\n")
+        logic=self.logic
+        mapping={
+            "/etc/wpp-node-agent":str(root/"etc/wpp-node-agent"),
+            "/opt/wpp-node-agent":str(root/"opt/wpp-node-agent"),
+            "/etc/wpp-node-vpn":str(root/"etc/wpp-node-vpn"),
+            "/etc/systemd/system":str(root/"etc/systemd/system"),
+            "/opt/tproxy-panel":str(root/"opt/tproxy-panel"),
+            "/etc/tproxy-server":str(root/"etc/tproxy-server"),
+            "/etc/mtproxy":str(root/"etc/mtproxy"),
+            "/etc/web-proxy-panel":str(root/"etc/web-proxy-panel"),
+            "/var/www/wpp-node-site":str(root/"var/www/wpp-node-site"),
+            "/var/backups":str(root/"backups"),
+            "/etc/caddy/Caddyfile":str(root/"etc/caddy/Caddyfile"),
+        }
+        for old,new in sorted(mapping.items(),key=lambda pair: -len(pair[0])):
+            logic=logic.replace(old,new)
+        env=os.environ.copy()
+        env["PATH"]=str(root/"bin")+os.pathsep+env.get("PATH","")
+        return root,cfg,logic,env
+
+    def run_preflight(self,code,env,mode="check"):
+        return subprocess.run(
+            ["python3","-c",code,mode],
+            text=True,capture_output=True,env=env,timeout=10
+        )
+
+    def test_incomplete_is_cleaned_before_new_attempt_with_backup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"etc/wpp-node-vpn").mkdir(parents=True)
+            (root/"etc/wpp-node-vpn/settings.json").write_text(
+                json.dumps({"domain":"different.example.net"})
+            )
+            (root/"etc/wpp-node-vpn/profiles.json").write_text('{"profiles":{}}')
+            (root/"etc/systemd/system/wpp-node-agent.service").write_text("Agent=1")
+            self.assertEqual(self.run_preflight(code,env).returncode,0)
+            clean=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(clean.returncode,0,clean.stderr)
+            self.assertFalse(cfg.exists())
+            self.assertFalse((root/"opt/wpp-node-agent/agent.py").exists())
+            self.assertFalse((root/"etc/wpp-node-vpn/settings.json").exists())
+            self.assertTrue((root/"etc/caddy/Caddyfile").exists())
+            backups=list((root/"backups").glob("wpo-node-incomplete-*"))
+            self.assertEqual(len(backups),1)
+            self.assertTrue((backups[0]/"node-vpn/settings.json").exists())
+            self.assertTrue((backups[0]/"node-config/config.json").exists())
+            self.assertTrue((backups[0]/"wpp-node-agent.service").exists())
+
+    def test_enrolled_node_is_never_reinstalled_even_when_offline(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"etc/wpp-node-agent/registered.json").write_text(
+                json.dumps({"domain":"old.example.net","registered":True})
+            )
+            for mode in ("check","cleanup"):
+                result=self.run_preflight(code,env,mode)
+                self.assertEqual(result.returncode,20,result.stderr)
+                self.assertIn("Нода уже установлена",result.stdout)
+                self.assertTrue(cfg.exists())
+            self.assertFalse((root/"backups").exists())
+
+    def test_legacy_live_node_is_not_cleaned(self):
+        live=("wpp-node-agent.service","wpo-node-vpn.service","wpo-node-relay.service")
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp,live)
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,20,result.stderr)
+            self.assertTrue(cfg.exists())
+
+    def test_nonempty_vpn_profiles_block_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"etc/wpp-node-vpn").mkdir(parents=True)
+            (root/"etc/wpp-node-vpn/profiles.json").write_text(
+                json.dumps({"profiles":{"one":{"name":"User"}}})
+            )
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,30,result.stderr)
+            self.assertIn("пользовательские VPN",result.stderr)
+            self.assertTrue(cfg.exists())
+
+    def test_real_web_proxy_profiles_block_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"etc/tproxy-server").mkdir(parents=True)
+            (root/"etc/tproxy-server/profiles.json").write_text(json.dumps(
+                {"profiles":[{"name":"node-bootstrap"},{"name":"customer-1"}]}
+            ))
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,30,result.stderr)
+            self.assertTrue(cfg.exists())
+
+    def test_corrupt_profile_registry_blocks_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"etc/wpp-node-vpn").mkdir(parents=True)
+            (root/"etc/wpp-node-vpn/profiles.json").write_text("{bad")
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,30,result.stderr)
+            self.assertTrue(cfg.exists())
+
+    def test_broken_receipt_blocks_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"etc/wpp-node-agent/registered.json").write_text("{bad")
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,30,result.stderr)
+            self.assertTrue(cfg.exists())
+
+    def test_no_node_does_not_touch_host(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            cfg.unlink()
+            (root/"opt/wpp-node-agent/agent.py").unlink()
+            (root/"opt/wpp-node-agent").rmdir()
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertFalse((root/"backups").exists())
+
+
+if __name__=="__main__":
+    unittest.main()
