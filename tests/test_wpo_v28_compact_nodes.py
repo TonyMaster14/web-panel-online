@@ -28,6 +28,7 @@ class CompactNodePickerTest(unittest.TestCase):
         self.assertIn("Швеция",html)
         self.assertIn('title="Основная нода"',html)
         self.assertEqual(html.count('class="wpo-v28-node-star"'),1)
+        self.assertIn('color:#facc15;font-size:15px;font-weight:750;',html)
         self.assertEqual(html.count('class="wpo-v28-node-title"'),3)
         self.assertNotIn("VPN готов",html)
         self.assertNotIn("VPN пока не готова",html)
