@@ -40,8 +40,13 @@ class TestNodeInstallState(unittest.TestCase):
         script.write_text(
             "#!/bin/sh\n"
             "if [ \"$1\" = is-active ]; then\n"
-            "  case \"$3\" in "+ pattern +") exit 0;; esac\n"
+            "  case \"$3\" in "+pattern+")\n"
+            "    [ -e \"$(dirname \"$0\")/stopped-$3\" ] || exit 0;;\n"
+            "  esac\n"
             "  exit 3\n"
+            "fi\n"
+            "if [ \"$1\" = disable ] && [ \"$2\" = --now ]; then\n"
+            "  touch \"$(dirname \"$0\")/stopped-$3\"\n"
             "fi\n"
             "exit 0\n"
         )
@@ -113,15 +118,35 @@ class TestNodeInstallState(unittest.TestCase):
                 self.assertTrue(cfg.exists())
             self.assertFalse((root/"backups").exists())
 
-    def test_legacy_live_node_is_not_cleaned(self):
+    def test_active_services_after_failed_install_do_not_mean_registered(self):
+        # This reproduces the VPS report: all services were active but the
+        # installer failed at 45%, before controller enrollment and receipt.
         live=("wpp-node-agent.service","wpo-node-vpn.service","wpo-node-relay.service")
         with tempfile.TemporaryDirectory() as temp:
             root,cfg,code,env=self.sandbox(temp,live)
-            result=self.run_preflight(code,env,"cleanup")
-            self.assertEqual(result.returncode,20,result.stderr)
-            self.assertTrue(cfg.exists())
+            cfg.write_text(json.dumps({"domain":"old.example.net","version":"0.4.0"}))
+            (root/"etc/wpp-node-vpn").mkdir(parents=True)
+            (root/"etc/wpp-node-vpn/settings.json").write_text(
+                json.dumps({"domain":"old.example.net"})
+            )
+            (root/"etc/wpp-node-vpn/profiles.json").write_text('{"profiles":{}}')
+            for name in live:
+                (root/"etc/systemd/system"/name).write_text("Service=1")
+            check=self.run_preflight(code,env,"check")
+            self.assertEqual(check.returncode,0,check.stderr)
+            self.assertIn("незавершена",check.stdout)
+            self.assertNotIn("Нода уже установлена",check.stdout)
+            clean=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(clean.returncode,0,clean.stderr)
+            self.assertFalse(cfg.exists())
+            self.assertFalse((root/"opt/wpp-node-agent/agent.py").exists())
+            self.assertTrue(list((root/"backups").glob("wpo-node-incomplete-*")))
+            for name in live:
+                self.assertTrue((root/"bin"/("stopped-"+name)).exists(),name)
 
-    def test_legacy_provisioned_node_offline_is_not_cleared(self):
+    def test_version_040_and_existing_units_before_enroll_are_incomplete(self):
+        # Version 0.4.0 is set BEFORE the enroll request. It is not proof
+        # that the node ever reached 100% of the installation.
         with tempfile.TemporaryDirectory() as temp:
             root,cfg,code,env=self.sandbox(temp)
             cfg.write_text(json.dumps({"domain":"old.example.net","version":"0.4.0"}))
@@ -132,10 +157,9 @@ class TestNodeInstallState(unittest.TestCase):
             for name in ("wpo-node-vpn.service","wpo-node-relay.service"):
                 (root/"etc/systemd/system"/name).write_text("Service=1")
             result=self.run_preflight(code,env,"cleanup")
-            self.assertEqual(result.returncode,20,result.stderr)
-            self.assertIn("Нода уже установлена",result.stdout)
-            self.assertTrue(cfg.exists())
-            self.assertFalse((root/"backups").exists())
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertFalse(cfg.exists())
+            self.assertTrue(list((root/"backups").glob("wpo-node-incomplete-*")))
 
     def test_nonempty_vpn_profiles_block_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -148,6 +172,21 @@ class TestNodeInstallState(unittest.TestCase):
             self.assertEqual(result.returncode,30,result.stderr)
             self.assertIn("пользовательские VPN",result.stderr)
             self.assertTrue(cfg.exists())
+
+    def test_failed_install_with_active_services_and_real_profiles_is_preserved(self):
+        # A genuinely used legacy node without a receipt must not lose data.
+        active=("wpp-node-agent.service","wpo-node-vpn.service","wpo-node-relay.service")
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp,active)
+            (root/"etc/wpp-node-vpn").mkdir(parents=True)
+            (root/"etc/wpp-node-vpn/profiles.json").write_text(
+                json.dumps({"profiles":{"existing-client":{"name":"User"}}})
+            )
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,30,result.stderr)
+            self.assertTrue(cfg.exists())
+            self.assertFalse((root/"backups").exists())
+            self.assertFalse(list((root/"bin").glob("stopped-*")))
 
     def test_real_web_proxy_profiles_block_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
