@@ -200,7 +200,9 @@ wpo_install_state() {
 }
 
 wpo_clean_partial() {
-    local removal_script="" temporary_script="" after
+    local phase="${1:-partial}" removal_script="" temporary_script="" after
+    [[ "$phase" == partial || "$phase" == installed ]] ||
+        error 'Недопустимый режим очистки WPO.'
     # Refuse cleanup while another installation or update holds the lock.
     command -v flock >/dev/null 2>&1 || error 'Не найден flock (util-linux).'
     exec 7>/run/lock/web-panel-proxy.lock
@@ -210,9 +212,16 @@ wpo_clean_partial() {
     flock -u 7
     exec 7>&-
 
-    printf '\n%sОбнаружена незавершённая установка WPO.%s\n' "$cyan" "$reset"
+    if [[ "$phase" == installed ]]; then
+        printf '\n%sУдаляю прежнюю панель WPO по подтверждению yes.%s\n' "$cyan" "$reset"
+    else
+        printf '\n%sОбнаружена незавершённая установка WPO.%s\n' "$cyan" "$reset"
+    fi
     printf '%sОчищаю компоненты WPO перед новой установкой...%s\n' "$ice" "$reset"
-    if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/uninstall-web-proxy.sh" ]]; then
+    if [[ -n "${WPO_REINSTALL_STAGED_SOURCE:-}" &&
+          -s "$WPO_REINSTALL_STAGED_SOURCE/uninstall-web-proxy.sh" ]]; then
+        removal_script="$WPO_REINSTALL_STAGED_SOURCE/uninstall-web-proxy.sh"
+    elif [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/uninstall-web-proxy.sh" ]]; then
         removal_script="$LOCAL_BASE/uninstall-web-proxy.sh"
     elif [[ -s /usr/local/sbin/web-panel-proxy-uninstall ]]; then
         removal_script=/usr/local/sbin/web-panel-proxy-uninstall
@@ -226,9 +235,20 @@ wpo_clean_partial() {
         fi
         removal_script="$temporary_script"
     fi
-    if ! bash -n "$removal_script" || ! bash "$removal_script"; then
+    if ! bash -n "$removal_script"; then
         [[ -z "$temporary_script" ]] || rm -f -- "$temporary_script"
-        error 'Очистка незавершённой установки не удалась. Новая установка не запущена.'
+        error 'Скрипт удаления WPO повреждён. Новая установка не запущена.'
+    fi
+    # During the terminal wizard, write the verbose removal output into the
+    # installer log, not over the progress bar on the operator's screen.
+    if (( USE_WIZARD )) && [[ -n "${LOG:-}" ]]; then
+        if ! bash "$removal_script" >> "$LOG" 2>&1; then
+            [[ -z "$temporary_script" ]] || rm -f -- "$temporary_script"
+            error "Очистка WPO не удалась. Проверьте журнал: $LOG"
+        fi
+    elif ! bash "$removal_script"; then
+        [[ -z "$temporary_script" ]] || rm -f -- "$temporary_script"
+        error 'Очистка WPO не удалась. Новая установка не запущена.'
     fi
     [[ -z "$temporary_script" ]] || rm -f -- "$temporary_script"
     after="$(wpo_install_state)"
@@ -236,15 +256,68 @@ wpo_clean_partial() {
     printf '%sОстатки WPO очищены. Начинаю новую установку.%s\n\n' "$success" "$reset"
 }
 
-# Run BEFORE the classic installer or wizard. A completed panel must
-# never be silently updated or overwritten by a second install.sh.
+# A completed panel can be replaced only after an explicit interactive
+# "yes". Do not use automatic -y flags or infer consent from redirected stdin.
+WPO_REINSTALL_APPROVED=0
+wpo_offer_reinstall(){
+    printf '\n%sWEB PANEL ONLINE уже установлена на этом VPS.%s\n' "$cyan" "$reset"
+    printf '%sВНИМАНИЕ: новая установка удалит ВСЕ данные и компоненты WPO:%s\n' "$red" "$reset"
+    printf 'пользователей, подписки, пароли, ключи, ноды и настройки.\n'
+    printf 'Ubuntu, SSH и посторонние проекты не удаляются.\n'
+    if [[ ! -r /dev/tty || ! -w /dev/tty ]]; then
+        error 'Повторная установка требует ручного подтверждения yes/no в SSH-терминале.'
+    fi
+    local answer=""
+    while true; do
+        printf 'Установить новую панель? (yes/no): ' > /dev/tty
+        IFS= read -r answer < /dev/tty || exit 130
+        case "$answer" in
+            yes|YES|Yes)
+                WPO_REINSTALL_APPROVED=1
+                printf '%sСогласие получено. Сначала проверю новый пакет и настройки.%s\n' "$ice" "$reset"
+                return 0
+                ;;
+            no|NO|No|'')
+                printf 'Отмена: прежняя панель и её данные сохранены.\n'
+                exit 0
+                ;;
+            *)
+                printf 'Введите только yes или no.\n' > /dev/tty
+                ;;
+        esac
+    done
+}
+# Only remove the old panel after fetching a COMPLETE installer package.
+# Failed source downloads, cancelled credentials and incorrect DNS must never
+# delete a working panel. Both interactive and classic paths call this guard.
+wpo_reinstall_stage(){
+    [[ "$WPO_REINSTALL_APPROVED" == 1 ]] || return 0
+    local source="$1" host_ips="" vps_ip=""
+    [[ -s "$source/install-final.sh" && -s "$source/node-install.sh" &&
+       -s "$source/uninstall-web-proxy.sh" ]] ||
+        error 'Новый пакет неполный. Существующая панель сохранена.'
+    bash -n "$source/install-final.sh" &&
+        bash -n "$source/uninstall-web-proxy.sh" ||
+        error 'Ошибка синтаксиса нового пакета. Существующая панель сохранена.'
+    if (( USE_WIZARD )); then
+        # Verify the *new* domain before touching old clients and credentials.
+        vps_ip="$(curl -4fsS --connect-timeout 5 --max-time 12 https://api.ipify.org 2>/dev/null || true)"
+        host_ips="$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u || true)"
+        [[ "$vps_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+            error 'Не удалось определить IPv4 VPS. Старая панель сохранена.'
+        grep -Fxq "$vps_ip" <<< "$host_ips" ||
+            error "DNS домена $DOMAIN не указывает на этот VPS ($vps_ip). Старая панель сохранена."
+        printf '4\tОчистка прежней панели\n' > "$PROGRESS"
+    fi
+    WPO_REINSTALL_STAGED_SOURCE="$source"
+    wpo_clean_partial installed
+    WPO_REINSTALL_APPROVED=0
+}
+# Run BEFORE the classic installer or wizard. A completed panel must not be
+# silently overwritten by a second install.sh.
 WPO_INSTALL_STATE="$(wpo_install_state)"
 case "$WPO_INSTALL_STATE" in
-    installed)
-        printf '\n%sWEB PANEL ONLINE уже установлена на этом VPS.%s\n' "$cyan" "$reset"
-        printf 'Установка не запущена, существующая панель и данные сохранены.\n'
-        exit 0
-        ;;
+    installed) wpo_offer_reinstall ;;
     protected)
         error 'Обнаружены данные прежней WPO с неизвестным состоянием. Автоматическая очистка отменена, чтобы не потерять данные.'
         ;;
@@ -256,6 +329,7 @@ esac
 # Classic mode remains compatible with previous invocation patterns.
 if (( ! USE_WIZARD )); then
     if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
+        wpo_reinstall_stage "$LOCAL_BASE"
         bash "$LOCAL_BASE/install-final.sh"
         exit $?
     fi
@@ -272,6 +346,7 @@ if (( ! USE_WIZARD )); then
     fi
     [[ -s "$WORK/source/install-final.sh" ]] || error 'Неполный пакет GitHub.'
     chmod 0700 "$WORK/source"/*.sh
+    wpo_reinstall_stage "$WORK/source"
     bash "$WORK/source/install-final.sh"
     exit $?
 fi
@@ -431,6 +506,8 @@ fi
     printf '\n'; error "Неполный пакет установщика. Журнал: $LOG"
 }
 chmod 0700 "$SOURCE"/*.sh
+# New package, access credentials and DNS are ready; only now wipe old WPO.
+wpo_reinstall_stage "$SOURCE"
 # Backend milestones stay in the log but never jump the visible percent.
 wpo_progress_tick
 
