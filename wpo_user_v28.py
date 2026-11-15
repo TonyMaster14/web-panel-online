@@ -216,7 +216,7 @@ STYLE = """
 .wpo-v28-node-title strong{display:block;min-width:0;font-size:11px;
  line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wpo-v28-node-star{display:inline-flex;align-items:center;justify-content:center;
- flex:0 0 auto;color:var(--accent);font-size:15px;font-weight:750;
+ flex:0 0 auto;color:#facc15;font-size:15px;font-weight:750;
  line-height:1}
 .wpo-v28-dialog .unavailable{opacity:.48;cursor:not-allowed}
 .wpo-v28-dialog .unavailable .wpo-v28-radio i{animation:none}
