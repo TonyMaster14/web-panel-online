@@ -55,11 +55,15 @@ done
     def test_progress_cannot_outrun_actual_checkpoints(self):
         src=SOURCE.read_text(encoding="utf-8")
         wizard=src.split("# WPO_NODE_WIZARD_END",1)[0]
-        self.assertIn("node_percent=$node_confirmed",wizard)
+        self.assertNotIn("node_percent=$node_confirmed",wizard)
         self.assertNotIn("wanted=$((1+elapsed*98/",wizard)
         tick=wizard.split("node_tick(){",1)[1].split("  # Domain and email",1)[0]
-        self.assertNotIn("node_percent=$((node_percent+1))",tick)
+        self.assertIn("node_percent < ceiling",tick)
+        self.assertIn("node_percent=$((node_percent+1))",tick)
+        self.assertIn("98) ceiling=99 ;;",tick)
+        self.assertIn("node_confirmed",tick)
         self.assertIn("while (( node_percent < 100 )); do",wizard)
+        self.assertIn("if (( status != 0 )); then",wizard)
 
 if __name__=="__main__":
     unittest.main()
