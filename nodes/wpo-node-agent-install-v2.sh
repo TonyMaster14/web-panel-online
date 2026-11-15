@@ -53,7 +53,7 @@ def refuse(reason):
 if marker.exists():
     try:
         state=json.loads(marker.read_text(encoding='utf-8'))
-        if not isinstance(state,dict) or not state.get('domain') or not state.get('node_id'):
+        if not isinstance(state,dict) or not state.get('domain') or state.get('registered') is not True:
             raise ValueError('invalid registration receipt')
     except (OSError,ValueError,TypeError):
         refuse('некорректная отметка регистрации. Требуется ручная проверка.')
@@ -925,6 +925,29 @@ else
   echo 'Ошибка регистрации. Если ключ установки истёк, удалите незавершённую установку в панели и создайте новый ключ.'
   exit 5
 fi
+# A successful controller enrollment is the only completion condition.
+# Subsequent installer runs must refuse to replace a registered node.
+python3 - "$DOMAIN" <<'PY_WPO_NODE_REGISTERED'
+import datetime,json,os,sys,tempfile
+from pathlib import Path
+domain=sys.argv[1]
+directory=Path('/etc/wpp-node-agent')
+directory.mkdir(mode=0o700,parents=True,exist_ok=True)
+target=directory/'registered.json'
+fd,tmp=tempfile.mkstemp(dir=str(directory),prefix='.registration-')
+try:
+    with os.fdopen(fd,'w',encoding='utf-8') as stream:
+        json.dump({'domain':domain,'registered':True,
+                   'registered_at':datetime.datetime.now(
+                       datetime.timezone.utc).isoformat()},stream)
+        stream.write('\n')
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.chmod(tmp,0o600)
+    os.replace(tmp,target)
+finally:
+    if os.path.exists(tmp): os.unlink(tmp)
+PY_WPO_NODE_REGISTERED
 trap - ERR
 echo "Готово: Node Agent зарегистрирован на https://$DOMAIN"
 if [[ -n "${WPO_NODE_PROGRESS_FILE:-}" && -f "$WPO_NODE_PROGRESS_FILE" ]]; then printf '98\tРегистрация подтверждена\n' > "$WPO_NODE_PROGRESS_FILE"; fi
