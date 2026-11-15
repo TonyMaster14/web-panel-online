@@ -1272,6 +1272,37 @@ def routing_ui(connections, state, path, csrf):
     .routing-form .routing-actions button{{transition:none}}
     .routing-form .routing-actions button:hover:not(:disabled){{transform:none}}
 }}
+
+/* wpo-routing-custom-inset-v8 */
+/* Mirror the 16px air around the rule cards; unlike the older full-height
+   blue sidebar, this card has its own thin outline and rounded corners. */
+.routing-form .routing-layout .routing-custom{{
+    align-self:stretch;min-width:0;
+    margin:16px 16px 16px 0;
+    padding:17px 16px;
+    border:1px solid var(--line);
+    border-radius:13px;
+    background:color-mix(in srgb,var(--raised) 88%,var(--accent));
+    box-shadow:0 5px 16px #00000016
+}}
+.routing-form .routing-layout .routing-custom h2{{
+    margin-top:0;
+}}
+.routing-form .routing-layout .routing-custom textarea{{
+    box-sizing:border-box;max-width:100%
+}}
+@media(max-width:1150px){{
+    /* The layout stacks here, so inset both sides equally. */
+    .routing-form .routing-layout .routing-custom{{
+        margin:0 16px 16px;
+        border:1px solid var(--line);
+    }}
+}}
+@media(max-width:650px){{
+    .routing-form .routing-layout .routing-custom{{
+        margin:0 12px 12px;padding:14px 13px;border-radius:12px
+    }}
+}}
 </style>{chooser}<select id="routingConnection" hidden aria-label="Текущее подключение для маршрутизации">{options}</select>{''.join(forms)}{guide}<script>(()=>{{const dialog=document.getElementById('awgRuGuide'),scenes=dialog?[...dialog.querySelectorAll('.awg-guide-scene')]:[],play=dialog?.querySelector('[data-awg-guide-play]'),progress=dialog?.querySelector('.awg-guide-progress i');let step=0,timer=null;const draw=()=>{{scenes.forEach((scene,index)=>scene.classList.toggle('is-current',index===step));if(progress)progress.style.width=((step+1)/scenes.length*100)+'%'}};const pause=()=>{{clearInterval(timer);timer=null;if(play)play.textContent='▶ Смотреть'}};const start=()=>{{pause();if(play)play.textContent='Ⅱ Пауза';timer=setInterval(()=>{{step=(step+1)%scenes.length;draw()}},2600)}};document.querySelectorAll('[data-open-awg-guide]').forEach(button=>button.addEventListener('click',()=>{{step=0;draw();dialog?.showModal();start()}}));dialog?.querySelector('[data-close-awg-guide]')?.addEventListener('click',()=>dialog.close());dialog?.addEventListener('close',pause);play?.addEventListener('click',()=>timer?pause():start());draw()}})();</script><script>(()=>{{const select=document.getElementById('routingConnection'),cards=[...document.querySelectorAll('[data-routing-choice]')],forms=[...document.querySelectorAll('[data-routing-form]')];const remembered=location.hash.startsWith('#routing-')?decodeURIComponent(location.hash.slice(9)):'';if(forms.some(form=>form.dataset.routingForm===remembered))select.value=remembered;const show=()=>{{forms.forEach(form=>form.hidden=form.dataset.routingForm!==select.value);cards.forEach(card=>{{const active=card.dataset.routingChoice===select.value;card.classList.toggle('is-selected',active);card.setAttribute('aria-pressed',String(active))}});const chosen=cards.find(card=>card.dataset.routingChoice===select.value);const enabled=chosen?.dataset.routingEnabled==='1';const status=document.getElementById('routingState');status?.classList.toggle('is-on',enabled);const title=document.getElementById('routingStateTitle');if(title)title.textContent=enabled?'Маршрутизация включена':'Маршрутизация отключена'}};show();cards.forEach(card=>card.addEventListener('click',()=>{{if(select.value===card.dataset.routingChoice)return;select.value=card.dataset.routingChoice;select.dispatchEvent(new Event('change',{{bubbles:true}}))}}));select.addEventListener('change',()=>{{show();history.replaceState(null,'',location.pathname+location.search+'#routing-'+encodeURIComponent(select.value))}});forms.forEach(form=>{{const buttons=[...form.querySelectorAll('.routing-actions button')],fields=[...form.querySelectorAll('.routing-toggle input,textarea')];const update=()=>{{const chosen=fields.some(field=>field.type==='checkbox'?field.checked:Boolean(field.value.trim()));const saved=form.dataset.routingStored==='1';buttons.forEach(button=>button.disabled=!(chosen||(button.value==='remove-selected'&&saved)))}};fields.forEach(field=>field.addEventListener(field.type==='checkbox'?'change':'input',update));form.addEventListener('submit',event=>{{const button=event.submitter;if(button?.value!=='remove-selected')return;const specific=fields.some(field=>field.type==='checkbox'?field.checked:Boolean(field.value.trim()));if(!specific&&form.dataset.routingStored==='1'){{if(!confirm('Удалить всю маршрутизацию выбранного подключения, включая сохранённые исключения?')){{event.preventDefault();return}}button.value='remove-all'}}else if(!confirm('Убрать только выбранные правила маршрутизации? Остальные настройки останутся без изменений.'))event.preventDefault()}});update()}})}})();</script>'''
 
 
