@@ -3838,6 +3838,10 @@ class Handler(BaseHTTPRequestHandler):
                 elif operation=="remove-selected" and is_awg: routing_store.update_awg_selected(ROUTING_FILE,connection_id,form,remove=True)
                 elif operation=="add-selected": routing_store.update_selected(ROUTING_FILE,connection_id,form)
                 elif operation=="remove-selected": routing_store.update_selected(ROUTING_FILE,connection_id,form,remove=True)
+                # wpo-routing-explicit-remove-all-v4: remove the whole selected
+                # connection's routing profile, including custom exceptions.
+                # AWG is managed by its own AllowedIPs update action only.
+                elif operation=="remove-all" and not is_awg: routing_store.delete_profile(ROUTING_FILE,connection_id)
                 else: raise routing_store.RoutingError("Неизвестная операция маршрутизации.")
                 self.redirect("/routing#routing-"+connection_id)
             except (routing_store.RoutingError,connection_store.ConnectionError) as exc:
