@@ -376,6 +376,11 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
     (( floor > 94 )) && floor=94
     (( wanted < floor )) && wanted=$floor
     (( wanted > 98 )) && wanted=98
+    # Estimated progress must never run far ahead of the last verified stage.
+    # When APT is still working at milestone 16, don't claim 75% installed.
+    local verified_ceiling=$((node_confirmed+10))
+    (( verified_ceiling > 98 )) && verified_ceiling=98
+    (( wanted > verified_ceiling )) && wanted=$verified_ceiling
     if (( node_percent < wanted && elapsed > node_second )); then
       node_percent=$((node_percent+1))
       node_second=$elapsed
