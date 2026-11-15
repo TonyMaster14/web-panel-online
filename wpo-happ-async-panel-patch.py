@@ -103,20 +103,25 @@ def patch(source):
     if updated.count(needle)!=2:
         raise ValueError("Expected two WPO Happ interval headers")
     updated=updated.replace(needle,'"profile-update-interval":"1"',1)
-    create_anchor='                    create_error(result.get("message","Ошибка создания подписки"),int(result.get("status",400))); return'
-    if updated.count(create_anchor)!=1:
-        raise ValueError("Subscription creation handler missing")
-    # New multi-node subscriptions already contain a real reserved device ID;
-    # start preparation right after the manager commits it to disk.
-    updated=updated.replace(create_anchor, create_anchor+"""
-                # wpo-happ-prewarm-on-create-v1
+    # Trigger pre-provisioning immediately AFTER successful subscription
+    # creation. Previously the hook was inserted after a 'return' inside the
+    # error branch, so it could never run.
+    success_anchor='''                if not result.get("ok"):
+                    create_error(result.get("message","Ошибка создания подписки"),int(result.get("status",400))); return
+'''
+    if updated.count(success_anchor)!=1:
+        raise ValueError("Subscription success path not found")
+    success_hook='''                # wpo-happ-prewarm-on-create-v2: after manager commit.
+                # Never wait for remote VPN provisioning inside admin HTTP.
                 try:
                     subprocess.Popen(
-                        ["systemctl","start","--no-block","wpo-happ-prepare.service"],
+                        ["systemctl","start","--no-block","wpo-happ-preparer.service"],
                         stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,close_fds=True)
                 except OSError:
-                    pass""",1)
+                    pass
+'''
+    updated=updated.replace(success_anchor,success_anchor+success_hook,1)
     for safe in ('local_count=len(result["users"]) if local_selected else 0',
                  'len(distinct_nodes)>1','SUB_FETCH_SLOTS.release()',
                  'wpo_happ_async_feed.enqueue('):
