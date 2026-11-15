@@ -69,6 +69,7 @@ class TestNodeInstallState(unittest.TestCase):
             "/etc/web-proxy-panel":str(root/"etc/web-proxy-panel"),
             "/var/www/wpp-node-site":str(root/"var/www/wpp-node-site"),
             "/var/backups":str(root/"backups"),
+            "/var/log/web-panel-online":str(root/"logs"),
             "/etc/caddy/Caddyfile":str(root/"etc/caddy/Caddyfile"),
         }
         for old,new in sorted(mapping.items(),key=lambda pair: -len(pair[0])):
@@ -160,6 +161,37 @@ class TestNodeInstallState(unittest.TestCase):
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertFalse(cfg.exists())
             self.assertTrue(list((root/"backups").glob("wpo-node-incomplete-*")))
+
+    def test_successful_legacy_enrollment_log_prevents_reinstall(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"logs").mkdir()
+            log=root/"logs/node-install-20261115T120000Z-1234.log"
+            log.write_text(
+                "Registration complete\\n"
+                "Готово: Node Agent зарегистрирован на https://old.example.net\\n"
+            )
+            log.chmod(0o600)
+            for mode in ("check","cleanup"):
+                result=self.run_preflight(code,env,mode)
+                self.assertEqual(result.returncode,20,result.stderr)
+                self.assertIn("Нода уже установлена",result.stdout)
+                self.assertTrue(cfg.exists())
+            self.assertFalse((root/"backups").exists())
+
+    def test_failed_legacy_enrollment_log_not_considered_complete(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"logs").mkdir()
+            log=root/"logs/node-install-20261115T120001Z-1234.log"
+            log.write_text(
+                "WEB Proxy relay did not become HTTP-ready\\n"
+                "Установка ноды прервана (код 4)\\n"
+            )
+            log.chmod(0o600)
+            result=self.run_preflight(code,env,"check")
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertNotIn("Нода уже установлена",result.stdout)
 
     def test_nonempty_vpn_profiles_block_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
