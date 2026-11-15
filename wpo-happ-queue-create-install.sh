@@ -38,14 +38,15 @@ cleanup(){
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-REV=bbe233dd8a88efcec090907508e6e0d9295ae4e3
-BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV"
+PATCH_REV=bbe233dd8a88efcec090907508e6e0d9295ae4e3
+DIAG_REV=45eca09bb1125031f6df29410a328b817ceab780
+BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online"
 curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
   --connect-timeout 12 --max-time 90 \
-  "$BASE/wpo-happ-queue-create-patch.py" -o "$WORK/patch.py"
+  "$BASE/$PATCH_REV/wpo-happ-queue-create-patch.py" -o "$WORK/patch.py"
 curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
   --connect-timeout 12 --max-time 90 \
-  "$BASE/wpo-happ-readonly-diagnostic.py" -o "$WORK/diagnostic.py"
+  "$BASE/$DIAG_REV/wpo-happ-all-nodes-readonly.py" -o "$WORK/diagnostic.py"
 python3 -m py_compile "$WORK/patch.py" "$WORK/diagnostic.py"
 python3 "$WORK/patch.py" --input "$PANEL" --output "$WORK/panel.py"
 python3 -m py_compile "$WORK/panel.py"
