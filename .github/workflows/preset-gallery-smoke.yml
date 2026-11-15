@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "install-panel.sh"
+      - "installers/install-panel.sh"
+      - "installers/README.md"
       - "wpp_ui.py"
       - "wpp_panel_extras.py"
       - "wpp_presets.py"

@@ -8,7 +8,7 @@ TEMP="$(mktemp /tmp/wpo-zero-profiles.XXXXXXXX.sh)"
 trap 'rm -f -- "$TEMP"' EXIT
 echo "Обновление v6: публичный сайт независимо от WEB Proxy, без фиктивных профилей..."
 curl -4fsSL --retry 3 --connect-timeout 12 --max-time 90 \
-  'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/main/wpo-site-zero-profiles-v6.sh' \
+  'https://raw.githubusercontent.com/TonyMaster14/web-panel-online/main/maintenance/other/wpo-site-zero-profiles-v6.sh' \
   -o "$TEMP"
 bash -n "$TEMP"
 bash "$TEMP"

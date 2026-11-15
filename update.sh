@@ -416,7 +416,7 @@ if [[ -n "$LOCAL_SOURCE" ]]; then
         cp -aL "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
     done
     for file in install-panel.sh update.sh uninstall-web-proxy.sh repair-landing-pages.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
-        cp -a "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
+        cp -aL "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
     done
     if [[ -s "$LOCAL_SOURCE/assets/OpenFlux-linux-amd64" ]]; then
         cp -a "$LOCAL_SOURCE/assets/OpenFlux-linux-amd64" "$TEMP_DIR/source/assets/OpenFlux-linux-amd64"
