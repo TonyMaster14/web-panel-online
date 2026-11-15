@@ -31,7 +31,7 @@ class TestNodeWizardTTY(unittest.TestCase):
         assert "node_box 'НОДА УСТАНОВЛЕНА' \"$nyellow\"" in cls.source
         subprocess.run(["bash","-n",str(AGENT)],check=True)
 
-    def exercise(self,root,failed=False,interactive=True):
+    def exercise(self,root,failed=False,interactive=True,tap_enter=False):
         root=Path(root)
         head=self.source.split(BOUNDARY,1)[0]+BOUNDARY+"\n"
         head=head.replace(
@@ -54,7 +54,7 @@ IFS= read -r e
 [[ "$d" == "se.example.net" ]] || exit 22
 [[ "$e" == "node@example.net" ]] || exit 23
 printf '52\tVPN ready\n' > "$WPO_NODE_PROGRESS_FILE"
-sleep 0.03
+sleep "${WPO_NODE_FAKE_DELAY:-0.03}"
 if [[ "@{WPO_NODE_FAKE_FAILURE:-0}" == 1 ]]; then
   echo "ERROR: simulated failure"
   exit 7
@@ -68,6 +68,7 @@ exit 0
         env=os.environ.copy()
         env["TERM"]="xterm-256color"
         env["WPO_NODE_FAKE_FAILURE"]="1" if failed else "0"
+        env["WPO_NODE_FAKE_DELAY"]="0.70" if tap_enter else "0.03"
         command=["bash",str(script),"a"*43]
         if not interactive:
             p=subprocess.run(command,input="se.example.net\nnode@example.net\n",
@@ -80,6 +81,8 @@ exit 0
         os.close(slave)
         os.write(master,b"\nse.example.net\nnode@example.net\n")
         chunks=[]
+        pressed=False
+        tty_echo_disabled=False
         deadline=time.monotonic()+12
         try:
             while time.monotonic()<deadline:
@@ -91,12 +94,23 @@ exit 0
                         raise
                     if not data: break
                     chunks.append(data)
+                    if tap_enter and not pressed and b"\xe2\x96" in b"".join(chunks):
+                        # The progress UI is active. Real terminal flags must
+                        # suppress Enter echo without disabling Ctrl+C signals.
+                        tty_echo_disabled=not bool(termios.tcgetattr(master)[3] & termios.ECHO)
+                        os.write(master,b"\r\r")
+                        pressed=True
                 elif proc.poll() is not None:
                     break
             if proc.poll() is None:
                 proc.kill()
                 self.fail("Wizard did not exit")
-            return proc.wait(),b"".join(chunks).decode("utf-8","replace")
+            code=proc.wait()
+            output=b"".join(chunks).decode("utf-8","replace")
+            if tap_enter:
+                self.assertTrue(pressed,"No active progress bar seen")
+                self.assertTrue(tty_echo_disabled,"Pressing Enter would duplicate progress lines")
+            return code,output
         finally:
             os.close(master)
 
@@ -130,6 +144,12 @@ exit 0
                                      (len(pieces[1])-len("ENTER — установить"))/2),1)
             self.assertLessEqual(abs(pieces[2].index("q — выход") -
                                      (len(pieces[2])-len("q — выход"))/2),1)
+
+    def test_enter_while_installing_does_not_echo_or_duplicate_bar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code,out=self.exercise(tmp,tap_enter=True)
+            self.assertEqual(code,0,out[-1000:])
+            self.assertIn("НОДА УСТАНОВЛЕНА",out)
 
     def test_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
