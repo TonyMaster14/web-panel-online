@@ -97,6 +97,11 @@ if log_dir.is_dir():
             stat=old_log.lstat()
             if not old_log.is_file() or old_log.is_symlink() or stat.st_mode&0o022:
                 continue
+            # A newer failed attempt may have overwritten config.json while
+            # leaving a successful log from an older installation behind.
+            # Such a stale log does not prove the CURRENT config was enrolled.
+            if stat.st_mtime + 1 < agent_cfg.stat().st_mtime:
+                continue
             with old_log.open('rb') as stream:
                 stream.seek(0,os.SEEK_END)
                 end=stream.tell()
