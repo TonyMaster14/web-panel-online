@@ -125,15 +125,39 @@ if log_dir.is_dir():
 # Without a verified receipt or successful legacy log, preserve real user
 # profiles but allow safe cleanup of unfinished WPO components.
 
-# Preserve all user credentials. A valid registry with any real entries
-# makes automatic cleanup unsafe, even when its services are stopped.
+# A failed installation's VLESS/Hysteria POST self-test can leave one
+# internal "WPO install check" identity behind if its DELETE failed. Such a
+# service-only identity is not a subscriber. All other records are protected.
+# Back up the complete old node before clearing, including test credentials.
+def internal_install_check(identifier, entry):
+    import re
+    import uuid
+    if not isinstance(identifier,str) or not re.fullmatch(r'[a-f0-9]{64}',identifier):
+        return False
+    if not isinstance(entry,dict) or set(entry)!={'name','secrets','native'}:
+        return False
+    if entry['name']!='WPO install check' or entry['native']!={}:
+        return False
+    secrets=entry['secrets']
+    if not isinstance(secrets,dict) or set(secrets)!={'vless','hysteria'}:
+        return False
+    try:
+        return all(str(uuid.UUID(secret))==secret for secret in secrets.values())
+    except (ValueError,AttributeError,TypeError):
+        return False
+
 profile_state=vpn_dir/'profiles.json'
 if profile_state.exists():
     try:
         data=json.loads(profile_state.read_text(encoding='utf-8'))
         entries=data['profiles']
-        if not isinstance(entries,dict) or entries:
-            raise ValueError('nonempty VPN profiles')
+        if not isinstance(entries,dict) or any(
+            not internal_install_check(identifier,entry)
+            for identifier,entry in entries.items()
+        ):
+            raise ValueError('real or malformed VPN profiles')
+        if entries:
+            print('Найдены только служебные профили прерванной проверки WPO.')
     except (OSError,ValueError,TypeError,KeyError):
         refuse('есть пользовательские VPN-профили или повреждённый реестр.')
 
