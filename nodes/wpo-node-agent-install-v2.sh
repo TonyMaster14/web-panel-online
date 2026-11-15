@@ -85,10 +85,31 @@ try:
 except (OSError,ValueError,TypeError,AttributeError):
     refuse('невозможно прочитать прежнюю конфигурацию ноды.')
 
-# Version 0.4.0 is written by the eight-engine installer BEFORE controller
-# enrollment, so it cannot be used to infer that the installation completed.
-# Old nodes without a receipt are treated as incomplete only if there are no
-# real user profiles. The following safeguards preserve all unknown data.
+# Version 0.4.0 and running services are set BEFORE registration.
+# For a fully installed legacy node which predates registered.json, protect it
+# only if its root-owned installation log proves that enrollment succeeded.
+# A previous 45%-95% failure cannot have written this success line.
+log_dir=Path('/var/log/web-panel-online')
+success_line=('Готово: Node Agent зарегистрирован на https://'+config['domain']).encode()
+if log_dir.is_dir():
+    for old_log in log_dir.glob('node-install-*.log'):
+        try:
+            stat=old_log.lstat()
+            if not old_log.is_file() or old_log.is_symlink() or stat.st_mode&0o022:
+                continue
+            with old_log.open('rb') as stream:
+                stream.seek(0,os.SEEK_END)
+                end=stream.tell()
+                stream.seek(max(0,end-32768),os.SEEK_SET)
+                tail=stream.read(32768)
+            if success_line in tail.splitlines():
+                print('Нода уже установлена и зарегистрирована ранее: '+config['domain'])
+                sys.exit(20)
+        except OSError:
+            continue
+
+# Without a verified receipt or successful legacy log, preserve real user
+# profiles but allow safe cleanup of unfinished WPO components.
 
 # Preserve all user credentials. A valid registry with any real entries
 # makes automatic cleanup unsafe, even when its services are stopped.
