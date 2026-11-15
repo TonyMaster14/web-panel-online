@@ -1077,18 +1077,18 @@ def routing_ui(connections, state, path, csrf):
 .routing-tab-copy small{{font-size:10px;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}}
 .routing-form .routing-client-notice{{margin:13px 14px 0;border:1px solid color-mix(in srgb,var(--red) 52%,var(--line));border-radius:13px;overflow:hidden;box-shadow:inset 4px 0 var(--red),0 4px 15px #00000018}}
 .routing-form .routing-switches{{align-content:start;grid-auto-rows:minmax(77px,auto)}}
-.routing-form .routing-switches .routing-toggle{{position:relative;display:flex;align-items:center;gap:11px;min-width:0;min-height:77px;height:auto;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--input);box-shadow:none;cursor:pointer;transition:border-color .16s,background .16s,box-shadow .16s}}
-.routing-form .routing-switches .routing-toggle:hover{{border-color:#3b82f6}}
-.routing-form .routing-switches .routing-toggle.is-active{{border-color:var(--line);background:var(--input);box-shadow:none}}
-.routing-form .routing-switches .routing-toggle input[type=checkbox]{{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0}}
-.routing-form .routing-switches .routing-toggle:focus-within{{outline:2px solid #3b82f6;outline-offset:2px}}
+.routing-form .routing-switches label.routing-toggle{{position:relative;display:flex;align-items:center;gap:11px;min-width:0;min-height:77px;height:auto;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--input);box-shadow:none;cursor:pointer;transition:border-color .16s,background .16s,box-shadow .16s}}
+.routing-form .routing-switches label.routing-toggle:hover{{border-color:#3b82f6}}
+.routing-form .routing-switches label.routing-toggle.is-active{{border-color:var(--line);background:var(--input);box-shadow:none}}
+.routing-form .routing-switches label.routing-toggle input[type=checkbox]{{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;margin:0}}
+.routing-form .routing-switches label.routing-toggle:focus-within{{outline:2px solid #3b82f6;outline-offset:2px}}
 .routing-form .routing-switches .routing-rule-dot{{display:inline-flex;align-items:center;justify-content:center;flex:0 0 16px;width:16px;height:16px;border:1.5px solid #8292a6;border-radius:50%;background:transparent}}
 .routing-form .routing-switches .routing-rule-dot i{{display:block;width:7px;height:7px;border-radius:50%;background:transparent}}
 .routing-form .routing-switches .routing-rule-copy{{display:block;min-width:0;flex:1}}
-.routing-form .routing-switches .routing-toggle:has(input:checked){{border-color:#3b82f6;background:color-mix(in srgb,#3b82f6 15%,var(--input));box-shadow:inset 0 0 0 1px color-mix(in srgb,#3b82f6 45%,transparent)}}
-.routing-form .routing-switches .routing-toggle:has(input:checked) .routing-rule-dot{{border-color:#22c55e;background:color-mix(in srgb,#22c55e 10%,transparent)}}
-.routing-form .routing-switches .routing-toggle:has(input:checked) .routing-rule-dot i{{background:#22c55e}}
-.routing-form .routing-switches .routing-toggle em{{margin-left:5px;font-size:9px;color:var(--green)}}
+.routing-form .routing-switches label.routing-toggle:has(input:checked){{border-color:#3b82f6;background:color-mix(in srgb,#3b82f6 15%,var(--input));box-shadow:inset 0 0 0 1px color-mix(in srgb,#3b82f6 45%,transparent)}}
+.routing-form .routing-switches label.routing-toggle:has(input:checked) .routing-rule-dot{{border-color:#22c55e;background:color-mix(in srgb,#22c55e 10%,transparent)}}
+.routing-form .routing-switches label.routing-toggle:has(input:checked) .routing-rule-dot i{{background:#22c55e}}
+.routing-form .routing-switches label.routing-toggle em{{margin-left:5px;font-size:9px;color:var(--green)}}
 @media(max-width:1150px){{.routing-protocol-grid{{grid-template-columns:repeat(2,minmax(0,1fr))}}}}
 @media(max-width:650px){{.routing-protocol-grid{{grid-template-columns:1fr 1fr;gap:8px}}.routing-protocol-card{{min-height:80px;padding:11px 10px;gap:8px}}.routing-tab-copy b{{font-size:11px}}.routing-tab-copy small{{font-size:9px}}.routing-form .routing-client-notice{{margin:10px 10px 0}}.routing-protocol-head p{{font-size:10px}}}}
 
