@@ -1062,7 +1062,7 @@ def routing_ui(connections, state, path, csrf):
 <label class="routing-toggle{active('block_bittorrent')}"><input type="checkbox" name="select_block_bittorrent" value="1"><span class="routing-rule-dot" aria-hidden="true"><i></i></span><span class="routing-rule-copy"><b>Блокировать BitTorrent {active_mark('block_bittorrent')}</b><small>Торрент-трафик не попадёт на VPN-сервер</small></span></label>
 <label class="routing-toggle{active('split_dns')}"><input type="checkbox" name="select_split_dns" value="1"><span class="routing-rule-dot" aria-hidden="true"><i></i></span><span class="routing-rule-copy"><b>Раздельный DNS {active_mark('split_dns')}</b><small>Яндекс DNS для RU, Cloudflare и Google для остального</small></span></label>
 </div></section><aside class="routing-custom"><h2>Свои исключения</h2><label>Домены напрямую<textarea name="direct_domains_delta" rows="5" placeholder="Укажите домены для добавления или удаления"></textarea></label><small>Сейчас: {esc(direct) if direct else 'нет добавленных доменов'}</small><label>Домены через VPN<textarea name="proxy_domains_delta" rows="5" placeholder="Укажите домены для добавления или удаления"></textarea></label><small>Сейчас: {esc(proxy) if proxy else 'нет добавленных доменов'}</small></aside></div>
-<footer class="routing-actions"><span class="muted">Выберите пункты, затем добавьте или уберите только их.</span><button class="routing-add" type="submit" name="operation" value="add-selected" disabled>Добавить маршрутизацию</button><button class="danger" type="submit" name="operation" value="remove-selected" disabled>Убрать маршрутизацию</button></footer></form>''')
+<footer class="routing-actions"><div class="routing-actions-primary"><span class="muted">Выберите пункты, затем добавьте или уберите только их.</span><button class="routing-add" type="submit" name="operation" value="add-selected" disabled>Добавить маршрутизацию</button></div><div class="routing-actions-secondary"><button class="danger" type="submit" name="operation" value="remove-selected" disabled>Убрать маршрутизацию</button></div></footer></form>''')
     guide=f'''<dialog id="awgRuGuide" class="awg-guide-dialog"><div class="awg-guide-head"><div><b>Инструкция по установке маршрутизации</b><small>Пошаговая настройка AmneziaVPN</small></div><button type="button" data-close-awg-guide aria-label="Закрыть">×</button></div><div class="awg-guide-player"><video data-awg-guide-video controls playsinline preload="metadata" src="{esc(path)}/__assets/awg-routing-guide.mp4?v=20261023b"></video></div><div class="awg-guide-foot"><span>7 шагов · около 15 секунд</span><button type="button" data-replay-awg-guide>Смотреть заново</button></div></dialog><script>(()=>{{const dialog=document.getElementById('awgRuGuide'),video=dialog?.querySelector('[data-awg-guide-video]');document.querySelectorAll('[data-open-awg-video-guide]').forEach(button=>button.addEventListener('click',()=>{{if(!dialog||!video)return;dialog.showModal();video.currentTime=0;video.play().catch(()=>{{}})}}));dialog?.querySelector('[data-close-awg-guide]')?.addEventListener('click',()=>dialog.close());dialog?.querySelector('[data-replay-awg-guide]')?.addEventListener('click',()=>{{video.currentTime=0;video.play().catch(()=>{{}})}});dialog?.addEventListener('close',()=>video?.pause());dialog?.addEventListener('click',event=>{{if(event.target===dialog)dialog.close()}})}})();</script>'''
     return f'''<style>
 .routing-layout.awg-routing-layout{{grid-template-columns:1fr}}.awg-routing-layout .routing-main{{padding:22px}}.awg-routing-layout .awg-preset-switches{{display:block}}.awg-routing-layout .awg-ru-direct{{display:flex;align-items:center;justify-content:space-between;gap:28px;width:100%;min-height:112px;padding:22px 24px;border-color:color-mix(in srgb,var(--accent) 44%,var(--line));border-radius:15px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 13%,var(--raised)),color-mix(in srgb,var(--raised) 97%,var(--accent)));box-shadow:0 10px 28px #00000020;cursor:default}}.awg-ru-content{{display:flex;align-items:center;min-width:0;gap:16px}}.awg-ru-icon{{display:grid;place-items:center;flex:0 0 52px;width:52px;height:52px;border:1px solid color-mix(in srgb,var(--accent) 70%,var(--line));border-radius:15px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 30%,var(--surface)),color-mix(in srgb,var(--accent) 12%,var(--surface)));color:var(--accent);font-size:13px;font-weight:800;letter-spacing:.08em;box-shadow:inset 0 0 18px color-mix(in srgb,var(--accent) 10%,transparent)}}.awg-ru-copy b{{font-size:15px;line-height:1.35}}.awg-ru-copy small{{max-width:580px;margin-top:5px;font-size:11px;line-height:1.55}}.awg-routing-layout .awg-ru-actions{{display:flex;align-items:center;flex:0 0 auto;gap:10px}}.awg-routing-layout .awg-ru-actions .btn,.awg-routing-layout .awg-ru-actions button{{display:inline-flex;align-items:center;justify-content:center;max-width:none;min-height:42px;padding:10px 16px;border-radius:10px;font-size:11px;font-weight:700;line-height:1.25;text-align:center;text-decoration:none;white-space:nowrap}}.awg-routing-layout .awg-download{{border-color:color-mix(in srgb,var(--accent) 75%,var(--line));background:var(--accent);color:#fff}}.awg-routing-layout .awg-instruction{{border-color:color-mix(in srgb,var(--accent) 42%,var(--line));background:color-mix(in srgb,var(--accent) 11%,var(--surface));color:var(--text)}}@media(max-width:900px){{.awg-routing-layout .awg-ru-direct{{align-items:flex-start;flex-direction:column;gap:18px}}.awg-routing-layout .awg-ru-actions{{width:100%;flex-wrap:wrap}}.awg-routing-layout .awg-ru-actions>*{{flex:1 1 210px}}}}@media(max-width:540px){{.awg-routing-layout .routing-main{{padding:14px}}.awg-routing-layout .awg-ru-direct{{padding:18px}}.awg-ru-icon{{flex-basis:44px;width:44px;height:44px;border-radius:12px}}.awg-routing-layout .awg-ru-actions{{display:grid;grid-template-columns:1fr}}.awg-routing-layout .awg-ru-actions>*{{width:100%;white-space:normal}}}}
@@ -1189,6 +1189,84 @@ def routing_ui(connections, state, path, csrf):
 }}
 .routing-protocol-section .routing-protocol-status:not(.is-on) .routing-tab-dot i{{
     background:#ef4444
+}}
+
+/* wpo-routing-actions-buttons-v5 */
+/* Two columns mirror routing-main and routing-custom exactly. */
+.routing-form .routing-actions{{
+    display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.65fr);
+    align-items:stretch;gap:0;padding:0;min-height:76px;
+    background:var(--surface);border-top:1px solid var(--line)
+}}
+.routing-form .routing-actions-primary,
+.routing-form .routing-actions-secondary{{
+    display:flex;align-items:center;justify-content:flex-end;
+    gap:12px;min-width:0;min-height:76px;padding:14px 20px
+}}
+.routing-form .routing-actions-primary>.muted{{
+    margin:0 auto 0 0;min-width:0;font-size:10px;line-height:1.4
+}}
+.routing-form .routing-actions-secondary{{
+    border-left:1px solid var(--line);
+    background:color-mix(in srgb,var(--raised) 88%,var(--accent))
+}}
+/* Same elevation and animation as the Create User primary action. */
+.routing-form .routing-actions button{{
+    flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+    min-width:210px;min-height:46px;padding:12px 20px;
+    border:1px solid transparent;border-radius:11px;
+    color:#fff;font-size:12px;font-weight:700;line-height:1.3;
+    white-space:nowrap;text-align:center;
+    box-shadow:0 4px 12px #0003;
+    transition:transform .2s cubic-bezier(.2,.75,.25,1),
+               background-color .18s ease,border-color .18s ease,
+               box-shadow .2s ease,filter .18s ease
+}}
+.routing-form .routing-actions button.routing-add{{
+    border-color:#3b82f6;background:#2563eb;color:#fff
+}}
+.routing-form .routing-actions button.danger{{
+    border-color:#e24d61;background:#c9364f;color:#fff
+}}
+@media(hover:hover) and (pointer:fine){{
+    .routing-form .routing-actions button:hover:not(:disabled){{
+        transform:translateY(-2px);
+        box-shadow:0 9px 20px #0005;
+        filter:brightness(1.08)
+    }}
+    .routing-form .routing-actions button.routing-add:hover:not(:disabled){{
+        border-color:#60a5fa;background:#3478f6
+    }}
+    .routing-form .routing-actions button.danger:hover:not(:disabled){{
+        border-color:#ff8190;background:#df405a!important
+    }}
+}}
+.routing-form .routing-actions button:active:not(:disabled){{
+    transform:translateY(0);box-shadow:0 2px 7px #0003
+}}
+.routing-form .routing-actions button:disabled{{
+    opacity:.42;box-shadow:none;cursor:not-allowed
+}}
+@media(max-width:1150px){{
+    .routing-form .routing-actions{{
+        grid-template-columns:repeat(2,minmax(0,1fr))
+    }}
+    .routing-form .routing-actions-primary>.muted{{display:none}}
+    .routing-form .routing-actions-primary,
+    .routing-form .routing-actions-secondary{{padding:13px 15px}}
+    .routing-form .routing-actions button{{min-width:0;width:100%}}
+}}
+@media(max-width:600px){{
+    .routing-form .routing-actions{{grid-template-columns:1fr}}
+    .routing-form .routing-actions-primary,
+    .routing-form .routing-actions-secondary{{min-height:0;padding:12px 15px}}
+    .routing-form .routing-actions-secondary{{
+        border-left:0;border-top:1px solid var(--line)
+    }}
+}}
+@media(prefers-reduced-motion:reduce){{
+    .routing-form .routing-actions button{{transition:none}}
+    .routing-form .routing-actions button:hover:not(:disabled){{transform:none}}
 }}
 </style>{chooser}<select id="routingConnection" hidden aria-label="Текущее подключение для маршрутизации">{options}</select>{''.join(forms)}{guide}<script>(()=>{{const dialog=document.getElementById('awgRuGuide'),scenes=dialog?[...dialog.querySelectorAll('.awg-guide-scene')]:[],play=dialog?.querySelector('[data-awg-guide-play]'),progress=dialog?.querySelector('.awg-guide-progress i');let step=0,timer=null;const draw=()=>{{scenes.forEach((scene,index)=>scene.classList.toggle('is-current',index===step));if(progress)progress.style.width=((step+1)/scenes.length*100)+'%'}};const pause=()=>{{clearInterval(timer);timer=null;if(play)play.textContent='▶ Смотреть'}};const start=()=>{{pause();if(play)play.textContent='Ⅱ Пауза';timer=setInterval(()=>{{step=(step+1)%scenes.length;draw()}},2600)}};document.querySelectorAll('[data-open-awg-guide]').forEach(button=>button.addEventListener('click',()=>{{step=0;draw();dialog?.showModal();start()}}));dialog?.querySelector('[data-close-awg-guide]')?.addEventListener('click',()=>dialog.close());dialog?.addEventListener('close',pause);play?.addEventListener('click',()=>timer?pause():start());draw()}})();</script><script>(()=>{{const select=document.getElementById('routingConnection'),cards=[...document.querySelectorAll('[data-routing-choice]')],forms=[...document.querySelectorAll('[data-routing-form]')];const remembered=location.hash.startsWith('#routing-')?decodeURIComponent(location.hash.slice(9)):'';if(forms.some(form=>form.dataset.routingForm===remembered))select.value=remembered;const show=()=>{{forms.forEach(form=>form.hidden=form.dataset.routingForm!==select.value);cards.forEach(card=>{{const active=card.dataset.routingChoice===select.value;card.classList.toggle('is-selected',active);card.setAttribute('aria-pressed',String(active))}});const chosen=cards.find(card=>card.dataset.routingChoice===select.value);const enabled=chosen?.dataset.routingEnabled==='1';const status=document.getElementById('routingState');status?.classList.toggle('is-on',enabled);const title=document.getElementById('routingStateTitle');if(title)title.textContent=enabled?'Маршрутизация включена':'Маршрутизация отключена'}};show();cards.forEach(card=>card.addEventListener('click',()=>{{if(select.value===card.dataset.routingChoice)return;select.value=card.dataset.routingChoice;select.dispatchEvent(new Event('change',{{bubbles:true}}))}}));select.addEventListener('change',()=>{{show();history.replaceState(null,'',location.pathname+location.search+'#routing-'+encodeURIComponent(select.value))}});forms.forEach(form=>{{const buttons=[...form.querySelectorAll('.routing-actions button')],fields=[...form.querySelectorAll('.routing-toggle input,textarea')];const update=()=>{{const chosen=fields.some(field=>field.type==='checkbox'?field.checked:Boolean(field.value.trim()));const saved=form.dataset.routingStored==='1';buttons.forEach(button=>button.disabled=!(chosen||(button.value==='remove-selected'&&saved)))}};fields.forEach(field=>field.addEventListener(field.type==='checkbox'?'change':'input',update));form.addEventListener('submit',event=>{{const button=event.submitter;if(button?.value!=='remove-selected')return;const specific=fields.some(field=>field.type==='checkbox'?field.checked:Boolean(field.value.trim()));if(!specific&&form.dataset.routingStored==='1'){{if(!confirm('Удалить всю маршрутизацию выбранного подключения, включая сохранённые исключения?')){{event.preventDefault();return}}button.value='remove-all'}}else if(!confirm('Убрать только выбранные правила маршрутизации? Остальные настройки останутся без изменений.'))event.preventDefault()}});update()}})}})();</script>'''
 
