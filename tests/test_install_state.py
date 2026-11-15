@@ -77,7 +77,12 @@ class SafetyContractTests(unittest.TestCase):
         self.assertLess(head, classic)
         self.assertLess(classic, wizard)
         self.assertIn("installed)", SOURCE[head:classic])
-        self.assertIn("exit 0", SOURCE[head:classic])
+        self.assertIn("wpo_offer_reinstall", SOURCE[head:classic])
+        consent = SOURCE[SOURCE.index("wpo_offer_reinstall(){"):head]
+        self.assertIn("no|NO|No|''", consent)
+        self.assertIn("exit 0", consent)
+        self.assertIn('WPO_REINSTALL_APPROVED=1', consent)
+        self.assertIn('[[ "$WPO_REINSTALL_APPROVED" == 1 ]]', SOURCE)
         self.assertIn("ask_domain", SOURCE[wizard:wizard+500])
         self.assertNotIn("Найдена установленная панель: обновляем", SOURCE)
     def test_install_markers_straddle_all_critical_checks(self):
@@ -96,7 +101,8 @@ class SafetyContractTests(unittest.TestCase):
         self.assertIn('bash -n "$removal_script"', cleaner)
         self.assertIn('bash "$removal_script"', cleaner)
         self.assertIn('[[ "$after" == clean ]]', cleaner)
-        self.assertIn("error 'Очистка незавершённой установки", cleaner)
+        self.assertIn("error 'Очистка WPO не удалась", cleaner)
+        self.assertIn('WPO_REINSTALL_STAGED_SOURCE', cleaner)
     def test_remover_stops_component_update_timers(self):
         self.assertIn("web-panel-proxy-component-auto-update.timer web-panel-proxy-component-auto-update.service", UNINSTALL)
         self.assertIn("/etc/systemd/system/web-panel-proxy-component-auto-update.timer", UNINSTALL)
