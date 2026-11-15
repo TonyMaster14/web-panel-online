@@ -88,7 +88,7 @@ class QueueCreateTests(unittest.TestCase):
                        'cp -a "$BACKUP" "$PANEL"',
                        'systemctl restart tproxy-panel.service',
                        'wpo_happ_preparer.py',
-                       'wpo-happ-readonly-diagnostic.py',
+                       'wpo-happ-all-nodes-readonly.py',
                        'wpo-happ-queue-create-patch.py'):
             self.assertIn(needle,installer)
         for forbidden in ("ssh root@","sshpass","curl -k",
