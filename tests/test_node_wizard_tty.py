@@ -8,6 +8,7 @@ import fcntl
 import os
 from pathlib import Path
 import pty
+import re
 import select
 import struct
 import subprocess
@@ -108,6 +109,20 @@ exit 0
                 self.assertIn(string,out)
             self.assertNotIn("Логин:",out)
             self.assertNotIn("Пароль:",out)
+            # Verify alignment in the captured real SSH terminal, ignoring ANSI.
+            plain=re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", out)
+            welcome=next(line for line in plain.splitlines()
+                         if "Добро пожаловать в установку ноды!" in line)
+            heading="Добро пожаловать в установку ноды!"
+            self.assertLessEqual(abs(welcome.index(heading)+len(heading)/2-32),1)
+            choices=next(line for line in plain.splitlines()
+                         if "ENTER — установить" in line and "q — выход" in line)
+            pieces=choices.split("│")
+            self.assertEqual(len(pieces),4,choices)
+            self.assertLessEqual(abs(pieces[1].index("ENTER — установить") -
+                                     (len(pieces[1])-len("ENTER — установить"))/2),1)
+            self.assertLessEqual(abs(pieces[2].index("q — выход") -
+                                     (len(pieces[2])-len("q — выход"))/2),1)
 
     def test_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
