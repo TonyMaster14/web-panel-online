@@ -40,7 +40,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-REV=9efc115b6186aa0f5db94e0245a3e8940ac2dc7d
+REV=b9b5b9a320685fe0c4a32de1cfd6bf3b2ddae855
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV"
 echo '=== Скачиваю закреплённые версии исправления WPO ==='
 for f in wpo-happ-preallocate-patch.py wpo-happ-async-panel-patch.py \
