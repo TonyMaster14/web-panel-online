@@ -34,7 +34,7 @@ cleanup(){
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-REF=93e738785a70f41196ef5930bc067caa58787494
+REF=e8853702748c2c1cb4d14c224551535bb25c37a8
 curl -4fsSL --retry 3 --proto '=https' --proto-redir '=https' \
   --connect-timeout 12 --max-time 90 \
   "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF/wpo-routing-cards-ui-patch.py" \
