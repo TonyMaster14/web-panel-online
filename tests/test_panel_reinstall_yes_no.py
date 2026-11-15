@@ -15,7 +15,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 INSTALLER=ROOT/"install.sh"
-ANCHOR="WPO_REINSTALL_APPROVED=0"
+ANCHOR="WPO_REINSTALL_APPROVED=0\nwpo_offer_reinstall(){"
 END="# Classic mode remains compatible with previous invocation patterns."
 
 
