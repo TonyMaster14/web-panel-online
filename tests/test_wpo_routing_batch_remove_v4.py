@@ -96,7 +96,7 @@ class RoutingBatchRemoveV4(unittest.TestCase):
         self.assertIn("button.value==='remove-selected'&&saved",page)
         self.assertIn("Удалить всю маршрутизацию выбранного подключения",page)
         self.assertIn("Убрать только выбранные правила маршрутизации",page)
-        self.assertIn(".routing-switches label.routing-toggle:has(input:checked)::after",page)
+        self.assertIn(".routing-switches label.routing-toggle.is-active:has(input:checked)::after",page)
         self.assertIn('name="operation" value="remove-selected"',page)
         self.assertIn('name="operation" value="add-selected"',page)
 
