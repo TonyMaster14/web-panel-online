@@ -27,7 +27,7 @@ class TestNodeWizardTTY(unittest.TestCase):
     def setUpClass(cls):
         cls.source=AGENT.read_text()
         assert cls.source.count(BOUNDARY)==1
-        assert "sleep 2\n  printf '\\033[2J\\033[H'" in cls.source
+        assert "(( node_percent == 100 )) || sleep 0.012" in cls.source
         assert "node_box 'НОДА УСТАНОВЛЕНА' \"$nyellow\"" in cls.source
         subprocess.run(["bash","-n",str(AGENT)],check=True)
 
@@ -40,9 +40,7 @@ class TestNodeWizardTTY(unittest.TestCase):
         )
         head=head.replace("/var/log/web-panel-online",str(root/"logs"))
         head=head.replace("/run/wpo-node-progress.",str(root/"progress."))
-        head=head.replace("sleep 2\n  printf '\\033[2J\\033[H'",
-                          "sleep 0.04\n  printf '\\033[2J\\033[H'")
-        head=head.replace("sleep 0.08","sleep 0.001")
+        head=head.replace("sleep 0.012","sleep 0.001")
         head=head.replace("sleep 0.2","sleep 0.01")
         head+=r'''
 if [[ "@{WPO_NODE_WIZARD_WORKER:-0}" != 1 ]]; then
@@ -158,6 +156,21 @@ exit 0
             self.assertIn("Установка ноды прервана",out)
             self.assertIn("Подробности:",out)
             self.assertNotIn("НОДА УСТАНОВЛЕНА",out)
+
+    def test_smooth_monotonic_progress_without_stage_jumps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code,out=self.exercise(tmp,tap_enter=True)
+            self.assertEqual(code,0,out[-1000:])
+            values=[int(p) for p in re.findall(r"(?<!\\d)(\\d{1,3})%",out)]
+            self.assertGreater(len(values),4,values)
+            self.assertEqual(values[-1],100,values)
+            self.assertTrue(all(0 <= b-a <= 1 for a,b in zip(values,values[1:])),values)
+
+    def test_failure_cannot_reach_full_progress(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code,out=self.exercise(tmp,failed=True)
+            self.assertEqual(code,7,out[-1000:])
+            self.assertNotIn("100%",out)
 
     def test_classic_no_tty(self):
         with tempfile.TemporaryDirectory() as tmp:
