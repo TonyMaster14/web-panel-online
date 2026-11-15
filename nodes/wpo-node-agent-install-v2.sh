@@ -53,7 +53,9 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
   node_commands(){
     # Give Enter and q equal visual weight on either side of the divider.
     local ltext='ENTER — установить' rtext='q — выход'
-    local lw=$(((nwidth-1)/2)) rw=$((nwidth-1-lw))
+    local lw rw
+    lw=$(((nwidth-1)/2))
+    rw=$((nwidth-1-lw))
     local la=$(((lw-${#ltext})/2)) lb ra rb
     lb=$((lw-${#ltext}-la))
     ra=$(((rw-${#rtext})/2))
