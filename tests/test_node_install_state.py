@@ -212,6 +212,56 @@ class TestNodeInstallState(unittest.TestCase):
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertNotIn("Нода уже установлена",result.stdout)
 
+    def test_failed_post_check_temporary_identity_can_be_cleaned(self):
+        # Actual 72% VPS failure: sync created this temporary two-protocol
+        # identity; delete() crashed in _connection_map before committing.
+        leftover={
+            "a"*64: {
+                "name":"WPO install check",
+                "secrets":{
+                    "vless":"cc98a634-bf01-42f0-8c9c-1fd3d5338e55",
+                    "hysteria":"81899b7c-3a8d-4ea5-bbe0-22c45c03e2a4",
+                },
+                "native":{},
+            }
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            vpn=root/"etc/wpp-node-vpn"
+            vpn.mkdir(parents=True)
+            registry=vpn/"profiles.json"
+            registry.write_text(json.dumps({"profiles":leftover}))
+            check=self.run_preflight(code,env,"check")
+            self.assertEqual(check.returncode,0,check.stderr)
+            self.assertIn("служебные профили",check.stdout)
+            cleanup=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(cleanup.returncode,0,cleanup.stderr)
+            self.assertFalse(registry.exists())
+            self.assertFalse(cfg.exists())
+            backup=list((root/"backups").glob("wpo-node-incomplete-*"))
+            self.assertEqual(len(backup),1)
+            saved=json.loads((backup[0]/"node-vpn/profiles.json").read_text())
+            self.assertEqual(saved["profiles"],leftover)
+
+    def test_fake_install_profile_with_real_client_is_preserved(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            vpn=root/"etc/wpp-node-vpn"
+            vpn.mkdir(parents=True)
+            registry=vpn/"profiles.json"
+            registry.write_text(json.dumps({"profiles":{
+                "a"*64:{"name":"WPO install check",
+                        "secrets":{"vless":"invalid"},
+                        "native":{}},
+                "b"*64:{"name":"real subscriber","secrets":{},"native":{}},
+            }}))
+            result=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(result.returncode,30,result.stderr)
+            self.assertIn("пользовательские VPN",result.stderr)
+            self.assertTrue(cfg.exists())
+            self.assertTrue(registry.exists())
+            self.assertFalse((root/"backups").exists())
+
     def test_nonempty_vpn_profiles_block_cleanup(self):
         with tempfile.TemporaryDirectory() as temp:
             root,cfg,code,env=self.sandbox(temp)
