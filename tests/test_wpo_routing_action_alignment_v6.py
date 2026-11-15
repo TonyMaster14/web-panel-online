@@ -59,7 +59,7 @@ class RoutingV6Tests(unittest.TestCase):
         page=render()
         self.assertIn('.routing-form .routing-actions{',page)
         self.assertIn('display:flex;align-items:center;justify-content:flex-end',page)
-        self.assertIn('gap:12px;min-height:76px;padding:14px 18px',page)
+        self.assertIn('gap:12px;min-height:76px;padding:14px 12px 14px 18px',page)
         self.assertIn('.routing-form .routing-actions-primary>.muted',page)
         self.assertIn('flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end',page)
         self.assertNotIn('grid-template-columns:minmax(0,1.5fr) minmax(300px,.65fr);\n    align-items:stretch;gap:0;padding:0;min-height:76px',page)
