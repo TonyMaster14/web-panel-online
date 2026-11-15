@@ -514,6 +514,65 @@ if ! curl -4fsS --connect-timeout 4 --max-time 12 \
   echo 'Node Agent не принимает новый ключ API (проверьте systemctl status wpp-node-agent.service).'
   exit 4
 fi
+# Recover only an orphaned VPN configuration from an interrupted install.
+# Never overwrite an active node or one containing real subscriber profiles.
+# The pinned VPN bootstrap rejects settings.json with another domain; it
+# cannot distinguish a half-installed VPS from an operating server by itself.
+python3 - "$DOMAIN" <<'PY_NODE_STALE_DOMAIN'
+import datetime
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+domain=sys.argv[1]
+root=Path('/etc/wpp-node-vpn')
+settings=root/'settings.json'
+if settings.exists():
+    try:
+        saved=json.loads(settings.read_text(encoding='utf-8'))
+        previous=saved['domain']
+        if not isinstance(previous,str) or not previous:
+            raise ValueError('empty prior domain')
+    except (OSError,ValueError,TypeError,KeyError) as exc:
+        raise SystemExit('Previous node VPN settings are unreadable; refusing to overwrite them.') from exc
+    if previous != domain:
+        def running(unit):
+            return subprocess.run(
+                ['systemctl','is-active','--quiet',unit],check=False,
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+            ).returncode == 0
+        if any(running(u) for u in ('wpo-node-xray.service','wpo-node-vpn.service')):
+            raise SystemExit(
+                'Node VPN domain mismatch: active VPN service belongs to '+previous+
+                '. Keep that node intact; use a separate VPS for '+domain+'.'
+            )
+        profiles=root/'profiles.json'
+        if profiles.exists():
+            try:
+                state=json.loads(profiles.read_text(encoding='utf-8'))
+                entries=state['profiles']
+                if not isinstance(entries,dict) or entries:
+                    raise ValueError('profiles are present or malformed')
+            except (OSError,ValueError,TypeError,KeyError) as exc:
+                raise SystemExit(
+                    'Node VPN domain mismatch: existing profile data must be preserved; '
+                    'refusing automatic recovery.'
+                ) from exc
+        suffix=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        archive=root/('orphaned-domain-backup-'+suffix+'-'+str(os.getpid()))
+        archive.mkdir(mode=0o700)
+        shutil.copy2(settings,archive/'settings.json')
+        os.chmod(archive/'settings.json',0o600)
+        # The pinned VPN bootstrap will create a new XHTTP path for the
+        # current domain. No client profiles or running services are touched.
+        settings.unlink()
+        print('Old incomplete VPN domain',previous,
+              'archived to',str(archive)+'. New domain:',domain)
+PY_NODE_STALE_DOMAIN
+
 # Pin backend scripts and their imported modules to one reviewed Git commit.
 # Avoid moving branch references during long multi-engine installation.
 # Includes native_changed, writable backend paths, and readable Xray rollback.
