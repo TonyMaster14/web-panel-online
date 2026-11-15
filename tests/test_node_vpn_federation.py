@@ -98,9 +98,9 @@ class NodeFederationTests(unittest.TestCase):
         vpn.XRAY.write_bytes(old)
         bad=SimpleNamespace(returncode=1,stderr="invalid config")
         ok=SimpleNamespace(returncode=0,stderr="")
-        with mock.patch.object(vpn,"command",side_effect=[bad,ok]), \\
-             mock.patch.object(vpn.os,"chown"), \\
-             mock.patch("grp.getgrnam",return_value=SimpleNamespace(gr_gid=123)):
+        with (mock.patch.object(vpn,"command",side_effect=[bad,ok]),
+              mock.patch.object(vpn.os,"chown"),
+              mock.patch("grp.getgrnam",return_value=SimpleNamespace(gr_gid=123))):
             with self.assertRaisesRegex(RuntimeError,"validation failed"):
                 vpn.apply({})
         self.assertEqual(vpn.XRAY.read_bytes(),old)
