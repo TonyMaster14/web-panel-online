@@ -3,6 +3,15 @@
 # wpo-node-agent-reinstall-v23: restart agent after key rotation and explain enrollment failures
 set -Eeuo pipefail
 umask 077
+# Never allow APT/dpkg or Ubuntu's needrestart to open an interactive
+# kernel/service-restart dialog during the SSH wizard. It can otherwise wait
+# indefinitely at the Caddy repository prerequisites, while the progress bar
+# continues moving. The node's own systemd services are explicitly restarted
+# later in the installer; an OS kernel reboot remains the operator's choice.
+export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_PRIORITY=critical
+export APT_LISTCHANGES_FRONTEND=none
+export NEEDRESTART_SUSPEND=1
 [[ $EUID -eq 0 ]] || { echo 'Запустите от root.'; exit 1; }
 TOKEN="$1"
 [[ "$TOKEN" =~ ^[A-Za-z0-9_-]{40,60}$ ]] || { echo 'Одноразовый ключ не передан.'; exit 2; }
