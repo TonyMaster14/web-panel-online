@@ -179,6 +179,25 @@ class TestNodeInstallState(unittest.TestCase):
                 self.assertTrue(cfg.exists())
             self.assertFalse((root/"backups").exists())
 
+    def test_stale_success_log_does_not_hide_new_failed_install(self):
+        # The server was previously enrolled, then a later attempt rewrote
+        # config.json and failed at 45%. Historical success is NOT evidence
+        # that the current node configuration was registered.
+        with tempfile.TemporaryDirectory() as temp:
+            root,cfg,code,env=self.sandbox(temp)
+            (root/"logs").mkdir()
+            log=root/"logs/node-install-20261115T120000Z-1234.log"
+            log.write_text("Готово: Node Agent зарегистрирован на https://old.example.net\\n")
+            log.chmod(0o600)
+            os.utime(log,(100,100))
+            os.utime(cfg,(200,200))
+            check=self.run_preflight(code,env,"check")
+            self.assertEqual(check.returncode,0,check.stderr)
+            self.assertIn("незавершена",check.stdout)
+            cleanup=self.run_preflight(code,env,"cleanup")
+            self.assertEqual(cleanup.returncode,0,cleanup.stderr)
+            self.assertFalse(cfg.exists())
+
     def test_failed_legacy_enrollment_log_not_considered_complete(self):
         with tempfile.TemporaryDirectory() as temp:
             root,cfg,code,env=self.sandbox(temp)
