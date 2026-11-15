@@ -339,8 +339,13 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
   chmod 0600 "$node_progress"
   printf '1\tПодготовка\n' > "$node_progress"
   node_confirmed=1 node_percent=1 node_second=-1 node_started=$SECONDS
+  node_last_drawn=''
   node_draw(){
-    local percent="$1" elapsed="$2" width full rest a b
+    local percent="$1" elapsed="$2" width full rest a b current
+    # A 0.2-second poll should not repaint the same timer/progress frame 5x.
+    current="$percent:$elapsed"
+    [[ "$current" != "$node_last_drawn" ]] || return 0
+    node_last_drawn="$current"
     node_size
     width=$((ncols-24))
     (( width > 40 )) && width=40
