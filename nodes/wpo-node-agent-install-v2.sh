@@ -927,6 +927,37 @@ source=source.replace(site_anchor,bridge_patch.strip(),1)
 source=source.replace('    sleep 0.2\n', '    sleep 0.5\n',1)
 path.write_text(source,encoding='utf-8')
 PY_WPO_RELAY_READY_RETRY
+# The pinned eight-engine bootstrap was downloading the original
+# wpo_node_eight.py, where _native_connections returned an envelope dict and
+# VLESS-only remove() restarted every unrelated native service. Pull just the
+# reviewed fixed Python module from an immutable commit: the remaining
+# binaries, bootstrap scripts, AWG, Naive and Mieru modules stay pinned.
+python3 - "$EIGHT_SETUP" <<'PY_WPO_NODE_NATIVE_FIX'
+from pathlib import Path
+import sys
+script=Path(sys.argv[1])
+source=script.read_text(encoding='utf-8')
+loop='for module in wpp_awg.py wpp_extra_protocols.py wpo_node_eight.py; do'
+url='"$BASE/$module" -o "$TEMP/$module"'
+compile_line='    python3 -m py_compile "$TEMP/$module"'
+if source.count(loop)!=1 or source.count(url)!=1 or source.count(compile_line)!=1:
+    raise SystemExit('Pinned native engine layout changed: refusing unsafe installation.')
+new_loop='''for module in wpp_awg.py wpp_extra_protocols.py wpo_node_eight.py; do
+    module_url="$BASE/$module"
+    if [[ "$module" == wpo_node_eight.py ]]; then
+        module_url="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/b424110fedc4940854e3d93eaa4f026df544bf8a/src/wpo_node_eight.py"
+    fi'''
+source=source.replace(loop,new_loop,1).replace(url,'"$module_url" -o "$TEMP/$module"',1)
+source=source.replace(compile_line,'''    if [[ "$module" == wpo_node_eight.py ]]; then
+        grep -Fq 'return list(GROUPED_CONNECTIONS.values())' "$TEMP/$module" &&
+        grep -Fq 'native_changed = assemble(old) != assemble(new)' "$TEMP/$module" || {
+            echo 'Node federation module is missing connection and removal fixes' >&2
+            exit 4
+        }
+    fi
+'''+compile_line,1)
+script.write_text(source,encoding='utf-8')
+PY_WPO_NODE_NATIVE_FIX
 bash -n "$EIGHT_SETUP"
 WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"
 rm -f -- "$EIGHT_SETUP"
