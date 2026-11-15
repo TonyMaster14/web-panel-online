@@ -113,6 +113,41 @@ class AsyncFeedHTTP(HappSubscription):
         self.assertEqual(self.calls.count("https://se.example.net"),1)
         self.assertNotIn("SECRET",serialized)
 
+    def test_async_three_servers_two_protocols_produce_six_real_profiles(self):
+        # One physical host appears twice: VLESS + Hysteria2. That does not
+        # count as two separate nodes for the auto-balancer.
+        second=dict(self.user, id="h"*16, protocol="hysteria",
+                    connection_id="hysteria-primary", backend_port=8443,
+                    secret="fedcba987654")
+        self.manager["users"]=[dict(self.user), second]
+        def request(node,method,path,data,timeout):
+            self.assertEqual(method,"POST")
+            self.assertEqual(path,"/wpp-api/v1/federation/sync")
+            self.assertEqual(set(data["protocols"]),{"vless","hysteria"})
+            host=node["url"].split("//",1)[1]
+            return {"ok":True,"profiles":[
+                {"protocol":"vless",
+                 "link":"vless://11111111-1111-4111-8111-111111111111@"
+                        +host+":443?encryption=none&security=tls&type=xhttp#VPN"},
+                {"protocol":"hysteria",
+                 "link":"hysteria2://node-secret@"+host+":8443/?sni="+host+"#VPN"},
+            ]}
+        self.namespace["node_api"].request=request
+        self.release.set()
+        self.fetch()
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline:
+            with remote.LOCK:
+                if len(remote.CACHE)>=2:break
+            time.sleep(.02)
+        status,_,body=self.fetch()
+        self.assertEqual(status,200,body)
+        configs=json.loads(body)
+        self.assertEqual(len(configs),7,"auto + 2 NL + 2 PL + 2 SE")
+        self.assertIn("Автовыбор",configs[0]["remarks"])
+        for host in ("vpn.example","pl.example.net","se.example.net"):
+            self.assertEqual(sum(host in json.dumps(c) for c in configs[1:]),2,host)
+
     def test_async_remote_only_without_verified_links_remains_explicit_pending(self):
         self.sub["node_ids"]=["a"*16,"b"*16]
         status,_,body=self.fetch()
