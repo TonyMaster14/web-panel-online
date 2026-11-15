@@ -1803,7 +1803,7 @@ def once(old,new,label):
 # Main node: one centered country name and a discreet starred flag. Status unchanged.
 once(
     '<div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(lc))}</span><div class="wpo-node-label"><h3>{esc(lname)}</h3><small>Основная нода</small></div>{status("local","online")}</div>',
-    '<div class="wpo-node-card-head"><span class="wpo-node-flag wpo-node-main-flag">{esc(node_flag(lc))}<span class="wpo-node-main-mark" title="Основная нода" aria-label="Основная нода">★</span></span><div class="wpo-node-label"><h3>{esc(lname)}</h3></div>{status("local","online")}</div>',
+    '<div class="wpo-node-card-head"><span class="wpo-node-flag">{esc(node_flag(lc))}</span><div class="wpo-node-label"><h3><span class="wpo-node-main-name">{esc(lname)}</span> <span class="wpo-node-main-star" title="Основная нода" aria-label="Основная нода">★</span></h3></div>{status("local","online")}</div>',
     'Основная нода без подписи и со звёздочкой')
 
 # Additional nodes: no duplicated country subtitle. Keep status at the right.
@@ -1862,12 +1862,15 @@ css=r"""
     display:flex;align-items:center;justify-content:flex-end
 }
 .wpo-nodes-page .wpo-node-card-bottom .wpo-node-actions{margin-left:auto}
-.wpo-nodes-page .wpo-node-main-flag{position:relative}
-.wpo-nodes-page .wpo-node-main-mark{
-    position:absolute;top:-5px;right:-5px;display:grid;place-items:center;
-    width:16px;height:16px;border:1px solid var(--line);border-radius:50%;
-    background:var(--surface);color:#eab308;
-    font:700 10px/1 system-ui,sans-serif
+.wpo-nodes-page .wpo-node-label h3:has(.wpo-node-main-star){
+    display:flex;align-items:center;gap:6px;min-width:0
+}
+.wpo-nodes-page .wpo-node-label .wpo-node-main-name{
+    min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.wpo-nodes-page .wpo-node-label .wpo-node-main-star{
+    flex:0 0 auto;display:inline-flex;align-items:center;
+    color:#facc15;font:750 15px/1 system-ui,sans-serif
 }
 @media(max-width:700px){
   .wpo-nodes-page .wpo-node-card{min-height:157px}
