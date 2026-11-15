@@ -52,7 +52,7 @@ done
 curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3   --connect-timeout 12 --max-time 90   "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/50fc724db31fe2e8b20862dfc5eff67e99e67984/wpo-node-agent-install-v2.sh"   -o "$WORK/wpp-node-agent-install.sh"
 bash -n "$WORK/wpp-node-agent-install.sh"
 grep -Fqx 'ENGINE_REV=b4d2691a6e942c0ff1ff4652acd63819cc0e0c6f'   "$WORK/wpp-node-agent-install.sh"
-grep -Fq 'wpo-node-site-template-fix.sh' "$WORK/wpp-node-agent-install.sh"
+grep -Fq 'WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"' "$WORK/wpp-node-agent-install.sh"
 
 echo '=== Проверка кода и защиты существующих профилей ==='
 python3 -m py_compile "$WORK/"*.py
