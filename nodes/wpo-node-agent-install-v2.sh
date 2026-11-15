@@ -806,6 +806,49 @@ curl -4fsSL --proto '=https' --proto-redir '=https' \
     "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${ENGINE_REV}/wpo-node-eight-enable.sh" \
     -o "$EIGHT_SETUP"
 bash -n "$EIGHT_SETUP"
+# The pinned Node Agent 0.4 engine has two 2-second relay readiness loops:
+# one during service startup and another after the Caddy site-bridge restart.
+# On a small VPS, systemd can still be restarting the healthy relay during
+# those loops. Adapt only retry/wait logic in the *downloaded temporary copy*,
+# leaving the pinned engine, binary, site behavior and registration untouched.
+python3 - "$EIGHT_SETUP" <<'PY_WPO_RELAY_READY_RETRY'
+import sys
+from pathlib import Path
+
+path=Path(sys.argv[1])
+source=path.read_text(encoding='utf-8')
+startup='for attempt in 1 2 3 4 5 6 7 8 9 10; do'
+site_anchor='bash -n "$TEMP/site-template-fix.sh"\nbash "$TEMP/site-template-fix.sh"'
+if source.count(startup)!=1 or source.count(site_anchor)!=1:
+    raise SystemExit('Pinned relay startup layout changed; refusing unverified patch.')
+
+source=source.replace(startup,'for attempt in $(seq 1 60); do',1)
+# The original script restarts WEB relay again after the private Caddy site
+# bridge is prepared. Patch its two 2-second loops in the downloaded script.
+bridge_patch="""bash -n "$TEMP/site-template-fix.sh"
+python3 - "$TEMP/site-template-fix.sh" <<'PY_WPO_SITE_READY_RETRY'
+import sys
+from pathlib import Path
+path=Path(sys.argv[1])
+source=path.read_text(encoding='utf-8')
+old_loop='for _ in 1 2 3 4 5 6 7 8 9 10; do'
+if source.count(old_loop)!=2 or source.count('sleep 0.2')!=2:
+    raise SystemExit('Pinned site-bridge readiness check changed.')
+source=source.replace(old_loop,'for _ in $(seq 1 60); do')
+source=source.replace('sleep 0.2','sleep 0.5')
+# Transient connection refusals are normal during restart; show the journal
+# only if all checks fail, not 10 low-level curl errors on the wizard screen.
+source=source.replace('curl -4fsS --noproxy', 'curl -4fs --noproxy')
+path.write_text(source,encoding='utf-8')
+PY_WPO_SITE_READY_RETRY
+bash -n "$TEMP/site-template-fix.sh"
+bash "$TEMP/site-template-fix.sh" """
+source=source.replace(site_anchor,bridge_patch.strip(),1)
+# Avoid prematurely failing the initial relay listener while systemd settles.
+source=source.replace('    sleep 0.2\n', '    sleep 0.5\n',1)
+path.write_text(source,encoding='utf-8')
+PY_WPO_RELAY_READY_RETRY
+bash -n "$EIGHT_SETUP"
 WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"
 rm -f -- "$EIGHT_SETUP"
 # Refuse to enroll unless the AUTHENTICATED agent reports the exact expected
