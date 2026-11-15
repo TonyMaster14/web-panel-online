@@ -174,7 +174,7 @@ class NodeFederationTests(unittest.TestCase):
         self.assertIn('controller == 1 && node == 1',dispatcher)
 
     def test_runtime_patch_arguments_expand_in_real_bash(self):
-        for filename in ("wpo-node-vpn-enable.sh","wpo-node-controller-vpn.sh","wpo-vpn-patch.sh"):
+        for filename in ("wpo-node-vpn-enable.sh","wpo-node-controller-vpn.sh","maintenance/other/wpo-vpn-patch.sh"):
             source=(ROOT / filename).read_text()
             self.assertNotIn(r"\${",source,filename)
         node_script=(ROOT / "wpo-node-vpn-enable.sh").read_text()

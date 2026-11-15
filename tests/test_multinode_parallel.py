@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import wpo_node_selection_v2 as exact
 import importlib.util
 from pathlib import Path
-_file=Path(__file__).resolve().parents[1]/"wpo-multinode-feed-fix.py"
+_file=Path(__file__).resolve().parents[1]/"maintenance/happ/wpo-multinode-feed-fix.py"
 _spec=importlib.util.spec_from_file_location("wpo_multinode_feed_fix",_file)
 fast=importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fast)

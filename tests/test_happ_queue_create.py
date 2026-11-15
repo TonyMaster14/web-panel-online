@@ -81,7 +81,7 @@ class QueueCreateTests(unittest.TestCase):
             queue.patch("def x():\n    if True:\n        if True:\n            if True:\n"+live.AFTER)
 
     def test_installer_main_only_and_restores_previous_panel(self):
-        installer=(ROOT/"wpo-happ-queue-create-install.sh").read_text()
+        installer=(ROOT/"maintenance/happ/wpo-happ-queue-create-install.sh").read_text()
         command=subprocess.run(["bash","-n"],input=installer,capture_output=True,text=True)
         self.assertEqual(command.returncode,0,command.stderr)
         for needle in ('! -e /etc/wpp-node-agent/config.json',
