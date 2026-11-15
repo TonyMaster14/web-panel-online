@@ -29,7 +29,7 @@ cleanup(){
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-REV=929b3faeadaa1cfd00f22c5629070ab0690a13f2
+REV=9b9a8aa45ef1240ddacd74d586dc7967a111bc67
 curl -4fsSL --retry 3 --proto '=https' --proto-redir '=https' \
   --connect-timeout 12 --max-time 90 \
   "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/wpo-node-picker-compact-patch.py" \
