@@ -22,10 +22,10 @@ NEW_TABS="""    def routing_enabled(item):
     routing_tabs=[]
 """
 OLD_CARD="""                f' data-routing-choice="{esc(item["id"])}"'
-                f' aria-pressed="{"true" if selected else "false"}'>"""
+                f' aria-pressed="{"true" if selected else "false"}">'"""
 NEW_CARD="""                f' data-routing-choice="{esc(item["id"])}"'
                 f' data-routing-enabled="{"1" if routing_enabled(item) else "0"}"'
-                f' aria-pressed="{"true" if selected else "false"}'>"""
+                f' aria-pressed="{"true" if selected else "false"}">'"""
 OLD_CHOOSER="""    chooser=(
         '<section class="routing-protocol-section" aria-label="Протоколы маршрутизации">'
         '<div class="routing-protocol-head"><h2>Маршрутизация</h2>'
