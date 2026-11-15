@@ -183,7 +183,11 @@ def apply(state):
             fd, tmp = tempfile.mkstemp(dir=str(XRAY.parent))
             with os.fdopen(fd, "wb") as f:
                 f.write(previous)
-            os.chmod(tmp, 0o600)
+            # The Xray daemon runs as the unprivileged xray user. Restoring
+            # root:root mode 0600 leaves the daemon unable to read its config
+            # and turns a recoverable POST failure into a persistent 503.
+            os.chown(tmp, 0, grp.getgrnam("xray").gr_gid)
+            os.chmod(tmp, 0o640)
             os.replace(tmp, XRAY)
             command("systemctl", "restart", UNIT, timeout=30)
         raise
