@@ -36,10 +36,11 @@ class TestNodeInstallState(unittest.TestCase):
         (root/"etc/caddy").mkdir(parents=True)
         (root/"etc/caddy/Caddyfile").write_text("node-old.example.net { respond OK }\n")
         script=root/"bin/systemctl"
+        pattern="|".join("'"+x+"'" for x in active) or "'__never_active__'"
         script.write_text(
             "#!/bin/sh\n"
             "if [ \"$1\" = is-active ]; then\n"
-            "  case \"$3\" in "+ "|".join("'"+x+"'" for x in active)+") exit 0;; esac\n"
+            "  case \"$3\" in "+ pattern +") exit 0;; esac\n"
             "  exit 3\n"
             "fi\n"
             "exit 0\n"
