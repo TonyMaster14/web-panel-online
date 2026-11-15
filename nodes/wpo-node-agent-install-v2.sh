@@ -99,7 +99,7 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
     printf '%s  Укажите email латиницей.%s\n' "$ngray" "$nreset"
   done
   install -d -m 0700 /var/log/web-panel-online
-  node_log="/var/log/web-panel-online/node-install-$(date -u +%Y%m%dT%H%M%SZ)-$.log"
+  node_log="/var/log/web-panel-online/node-install-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
   (umask 077; : > "$node_log")
   node_progress="$(mktemp /run/wpo-node-progress.XXXXXXXX)"
   chmod 0600 "$node_progress"
