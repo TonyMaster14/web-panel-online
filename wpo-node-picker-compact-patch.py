@@ -31,7 +31,7 @@ CHANGES=(
         '.wpo-v28-node-title strong{display:block;min-width:0;font-size:11px;\n'
         ' line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n'
         '.wpo-v28-node-star{display:inline-flex;align-items:center;justify-content:center;\n'
-        ' flex:0 0 auto;color:var(--accent);font-size:15px;font-weight:750;\n'
+        ' flex:0 0 auto;color:#facc15;font-size:15px;font-weight:750;\n'
         ' line-height:1}\n'
         '.wpo-v28-dialog .unavailable{opacity:.48;cursor:not-allowed}'
     )
@@ -42,6 +42,11 @@ def patch(source):
         ast.parse(source)
         if 'wpo-v28-node-star' not in source:
             raise ValueError('Incomplete node-picker patch')
+        old_star = 'flex:0 0 auto;color:var(--accent);font-size:15px;font-weight:750;'
+        yellow_star = 'flex:0 0 auto;color:#facc15;font-size:15px;font-weight:750;'
+        if old_star in source:
+            source = source.replace(old_star, yellow_star, 1)
+            ast.parse(source)
         return source
     result=source
     for old,new in CHANGES:
