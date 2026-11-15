@@ -16,10 +16,16 @@ class TestNodeFastUbuntu(unittest.TestCase):
         self.assertIn('stty -echo < /dev/tty',SRC)
         self.assertIn('stty "$node_tty_original" < /dev/tty',SRC)
         self.assertIn('[[ "$current" != "$node_last_drawn" ]] || return 0',SRC)
-        self.assertIn('node_percent=$node_confirmed',SRC)
+        self.assertNotIn('node_percent=$node_confirmed',SRC)
+        self.assertIn('node_last_move_us="${EPOCHREALTIME/./}"',SRC)
+        self.assertIn('interval=650000',SRC)
+        self.assertIn('(( node_percent == 100 )) || sleep 0.012',SRC)
+        self.assertIn('curl -fsS --connect-timeout 2 --max-time 4',SRC)
+        self.assertIn('sleep 1\\ndone',SRC)
+        self.assertIn('unzip openssl util-linux xz-utils tar',SRC)
         subprocess.run(["bash","-n",str(AGENT)],check=True)
 
-    def run_caddy_preflight(self,os_id):
+    def run_caddy_preflight(self,os_id,distro_package=True):
         block=SRC.split(START,1)[1].split(END,1)[0]
         cleaned=[]
         for line in block.splitlines():
@@ -32,6 +38,7 @@ class TestNodeFastUbuntu(unittest.TestCase):
             'ID='+os_id+'\n'
             'command(){ if [[ "@{1:-}" == -v && "@{2:-}" == caddy ]]; then return 1; fi; builtin command "$@"; }\n'
             'apt-get(){ printf "APT %s\\n" "$*"; }\n'
+            ('apt-cache(){ return 0; }\\n' if distro_package else 'apt-cache(){ return 1; }\\n')
             +START+"\n".join(cleaned)+"\n"
         ).replace("@{","$"+"{")
         return subprocess.run(["bash","-c",script],capture_output=True,text=True,timeout=4)
@@ -44,8 +51,14 @@ class TestNodeFastUbuntu(unittest.TestCase):
         self.assertNotIn("apt-transport-https",result.stdout)
         self.assertIn("install -y --no-install-recommends caddy",result.stdout)
 
-    def test_debian_keeps_legacy_prerequisites(self):
-        result=self.run_caddy_preflight("debian")
+    def test_distro_caddy_avoids_extra_repo_and_apt_refresh(self):
+        result=self.run_caddy_preflight("ubuntu",distro_package=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.count("APT install"),1,result.stdout)
+        self.assertNotIn("APT update",result.stdout)
+
+    def test_debian_keeps_legacy_prerequisites_on_fallback(self):
+        result=self.run_caddy_preflight("debian",distro_package=False)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn("debian-keyring",result.stdout)
         self.assertIn("debian-archive-keyring",result.stdout)
