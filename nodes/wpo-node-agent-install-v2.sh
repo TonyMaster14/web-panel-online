@@ -552,7 +552,13 @@ report installing 'Установка Caddy и подготовка сайта �
 apt-get update
 apt-get install -y --no-install-recommends curl ca-certificates gnupg python3
 if ! command -v caddy >/dev/null 2>&1; then
-  apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https
+  # Ubuntu 22.04+/APT already supports HTTPS. Debian archive keyrings aren't
+  # needed to verify Cloudsmith: Caddy has its own separately imported GPG key.
+  # These packages previously blocked Ubuntu 24.04 for ~18 minutes when an
+  # interactive needrestart kernel prompt appeared mid-APT install.
+  if [[ "$ID" == debian ]]; then
+    apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https
+  fi
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' -o /etc/apt/sources.list.d/caddy-stable.list
   chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
