@@ -33,6 +33,10 @@ class MainOnlyUpdate(unittest.TestCase):
             self.assertNotIn(dangerous,SH)
 
     def test_fast_happ_and_preallocation_are_both_installed(self):
+        self.assertIn('WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"',SH)
+        self.assertNotIn("wpo-node-site-template-fix.sh",SH)
+        # A previous invalid grep silently aborted the installer before
+        # touching panel.py, leaving the old 503 path in place.
         self.assertIn("wpo-happ-preallocate-patch.py",SH)
         self.assertIn("wpo-happ-async-panel-patch.py",SH)
         self.assertIn("wpo-happ-preparer.path",SH)
