@@ -43,6 +43,9 @@ class MainOnlyUpdate(unittest.TestCase):
         self.assertIn("wpo-happ-preparer.timer",SH)
         self.assertIn('PathChanged=/etc/web-proxy-panel/users.json',SH)
         self.assertIn('OnUnitInactiveSec=90s',SH)
+        self.assertIn('ReadWritePaths=/var/lib/tproxy-panel /run/lock',SH)
+        self.assertIn("Нода",SH)
+
         self.assertIn('ROLLBACK=1',SH)
         self.assertIn('ROLLBACK=0',SH)
         self.assertIn("def verified_links(",WORKER)
