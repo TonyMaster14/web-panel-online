@@ -489,21 +489,21 @@ def hiddify_compatible_links(links):
 
 
 def failover_xray_config(links, profile=None, name="WPP · Автопереключение"):
-    """Build one Xray profile whose ordered proxy pool is monitored by leastLoad.
+    """Build a live VPN pool selected by observed reachability and latency.
 
     The subscription URL and individual UUIDs remain unchanged.  Xray probes
     every outbound, moves new connections away from an unavailable route and
     automatically considers it again after recovery.
     """
     outbounds = []
-    for index, link in enumerate(links, 1):
+    for link in links:
         if not isinstance(link, str) or urlparse(link).scheme.lower() not in ("vless", "hysteria2", "hy2"):
             continue
         try:
             outbound = _proxy_outbound(link)
         except RoutingError:
             continue
-        outbound["tag"] = "proxy-%d" % index
+        outbound["tag"] = "proxy-%d" % (len(outbounds) + 1)
         outbounds.append(outbound)
     if not outbounds:
         raise RoutingError("Для автоматического переключения нет поддерживаемых подключений.")
@@ -523,13 +523,12 @@ def failover_xray_config(links, profile=None, name="WPP · Автоперекл�
         if rule.get("outboundTag") == "proxy":
             rule.pop("outboundTag", None)
             rule["balancerTag"] = "auto"
-    costs = [{"regexp": False, "match": "proxy-%d" % index, "value": float((index - 1) * 10)}
-             for index in range(1, len(outbounds) + 1)]
+    # wpo-live-failover-v2: use ordinary observatory alive/delay results.
+    # A failed pool must not silently fall back to the first dead node or
+    # bypass VPN protection. Explicit user-selected direct rules still apply.
     routing["balancers"] = [{
-        "tag": "auto", "selector": ["proxy-"], "fallbackTag": "proxy-1",
-        "strategy": {"type": "leastLoad", "settings": {
-            "expected": 1, "maxRTT": "3s", "tolerance": 0.5, "costs": costs,
-        }},
+        "tag": "auto", "selector": ["proxy-"], "fallbackTag": "block",
+        "strategy": {"type": "leastPing"},
     }]
     return {
         "remarks": str(name),
@@ -549,7 +548,7 @@ def failover_xray_config(links, profile=None, name="WPP · Автоперекл�
         "observatory": {
             "subjectSelector": ["proxy-"],
             "probeUrl": "https://www.gstatic.com/generate_204",
-            "probeInterval": "15s",
+            "probeInterval": "10s",
             "enableConcurrency": True,
         },
     }
