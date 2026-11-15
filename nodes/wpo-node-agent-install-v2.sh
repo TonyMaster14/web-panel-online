@@ -143,8 +143,9 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
     fi
     node_draw "$node_percent" "$elapsed"
   }
-  printf '\n  %sДомен: %s%s\n' "$ncyan" "$DOMAIN" "$nreset"
-  printf '  %sEmail: %s%s\n\n  %sУСТАНОВКА НОДЫ …%s\n\n' "$ncyan" "$EMAIL" "$nreset" "$nbold$ngreen" "$nreset"
+  # Domain and email were already entered above; don't duplicate them.
+  # Keep one empty line between the email prompt and installation status.
+  printf '\n  %sУСТАНОВКА НОДЫ …%s\n\n' "$nbold$ngreen" "$nreset"
   printf '\033[?25l'
   # Feed the original noninteractive worker the exact inputs entered above.
   # Enrollment/token/API and all protocol installation paths are unchanged.
@@ -162,8 +163,14 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
   node_tick
   if (( status != 0 )); then
     printf '\n%s  ✖ Установка ноды прервана (код %d)%s\n' "$nred" "$status" "$nreset"
-    hint="$(grep -E '^(ERROR:|Ошибка|HTTPS не готов|Node Agent не готов|Регистрация:)' "$node_log" | tail -n 1 || true)"
-    [[ -z "$hint" ]] || printf '  %s\n' "$hint"
+    # Show the actual cause for common APT/DNS/curl/certificate failures.
+    # Never print the full installer log here (it can contain sensitive data).
+    hint="$(grep -E '^(ERROR:|Ошибка|E: |Err:|curl: \(|HTTPS не готов|Node Agent не готов|Регистрация:|DNS A-запись|Некорректный домен|Email не введён|Проверьте email|Не удалось|Требуется Ubuntu|Требуется Debian)' "$node_log" | tail -n 1 || true)"
+    if [[ -n "$hint" ]]; then
+      printf '  %s\n' "$hint"
+    else
+      printf '  Причина записана в журнале. Посмотрите последние строки.\n'
+    fi
     printf '  Подробности: %s\n' "$node_log"
     exit "$status"
   fi
