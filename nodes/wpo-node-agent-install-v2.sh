@@ -237,12 +237,18 @@ esac
 # WPO_NODE_WIZARD_START: TTY shell around the unchanged Node Agent installer.
 if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t 0 && -t 1 ]]; then
   node_pid="" node_progress="" node_log=""
+  node_tty_original=""
   node_cleanup(){
     if [[ -n "$node_pid" ]] && kill -0 "$node_pid" 2>/dev/null; then
       kill "$node_pid" 2>/dev/null || true
       wait "$node_pid" 2>/dev/null || true
     fi
     [[ -z "$node_progress" ]] || rm -f -- "$node_progress"
+    # Restore the user's SSH terminal exactly as it was before the progress UI,
+    # including input echo. Also runs after Ctrl+C and failure exits.
+    if [[ -n "$node_tty_original" ]]; then
+      stty "$node_tty_original" < /dev/tty 2>/dev/null || true
+    fi
     printf '\033[0m\033[?25h'
     return 0
   }
@@ -374,6 +380,11 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
   # Domain and email were already entered above; don't duplicate them.
   # Keep one empty line between the email prompt and installation status.
   printf '\n  %sУСТАНОВКА НОДЫ …%s\n\n' "$nbold$ngreen" "$nreset"
+  # Pressing Enter while the installer runs is NOT another command. Disable
+  # terminal echo during the progress bar so CR/LF cannot push it down and
+  # leave a duplicate line on screen. Keep normal Ctrl+C signal handling.
+  node_tty_original="$(stty -g < /dev/tty 2>/dev/null || true)"
+  [[ -z "$node_tty_original" ]] || stty -echo < /dev/tty
   printf '\033[?25l'
   # Feed the original noninteractive worker the exact inputs entered above.
   # Enrollment/token/API and all protocol installation paths are unchanged.
