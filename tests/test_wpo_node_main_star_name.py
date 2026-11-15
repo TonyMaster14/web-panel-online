@@ -24,7 +24,7 @@ class MainNodeStarTests(unittest.TestCase):
     def test_surgical_existing_ui_patch(self):
         old = ("def nodes_ui():\n"
                "    local_card = " + patcher.OLD_MARKUP + "\n"
-               "CSS = " + repr(patcher.OLD_CSS) + "\n")
+               "CSS = '''" + patcher.OLD_CSS + "'''\n")
         ast.parse(old)
         new = patcher.patch(old)
         ast.parse(new)
