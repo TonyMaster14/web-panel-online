@@ -1,0 +1,74 @@
+name: Build WPO precompiled node engines (test branch)
+on:
+  push:
+    branches: [test/wpo-smooth-progress-v1]
+    paths:
+      - .github/workflows/wpo-node-prebuilt.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Build pinned MTProto and Go relay once on CI, never on customer VPS
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -s assets/node-prebuilt/mtproto-proxy-linux-amd64 &&
+                -s assets/node-prebuilt/tproxy-server-linux-amd64 &&
+                -s assets/node-prebuilt/SHA256SUMS ]]; then
+            echo "Prebuilt engines already exist; refusing to replace them."
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            --no-install-recommends make gcc libssl-dev zlib1g-dev ca-certificates curl git
+          mkdir -p assets/node-prebuilt
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          curl -4fLsS --proto '=https' --proto-redir '=https' --retry 3 \
+            --connect-timeout 20 --max-time 180 \
+            'https://github.com/TelegramMessenger/MTProxy/archive/f36d8af769ffaeac36978d38c2c0f6d1104c2137.tar.gz' \
+            -o "$tmp/mtproxy.tar.gz"
+          echo '919795c416b870670841a21d1930ad97a24c7b84b9eb8c6f9e3de32f2fdf4655  '$tmp'/mtproxy.tar.gz' | sha256sum -c -
+          mkdir -p "$tmp/mtproxy"
+          tar -xzf "$tmp/mtproxy.tar.gz" -C "$tmp/mtproxy" --strip-components=1
+          make -C "$tmp/mtproxy" -j"$(nproc)" >/dev/null
+          install -m 0755 "$tmp/mtproxy/objs/bin/mtproto-proxy" \
+            assets/node-prebuilt/mtproto-proxy-linux-amd64
+          git -C "$tmp" init -q relay
+          git -C "$tmp/relay" remote add origin https://github.com/telegramdesktop/tproxy-server.git
+          git -C "$tmp/relay" fetch -q --depth 1 origin 52a5feb7fac38f68da5afef9cedd9b3bfc8473ca
+          git -C "$tmp/relay" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$tmp/relay" rev-parse HEAD)" = 52a5feb7fac38f68da5afef9cedd9b3bfc8473ca
+          ( cd "$tmp/relay" &&
+            go test ./internal/config ./internal/server -run '^TestWPO' -count=1 &&
+            CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' \
+              -o "$GITHUB_WORKSPACE/assets/node-prebuilt/tproxy-server-linux-amd64" ./cmd/tproxy-server )
+          file assets/node-prebuilt/* || true
+          test -x assets/node-prebuilt/mtproto-proxy-linux-amd64
+          test -x assets/node-prebuilt/tproxy-server-linux-amd64
+          ldd assets/node-prebuilt/mtproto-proxy-linux-amd64 || true
+          sha256sum assets/node-prebuilt/mtproto-proxy-linux-amd64 \
+            assets/node-prebuilt/tproxy-server-linux-amd64 > assets/node-prebuilt/SHA256SUMS
+          cat assets/node-prebuilt/SHA256SUMS
+      - name: Push verified assets to test branch only
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git add assets/node-prebuilt/
+          if git diff --cached --quiet; then
+            echo 'Binaries already present; no commit needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'build(nodes): precompiled x86_64 MTProxy and WEB relay binaries'
+          git push origin HEAD:refs/heads/test/wpo-smooth-progress-v1

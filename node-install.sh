@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 umask 077
 
-REF="9fb7260fd7fa0b6c9d0490052d2a62e2df63f8c1"
+REF="0ea1afcc2c60620b4ebb089221341012c0b8eb0c"
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF"
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Complete first-install bundles already contain all the Nodes Lab source files.
@@ -119,7 +119,7 @@ new_nodes=r"""def nodes_ui(nodes, local, connection_token, path, csrf, pending_n
         name=str(n.get('name') or n.get('country_name') or 'Нода')
         code=str(n.get('country_code','UN')).upper()
         caps=n.get('capabilities') if isinstance(n.get('capabilities'),list) else []
-        cap='VLESS · Hysteria2' if 'federation' in caps or not caps else 'Node Agent'
+        cap='VLESS XHTTP · Hysteria2' if 'federation' in caps else 'Node Agent · VPN не установлена'
         edit=f'<button class="icon-btn" type="button" data-node-edit="{esc(uid)}" data-node-name="{esc(name)}" title="Переименовать" aria-label="Переименовать">{icon("edit")}</button>'
         delete=f'<form method="post" action="{esc(path)}/node-action" data-confirm="Удалить ноду «{esc(name)}»? Все управляемые профили будут отозваны.">{hidden(csrf,operation="delete",id=uid)}<button class="icon-btn danger" title="Удалить" aria-label="Удалить">{icon("trash")}</button></form>'
         cards.append(f'<article class="card wpo-node-card"><div class="wpo-node-card-top"><span class="wpo-node-flag">{esc(node_flag(code))}</span><div class="wpo-node-card-title"><strong>{esc(name)}</strong><small>{esc(n.get("country_name","Страна не определена"))} · {esc(n.get("url",""))}</small></div>{status(uid,state)}</div><div class="wpo-node-card-meta"><span>Агент {esc(n.get("version","—"))}</span><span>{esc(cap)}</span></div><div class="wpo-node-card-actions">{edit}{delete}</div></article>')
@@ -246,6 +246,9 @@ panel=once(panel,
                 if now-int(node.get("status_checked_at",0) or 0)<5: continue
                 try:
                     state=node_api.request(node,"GET",node_api.API_PREFIX+"/status",timeout=3)
+                    # wpo-live-node-capabilities-v1
+                    caps=state.get("capabilities",[])
+                    node["capabilities"]=[x for x in caps if isinstance(x,str)][:32] if isinstance(caps,list) else []
                     node["status"]="online"; node["status_detail"]="API отвечает"
                     node["version"]=str(state.get("version",node.get("version","")))[:32]
                     node["status_checked_at"]=now
@@ -3342,6 +3345,33 @@ apply wpo-nodes-lab-v24-install.sh "$UI" "/* wpo-node-indicator-center-v24 */"
 apply wpo-nodes-lab-v25-install.sh "$PANEL" "# wpo-node-template-save-v25"
 apply wpo-nodes-lab-v26-install.sh "$UI" "/* wpo-node-spinner-center-v26 */"
 
+# v27 test bridge: keep remote Node Agent support distinct from the 26
+# already validated UI stages. This is bundled with the branch's package
+# and never modifies unrelated node websites or subscriber keys.
+if [[ -s "$PACKAGE_DIR/wpo-node-controller-vpn.sh" ]] &&
+   ! grep -Fq '# wpo-vpn-controller-v27' "$PANEL"; then
+    TOUCHED=1
+    WPO_NODES_VPN_DURING_INSTALL=1 WPO_NODES_BATCH_RESTART=1 \
+        bash "$PACKAGE_DIR/wpo-node-controller-vpn.sh"
+fi
+
+# v28 test: the UI and expiry protection are installed with the panel,
+# so the user never needs a separate patch on the additional node VPS.
+if [[ -s "$PACKAGE_DIR/wpo_v28_apply.py" && -s "$PACKAGE_DIR/wpo_user_v28.py" ]]; then
+    TOUCHED=1
+    python3 "$PACKAGE_DIR/wpo_v28_apply.py" --app "$APP" \
+        --manager /usr/local/sbin/web-proxy-panelctl \
+        --helper "$PACKAGE_DIR/wpo_user_v28.py"
+    if [[ -s "$PACKAGE_DIR/wpo_node_remote_patch.py" && -s "$PACKAGE_DIR/wpo_node_remote.py" ]]; then
+        python3 "$PACKAGE_DIR/wpo_node_remote_patch.py" --app "$APP" \
+            --helper "$PACKAGE_DIR/wpo_node_remote.py"
+    else
+        die 'Тестовый пакет не содержит поддержку удалённых пользовательских профилей.'
+    fi
+else
+    die 'В тестовом пакете отсутствует интерфейс пользователей v28.'
+fi
+
 for file in "$PANEL" "$UI" "$GEO" "$AUTO"; do [[ -s "$file" ]] || die "Отсутствует файл: $file"; done
 # Validate the final generated-node installer and controller feature set.
 grep -Fq 'node-agent-installer.sh' "$PANEL" || die 'Нет маршрута установщика ноды.'
@@ -3384,4 +3414,5 @@ echo '✓ Компоненты ноды WPO установлены/провер�
 echo "✓ Фиксированная версия: $REF"
 echo "✓ Резервная копия до обновления: $BACKUP"
 echo '✓ Геолокация, флаги, индикаторы по центру и мгновенный выбор шаблонов сайтов сохранены.'
-echo 'Важно: Node Agent 0.2 управляет HTTPS-страницей и статусом. VPN на удалённой ноде пока не активирован.'
+echo '✓ Установщик новой ноды включает Xray и VPN-федерацию: VLESS XHTTP + Hysteria2.'
+echo 'Другие протоколы отображаются в каталоге и будут активированы после серверной реализации.'

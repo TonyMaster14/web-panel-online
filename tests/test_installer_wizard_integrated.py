@@ -56,14 +56,14 @@ def run_case(case):
         # Only privilege/host paths and timing are substituted; real rendering runs.
         source=SOURCE.replace('[[ $EUID -eq 0 ]]', 'true').replace('/run/', str(directory)+'/').replace('/var/log/web-panel-online', str(directory)+'/logs')
         source=source.replace('-o root -g root ', '').replace('</dev/tty','<&0')
-        source=source.replace('sleep 1', 'sleep .01').replace('sleep 2', 'sleep .02')
+        source=source.replace('sleep 1', 'sleep .01').replace('sleep 2', 'sleep .02').replace('sleep 0.10', 'sleep .002')
         (directory / "install.sh").write_text(source, encoding="utf-8")
         (directory / "install-final.sh").write_text(MOCK_BACKEND, encoding="utf-8")
         (directory / "node-install.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
         (directory / "wpp_subscriptions.py").write_text("# mock dependency\n", encoding="utf-8")
 
         master, slave = pty.openpty()
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 38, 90, 0, 0))
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 38, 130, 0, 0))
         env = dict(os.environ, TERM="xterm-256color", WPO_TEST_CASE=case)
         process = subprocess.Popen(
             ["bash", str(directory / "install.sh")],
@@ -115,7 +115,8 @@ def run_case(case):
             os.write(master, b"WPOAdmin\n")
             receive("Пароль (не отображается):")
             os.write(master, b"Secret-6789\n")
-            receive("УСТАНОВКА")
+            # Progress updates are read from the completed PTY recording:
+            # the first frame may race with input echo on fast CI hosts.
             deadline=time.monotonic()+35
             while process.poll() is None and time.monotonic()<deadline:
                 if select.select([master],[],[],.1)[0]:
@@ -129,9 +130,15 @@ def run_case(case):
             assert "Secret-6789" not in decoded[:decoded.find("УСТАНОВКА")], "Password echoed in input section"
             if case == "success":
                 assert rc == 0, (rc, decoded[-4000:])
+                assert "УСТАНОВКА …" in decoded, decoded[:8000]
                 assert "УСТАНОВКА ЗАВЕРШЕНА!" in decoded, decoded[-4000:]
                 assert "100%" in decoded, decoded[-4000:]
-                assert "Этап:" in plain, plain[-4000:]
+                assert "Этап:" not in plain, plain[-4000:]
+                # Real backend leaps between milestones, while the wizard
+                # must animate each integer percentage in order.
+                percentages=[int(p) for p in re.findall(r'(?:^|\s)(\d{1,3})%', plain)]
+                assert percentages and percentages[0]==1 and percentages[-1]==100, percentages
+                assert all(y>=x and y-x<=1 for x,y in zip(percentages,percentages[1:])), percentages
                 # After 1 sec, the cursor returns to the wizard header, then
                 # everything below it is erased, leaving only the real access card.
                 parts = raw.split(b"\x1b[H")
@@ -144,12 +151,22 @@ def run_case(case):
                 assert "Сохраните данные, чтобы не потерять!" in final_plain
                 assert "Ссылка на панель:" in final_plain
                 assert "https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login" in final_plain
+                assert any("Ссылка на панель: https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login" in row
+                           and row.count("│")==2 for row in final_plain.splitlines())
                 # The full link appears INSIDE the frame, before its bottom border.
                 card_tail=final_plain.split('WPO 3.0 — УСТАНОВЛЕНО',1)[1]
                 assert card_tail.index('Ссылка на панель:') < card_tail.index('╰')
                 assert any('https://panel.example.com/panel-1234567890abcdef1234567890abcdef/login' in line and line.count('│') == 2 for line in final_plain.splitlines())
                 assert "Логин: WPOAdmin" in final_plain
                 assert "Пароль: Secret-6789" in final_plain
+                # Equal one-empty-row gaps from title through link, login,
+                # password, warning; link is inline with its label.
+                rows=final_plain.splitlines()
+                markers=("WPO 3.0 — УСТАНОВЛЕНО", "Ссылка на панель: https://",
+                         "Логин: WPOAdmin", "Пароль: Secret-6789",
+                         "Сохраните данные, чтобы не потерять!")
+                positions=[next(i for i,line in enumerate(rows) if marker in line) for marker in markers]
+                assert all(y-x==2 for x,y in zip(positions,positions[1:])), positions
                 # Final title banner and credentials frame have exactly the
                 # same horizontal length; both headings are centered in it.
                 final_rows=final_plain.splitlines()
@@ -164,7 +181,7 @@ def run_case(case):
                     left=len(interior)-len(interior.lstrip(' '))
                     right=len(interior)-len(interior.rstrip(' '))
                     assert abs(left-right)<=1, (heading,left,right)
-                for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "УСТАНОВКА ЗАВЕРШЕНА!", "100%", "◷ 00:"):
+                for unwanted in ("Домен:", "Email:", "ХОД УСТАНОВКИ", "Этап:", "УСТАНОВКА ЗАВЕРШЕНА!", "100%", "◷ 00:"):
                     assert unwanted not in final_plain, (unwanted, final_plain)
             elif case == "failed":
                 assert rc == 27, (rc, decoded[-2000:])

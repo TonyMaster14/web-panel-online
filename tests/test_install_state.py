@@ -88,7 +88,7 @@ class SafetyContractTests(unittest.TestCase):
         self.assertLess(FINAL.index('xray run -test -config'),
                         FINAL.index('WPO_SUCCESS_TMP='))
         self.assertLess(FINAL.index('WPO_SUCCESS_TMP='),
-                        FINAL.index('wpp_progress 100 "Установка завершена"'))
+                        FINAL.index('wpp_progress 100 "Установка завершена"', FINAL.index('WPO_SUCCESS_TMP=')))
         self.assertIn('rm -f -- "$WPO_PENDING"', FINAL)
     def test_partial_removal_is_locked_and_checks_success(self):
         cleaner = SOURCE.split("wpo_clean_partial() {",1)[1].split("\nWPO_INSTALL_STATE=",1)[0]

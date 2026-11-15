@@ -308,16 +308,24 @@ RESULT="$(mktemp /run/wpo-ui-result.XXXXXXXX)"
 chmod 0600 "$PROGRESS" "$RESULT"
 printf '1\tЗагрузка пакета\n' > "$PROGRESS"
 
-# Keep one five-row progress block: status, gap, bar, gap, current stage.
-# Reserve its rows once. Resize events rebuild the layout once on the new screen.
+# Adaptive progress combines real verified backend checkpoints with an
+# elastic ETA. The display never jumps to a new milestone and never shows
+# 100% until the backend succeeds and its access card is available.
+# Runtime differs across VPS networks and builds, so intermediate % is an
+# estimate, not a guarantee of exact remaining seconds.
+WPO_PROGRESS_REFERENCE_SECONDS="${WPO_PROGRESS_REFERENCE_SECONDS:-240}"
+if ! [[ "$WPO_PROGRESS_REFERENCE_SECONDS" =~ ^[0-9]+$ ]] ||
+   (( WPO_PROGRESS_REFERENCE_SECONDS < 30 || WPO_PROGRESS_REFERENCE_SECONDS > 3600 )); then
+    WPO_PROGRESS_REFERENCE_SECONDS=240
+fi
+WPO_CONFIRMED=1
+WPO_LAST_INCREMENT_SECOND=-1
+# Three rows only: status, blank row, progress bar with elapsed time.
 DRAW_LAST="" DRAW_READY=0 DRAW_RESIZED=0
 trap 'DRAW_RESIZED=1' WINCH
 draw(){
-    local pct="$1" label="$2" elapsed="$3" width filled empty bar rest key
-    local status stage packet prefix="" maxtext
-    [[ "$label" != 'Установка нод' ]] || label='Установка ноды'
-    if (( pct >= 90 && pct < 100 )); then label='Завершение установки'; fi
-    key="$pct|$label|$elapsed"
+    local pct="$1" elapsed="$2" width filled empty bar rest key prefix="" maxtext status packet
+    key="$pct|$elapsed"
     [[ "$key" != "$DRAW_LAST" || "$DRAW_RESIZED" == 1 ]] || return 0
     DRAW_LAST="$key"
     local previous_cols="$UI_COLS" previous_rows="${UI_ROWS:-24}"
@@ -330,11 +338,10 @@ draw(){
         DRAW_RESIZED=0
     fi
     if (( ! DRAW_READY )); then
-        # Ensure all rows exist even when the previous prompt was near the bottom.
-        printf '\n\n\n\n\n'
+        printf '\n\n\n'
         DRAW_READY=1
     fi
-    prefix=$'\033[4A\r'
+    prefix=$'\033[2A\r'
     width=$((UI_COLS-24))
     (( width > 40 )) && width=40
     (( width < 1 )) && width=1
@@ -343,23 +350,50 @@ draw(){
     printf -v rest '%*s' "$empty" ''; rest="${rest// /░}"
     maxtext=$((UI_COLS-3))
     status='УСТАНОВКА …'
-    stage="Этап: $label"
-    if (( pct == 100 )); then
-        status='УСТАНОВКА ЗАВЕРШЕНА!'
-        stage=''
-    fi
-    printf -v packet '%s\033[2K  %s%s%s\n\r\033[2K\n\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s\n\r\033[2K\n\r\033[2K  %s%s%s' \
+    if (( pct == 100 )); then status='УСТАНОВКА ЗАВЕРШЕНА!'; fi
+    printf -v packet '%s\033[2K  %s%s%s\n\r\033[2K\n\r\033[2K  %s%s%s%s%s  %3d%%  %s%02d:%02d:%02d%s' \
         "$prefix" "$bold$success" "${status:0:maxtext}" "$reset" \
         "$cyan" "$bar" "$blue" "$rest" "$reset" "$pct" \
-        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset" \
-        "$ice" "${stage:0:maxtext}" "$reset"
+        "$ice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$reset"
     printf '%s' "$packet"
+}
+# A new backend checkpoint corrects the estimate, not the visible percent.
+# The denominator scales dynamically: slow phases extend the ETA instead of
+# pinning the bar to 99% after four minutes.
+wpo_progress_tick(){
+    local elapsed="$((SECONDS-started))" real_percent="" real_stage="" remaining wanted floor
+    if [[ -f "$PROGRESS" ]] && IFS=$'\t' read -r real_percent real_stage < "$PROGRESS"; then
+        if [[ "$real_percent" =~ ^[0-9]+$ ]] &&
+           (( real_percent > WPO_CONFIRMED && real_percent <= 100 )); then
+            WPO_CONFIRMED="$real_percent"
+            # Record real checkpoints privately for comparing 4/5/6.5-min runs.
+            # Display remains stage-free.
+            if [[ -n "${LOG:-}" ]]; then
+                printf '[WPO timing] +%ds milestone=%d %s\n' \
+                    "$elapsed" "$WPO_CONFIRMED" "$real_stage" >> "$LOG"
+            fi
+        fi
+    fi
+    remaining=$((WPO_PROGRESS_REFERENCE_SECONDS * (100-WPO_CONFIRMED) / 100))
+    (( remaining < 15 )) && remaining=15
+    wanted=$((1 + elapsed * 98 / (elapsed+remaining)))
+    # Confirmed milestones provide a lower bound, but a 99% backend
+    # checkpoint merely STARTS the final validation and is not completion.
+    floor=$WPO_CONFIRMED
+    (( floor > 94 )) && floor=94
+    (( wanted < floor )) && wanted=$floor
+    (( wanted > 98 )) && wanted=98
+    # At most one integer step per real second, even if backend jumps 5->55.
+    if (( shown < wanted && elapsed > WPO_LAST_INCREMENT_SECOND )); then
+        shown=$((shown+1))
+        WPO_LAST_INCREMENT_SECOND=$elapsed
+    fi
+    draw "$shown" "$elapsed"
 }
 printf '\033[?25l'
 started=$SECONDS
 shown=1
-label='Загрузка пакета'
-draw "$shown" "$label" "$((SECONDS-started))"
+draw "$shown" "$((SECONDS-started))"
 SOURCE=""
 if [[ -n "$LOCAL_BASE" && -s "$LOCAL_BASE/install-final.sh" && -s "$LOCAL_BASE/wpp_subscriptions.py" && -s "$LOCAL_BASE/node-install.sh" ]]; then
     SOURCE="$LOCAL_BASE"
@@ -374,7 +408,7 @@ else
     git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$WORK/source" >> "$LOG" 2>&1 &
     INSTALL_PID=$!
     while kill -0 "$INSTALL_PID" 2>/dev/null; do
-        draw "$shown" 'Загрузка GitHub' "$((SECONDS-started))"
+        wpo_progress_tick
         sleep 0.2
     done
     if ! wait "$INSTALL_PID"; then
@@ -388,32 +422,17 @@ fi
     printf '\n'; error "Неполный пакет установщика. Журнал: $LOG"
 }
 chmod 0700 "$SOURCE"/*.sh
-printf '7\tПроверка установочного пакета\n' > "$PROGRESS"
-label='Проверка установочного пакета'
-# Show the actual verified milestone immediately, not one extra second per %.
-shown=7
-draw "$shown" "$label" "$((SECONDS-started))"
-confirmed=7
+# Backend milestones stay in the log but never jump the visible percent.
+wpo_progress_tick
 
 WEB_PANEL_PROXY_DOMAIN="$DOMAIN" WEB_PANEL_PROXY_ACME_EMAIL="$EMAIL" \
     WPO_UI_CREDENTIALS_FILE="$CREDENTIALS" WPO_UI_PROGRESS_FILE="$PROGRESS" \
     WPO_UI_RESULT_FILE="$RESULT" WPO_CARD_WIZARD=0 WPO_CARD_COLUMNS="$UI_COLS" \
     bash "$SOURCE/install-final.sh" >> "$LOG" 2>&1 &
 INSTALL_PID=$!
-label='Проверка установочного пакета'
 while kill -0 "$INSTALL_PID" 2>/dev/null; do
-    if IFS=$'\t' read -r target current_label < "$PROGRESS"; then
-        if [[ "$target" =~ ^[0-9]+$ ]] && (( target >= shown && target < 100 )); then
-            # Animate toward confirmed progress without running ahead of the installer.
-            (( target > confirmed )) && confirmed="$target"
-            [[ -n "$current_label" ]] && label="$current_label"
-        fi
-    fi
-    # The backend writes only verified milestones. Never artificially lag
-    # behind it by one percent per second on fast VPS installations.
-    if (( shown < confirmed )); then shown=$confirmed; fi
-    draw "$shown" "$label" "$((SECONDS-started))"
-    sleep 1
+    wpo_progress_tick
+    sleep 0.2
 done
 code=0
 wait "$INSTALL_PID" || code=$?
@@ -424,10 +443,13 @@ if (( code == 0 )); then
         printf '\n'
         error "Нет итоговой карточки доступа. Проверьте журнал: $LOG"
     fi
-    # A successful backend and valid result permit 100% immediately: no
-    # artificial 1-second-per-percent countdown before the finished screen.
-    shown=100
-    draw "$shown" "$label" "$((SECONDS-started))"
+    # After genuine success, animate every remaining integer up to 100.
+    # Catch up quickly only if the whole installation beat the estimate.
+    while (( shown < 100 )); do
+        shown=$((shown+1))
+        draw "$shown" "$((SECONDS-started))"
+        if (( shown < 100 )); then sleep 0.10; fi
+    done
     # Show verified access details two seconds after the 100% milestone.
     sleep 2
     # One final screen transition after the two-second success hold.

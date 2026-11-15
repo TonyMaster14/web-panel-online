@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# wpo-node-agent-eight-pinned-v1: eight actual engines, pinned backend source and live API readiness
 # wpo-node-agent-reinstall-v23: restart agent after key rotation and explain enrollment failures
 set -Eeuo pipefail
 umask 077
@@ -25,8 +26,19 @@ fail() {
   exit "$rc"
 }
 trap fail ERR
+# Do not enter provisioning while Ubuntu is already unpacking its own
+# security updates. fuser checks real file users; pgrep covers minimal
+# images where psmisc/fuser has not been installed.
+if { command -v fuser >/dev/null 2>&1 && fuser -s /var/lib/dpkg/lock-frontend; } ||
+   { command -v pgrep >/dev/null 2>&1 && pgrep -x 'apt-get|dpkg' >/dev/null 2>&1; }; then
+  echo 'Ubuntu сейчас обновляет системные пакеты (apt/dpkg занят).' >&2
+  echo 'Не удаляйте блокировку и не запускайте установщик параллельно.' >&2
+  echo 'Проверьте завершение обновления и повторно создайте установщик в WPO.' >&2
+  report error 'Менеджер пакетов занят обновлением Ubuntu; установка не начиналась.'
+  exit 75
+fi
 report installing 'Проверка VPS и домена.'
-echo '=== WEB PANEL ONLINE — Node Agent 0.2 ==='
+echo '=== WEB PANEL ONLINE — Node Agent 0.4 · 8 протоколов ==='
 read -r -p 'Домен ноды (например, de.example.com): ' DOMAIN
 DOMAIN=$(printf '%s' "$DOMAIN" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]')
 [[ "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || { report error 'Некорректный домен.'; echo 'Некорректный домен.'; exit 2; }
@@ -302,7 +314,132 @@ if ! curl -4fsS --connect-timeout 4 --max-time 12 \
   echo 'Node Agent не принимает новый ключ API (проверьте systemctl status wpp-node-agent.service).'
   exit 4
 fi
-report registration 'HTTPS готов. Регистрация в основной панели.'
+# Pin backend scripts and their imported modules to one reviewed Git commit.
+# Avoid moving branch references during long multi-engine installation.
+# Includes native_changed, writable backend paths, and readable Xray rollback.
+ENGINE_REV=007c4c1cddc86c900b841c1c0360127eb94c03d7
+# Test-only VPN capability is installed before enrollment. Registration
+# is blocked on failure: controller must never see a "ready" VPN node without
+# working local Xray and authenticated federation API.
+report installing 'Активация VPN ноды: VLESS XHTTP и Hysteria2.'
+VPN_SETUP="$(mktemp /tmp/wpo-node-vpn-enable.XXXXXXXX.sh)"
+trap fail ERR
+trap 'rm -f -- "$VPN_SETUP"' EXIT
+curl -4fsSL --proto '=https' --proto-redir '=https' \
+    --retry 3 --connect-timeout 15 --max-time 90 \
+    "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${ENGINE_REV}/wpo-node-vpn-enable.sh" \
+    -o "$VPN_SETUP"
+bash -n "$VPN_SETUP"
+WPO_NODE_VPN_REF="$ENGINE_REV" bash "$VPN_SETUP"
+rm -f -- "$VPN_SETUP"
+trap fail ERR
+# All eight server engines are mandatory: do NOT enroll a partly provisioned
+# node. Install MTProxy/WEB relay, AWG 2/3, Naive and Mieru automatically.
+report installing 'Установка всех 8 VPN-протоколов на ноду.'
+EIGHT_SETUP="$(mktemp /tmp/wpo-node-eight.XXXXXXXX.sh)"
+trap 'rm -f -- "${EIGHT_SETUP:-}" "${VPN_SETUP:-}"' EXIT
+curl -4fsSL --proto '=https' --proto-redir '=https' \
+    --retry 3 --connect-timeout 15 --max-time 90 \
+    "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${ENGINE_REV}/wpo-node-eight-enable.sh" \
+    -o "$EIGHT_SETUP"
+bash -n "$EIGHT_SETUP"
+WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"
+rm -f -- "$EIGHT_SETUP"
+# Refuse to enroll unless the AUTHENTICATED agent reports the exact expected
+# set; component files alone do not prove that the serving API is ready.
+# wpo-eight-agent-ready-retry-v1: systemd Type=simple may report active
+# before Python binds port 9088. Caddy then briefly emits HTTP 502. Verify
+# local agent readiness first, then authenticated public HTTPS, allowing
+# systemd restarts and Caddy reload to settle without reinstalling anything.
+NODE_STATUS=""
+NODE_API_READY=0
+for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  if systemctl is-active --quiet wpp-node-agent.service &&
+     curl -4fsS --noproxy '*' --connect-timeout 1 --max-time 3 \
+       http://127.0.0.1:9088/healthz >/dev/null 2>&1 &&
+     NODE_STATUS="$(curl -4fsS --connect-timeout 5 --max-time 12 \
+       -H "Authorization: Bearer $API_KEY" \
+       "https://$DOMAIN/wpp-api/v1/status" 2>/dev/null)"; then
+    NODE_API_READY=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$NODE_API_READY" != 1 ]]; then
+  echo 'Node Agent не готов после запуска протоколов. Диагностика:' >&2
+  systemctl is-active wpp-node-agent.service caddy.service 2>&1 || true
+  echo 'Локальная проверка API (9088):' >&2
+  curl -4sS --noproxy '*' -o /dev/null -w 'HTTP %{http_code}\\n' \
+    --connect-timeout 2 --max-time 3 http://127.0.0.1:9088/healthz >&2 || true
+  echo 'Публичная проверка API через Caddy (без раскрытия токена):' >&2
+  curl -4sS -o /dev/null -w 'HTTP %{http_code}\\n' \
+    --connect-timeout 3 --max-time 8 \
+    -H "Authorization: Bearer $API_KEY" \
+    "https://$DOMAIN/wpp-api/v1/status" >&2 || true
+  journalctl -u wpp-node-agent.service --no-pager -n 20 >&2 || true
+  report error 'Node Agent не отвечает после установки восьми протоколов.'
+  echo 'Не удалось проверить Node Agent: нода не будет зарегистрирована.' >&2
+  exit 4
+fi
+if ! NODE_STATUS="$NODE_STATUS" python3 - <<'PY_EIGHT_STATUS'
+import json,os
+data=json.loads(os.environ.get("NODE_STATUS","{}"))
+expected={"federation","vless","hysteria","web","mtproto","awg20","awg31","naive","mieru"}
+actual=set(data.get("capabilities",[]))
+missing=sorted(expected-actual)
+if not data.get("ok") or missing:
+    raise SystemExit("Node API lacks live engines: "+", ".join(missing))
+print("✓ Восемь протоколов и Federation подтверждены живым API Node Agent.")
+PY_EIGHT_STATUS
+then
+  report error 'API ноды не подтвердил доступность всех восьми протоколов.'
+  exit 4
+fi
+# wpo-node-provision-check-v1: GET readiness alone missed broken POST writes.
+# Create and delete an isolated random VPN identity before publishing the node.
+report installing 'Проверка создания VLESS/Hysteria2 профилей.'
+if ! python3 - <<'PY_PROVISION_CHECK'
+import json, secrets, urllib.request
+from pathlib import Path
+from urllib.parse import urlsplit
+config=json.loads(Path('/etc/wpp-node-agent/config.json').read_text())
+identifier=secrets.token_hex(32)
+opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+def request(operation, data):
+    req=urllib.request.Request('http://127.0.0.1:9089/wpp-api/v1/federation/'+operation,
+        data=json.dumps(data).encode(), method='POST', headers={
+            'Authorization':'Bearer '+config['api_key'], 'Content-Type':'application/json'})
+    with opener.open(req,timeout=90) as response:
+        value=json.loads(response.read(32768))
+    if not isinstance(value,dict) or value.get('ok') is not True:
+        raise RuntimeError('Federation rejected install check')
+    return value
+try:
+    try:
+        data=request('sync',{'external_id':identifier,'name':'WPO install check',
+                             'protocols':['vless','hysteria']})
+        records=data.get('profiles',[])
+        if not isinstance(records,list) or len(records)!=2:
+            raise RuntimeError('Incomplete protocol response')
+        if {p.get('protocol') for p in records}!={'vless','hysteria'}:
+            raise RuntimeError('Incomplete protocol response')
+        for p in records:
+            link=urlsplit(p.get('link',''))
+            expected='vless' if p['protocol']=='vless' else 'hysteria2'
+            if link.scheme!=expected or link.hostname!=config['domain']:
+                raise RuntimeError('Invalid protocol link')
+    finally:
+        request('delete',{'external_id':identifier})
+except Exception as exc:
+    # Never print API keys, generated links, or raw service errors.
+    raise SystemExit('Federation POST check failed: '+type(exc).__name__)
+print('✓ Создание и удаление VLESS/Hysteria2 профилей проверено.')
+PY_PROVISION_CHECK
+then
+  report error 'Не прошла проверка создания VPN-профилей. Нода не зарегистрирована.'
+  exit 4
+fi
+report registration 'Все 8 протоколов и HTTPS готовы. Регистрация ноды в панели.'
 if ENROLL_RESULT="$(python3 - "$ENROLL_URL" "$TOKEN" "$DOMAIN" "$API_KEY" <<'PY_ENROLL'
 import json,sys,urllib.request,urllib.error
 url,token,domain,key=sys.argv[1:]
