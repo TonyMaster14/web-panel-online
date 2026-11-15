@@ -7,6 +7,7 @@ Node Agent/API keys, profiles, services and ACME certificates are not modified.
 """
 import getpass
 import json
+import os
 from pathlib import Path
 import re
 import shlex
@@ -45,10 +46,13 @@ def parse_command(command):
     except ValueError as exc:
         raise ReattachError("Некорректная команда установки.") from exc
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self,*args,**kwargs):
+        return None
+
 def request_json(url, method, headers=None, payload=None):
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),
-                                       urllib.request.HTTPHandler(),
-                                       urllib.request.HTTPSHandler())
+                                       NoRedirect())
     body=None if payload is None else json.dumps(payload).encode("utf-8")
     req=urllib.request.Request(url,data=body,method=method,headers=headers or {})
     try:
@@ -93,7 +97,7 @@ def reattach(config, receipt, installer_command, transport=request_json):
     return domain
 
 def main():
-    if not hasattr(sys,"real_prefix") and hasattr(__import__("os"),"geteuid") and __import__("os").geteuid()!=0:
+    if os.geteuid()!=0:
         print("Запустите от root на VPS ноды.",file=sys.stderr)
         return 2
     if not CONFIG.is_file() or not RECEIPT.is_file():
