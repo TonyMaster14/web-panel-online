@@ -89,6 +89,16 @@ try:
 except (OSError,ValueError,TypeError,AttributeError):
     refuse('невозможно прочитать прежнюю конфигурацию ноды.')
 
+# Protect fully provisioned pre-receipt versions even while their services
+# are stopped. The 0.4.0 version is only written after all eight engines
+# were verified by the native engine bootstrap.
+if (config.get('version') == '0.4.0'
+    and (vpn_dir/'settings.json').is_file()
+    and (units_dir/'wpo-node-vpn.service').is_file()
+    and (units_dir/'wpo-node-relay.service').is_file()):
+    print('Нода уже установлена (устаревшая версия без отметки регистрации).')
+    sys.exit(20)
+
 # Preserve all user credentials. A valid registry with any real entries
 # makes automatic cleanup unsafe, even when its services are stopped.
 profile_state=vpn_dir/'profiles.json'
