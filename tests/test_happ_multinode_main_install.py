@@ -44,7 +44,7 @@ class MainOnlyUpdate(unittest.TestCase):
         self.assertIn('PathChanged=/etc/web-proxy-panel/users.json',SH)
         self.assertIn('OnUnitInactiveSec=90s',SH)
         self.assertIn('ReadWritePaths=/var/lib/tproxy-panel /run/lock',SH)
-        self.assertIn("Нода",SH)
+        self.assertIn("основная WPO",SH)
 
         self.assertIn('ROLLBACK=1',SH)
         self.assertIn('ROLLBACK=0',SH)
