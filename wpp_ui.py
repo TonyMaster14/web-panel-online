@@ -1092,6 +1092,34 @@ def routing_ui(connections, state, path, csrf):
 @media(max-width:1150px){{.routing-protocol-grid{{grid-template-columns:repeat(2,minmax(0,1fr))}}}}
 @media(max-width:650px){{.routing-protocol-grid{{grid-template-columns:1fr 1fr;gap:8px}}.routing-protocol-card{{min-height:80px;padding:11px 10px;gap:8px}}.routing-tab-copy b{{font-size:11px}}.routing-tab-copy small{{font-size:9px}}.routing-form .routing-client-notice{{margin:10px 10px 0}}.routing-protocol-head p{{font-size:10px}}}}
 
+
+/* wpo-routing-persisted-rules-v2 */
+/* Equal red border on all four sides; do not draw the prior thick left bar. */
+.routing-form .routing-client-notice{{
+    border:1px solid color-mix(in srgb,var(--red) 52%,var(--line));
+    border-radius:13px;
+    box-shadow:none;
+}}
+/* The red alert flows into the dark heading, without the blue hero wash. */
+.routing-form{{background:var(--surface)}}
+.routing-form .routing-hero{{background:var(--surface)}}
+/* Saved routing rules (.is-active) keep the SAME blue/green selected visuals
+   as a pending checkbox. The checkbox stays a delta control for add/remove. */
+.routing-form .routing-switches label.routing-toggle.is-active,
+.routing-form .routing-switches label.routing-toggle:has(input:checked){{
+    border-color:#3b82f6;
+    background:color-mix(in srgb,#3b82f6 15%,var(--input));
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,#3b82f6 45%,transparent);
+}}
+.routing-form .routing-switches label.routing-toggle.is-active .routing-rule-dot,
+.routing-form .routing-switches label.routing-toggle:has(input:checked) .routing-rule-dot{{
+    border-color:#22c55e;
+    background:color-mix(in srgb,#22c55e 10%,transparent);
+}}
+.routing-form .routing-switches label.routing-toggle.is-active .routing-rule-dot i,
+.routing-form .routing-switches label.routing-toggle:has(input:checked) .routing-rule-dot i{{
+    background:#22c55e;
+}}
 </style>{chooser}<select id="routingConnection" hidden aria-label="Текущее подключение для маршрутизации">{options}</select>{''.join(forms)}{guide}<script>(()=>{{const dialog=document.getElementById('awgRuGuide'),scenes=dialog?[...dialog.querySelectorAll('.awg-guide-scene')]:[],play=dialog?.querySelector('[data-awg-guide-play]'),progress=dialog?.querySelector('.awg-guide-progress i');let step=0,timer=null;const draw=()=>{{scenes.forEach((scene,index)=>scene.classList.toggle('is-current',index===step));if(progress)progress.style.width=((step+1)/scenes.length*100)+'%'}};const pause=()=>{{clearInterval(timer);timer=null;if(play)play.textContent='▶ Смотреть'}};const start=()=>{{pause();if(play)play.textContent='Ⅱ Пауза';timer=setInterval(()=>{{step=(step+1)%scenes.length;draw()}},2600)}};document.querySelectorAll('[data-open-awg-guide]').forEach(button=>button.addEventListener('click',()=>{{step=0;draw();dialog?.showModal();start()}}));dialog?.querySelector('[data-close-awg-guide]')?.addEventListener('click',()=>dialog.close());dialog?.addEventListener('close',pause);play?.addEventListener('click',()=>timer?pause():start());draw()}})();</script><script>(()=>{{const select=document.getElementById('routingConnection'),cards=[...document.querySelectorAll('[data-routing-choice]')],forms=[...document.querySelectorAll('[data-routing-form]')];const remembered=location.hash.startsWith('#routing-')?decodeURIComponent(location.hash.slice(9)):'';if(forms.some(form=>form.dataset.routingForm===remembered))select.value=remembered;const show=()=>{{forms.forEach(form=>form.hidden=form.dataset.routingForm!==select.value);cards.forEach(card=>{{const active=card.dataset.routingChoice===select.value;card.classList.toggle('is-selected',active);card.setAttribute('aria-pressed',String(active))}})}};show();cards.forEach(card=>card.addEventListener('click',()=>{{if(select.value===card.dataset.routingChoice)return;select.value=card.dataset.routingChoice;select.dispatchEvent(new Event('change',{{bubbles:true}}))}}));select.addEventListener('change',()=>{{show();history.replaceState(null,'',location.pathname+location.search+'#routing-'+encodeURIComponent(select.value))}});forms.forEach(form=>{{const buttons=[...form.querySelectorAll('.routing-actions button')],fields=[...form.querySelectorAll('.routing-toggle input,textarea')];const update=()=>{{const chosen=fields.some(field=>field.type==='checkbox'?field.checked:Boolean(field.value.trim()));buttons.forEach(button=>button.disabled=!chosen)}};fields.forEach(field=>field.addEventListener(field.type==='checkbox'?'change':'input',update));form.addEventListener('submit',event=>{{if(event.submitter?.value==='remove-selected'&&!confirm('Убрать только выбранные правила маршрутизации? Остальные настройки останутся без изменений.'))event.preventDefault()}});update()}})}})();</script>'''
 
 
