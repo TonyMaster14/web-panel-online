@@ -44,6 +44,24 @@ NEW_SAVE='''if changed:
                      current=current_live
              pending=wpo_pending_load(); pending_rows=[]'''
 
+# Installation progress and enrollment share the registry lock, so a late
+# progress update cannot resurrect a pending card after registration.
+OLD_PENDING='''payload=self.json_request(16384); digest=wpo_token_hash(payload.get("token","")); pending=wpo_pending_load(); item=pending.get(digest)
+                 if not isinstance(item,dict) or int(item.get("expires_at",0))<int(time.time()): self.send_json({"ok":False,"message":"Ключ установки недействителен или истёк."},403); return
+                 state=str(payload.get("status",""))
+                 if state not in ("installing","registration","error"): self.send_json({"ok":False,"message":"Недопустимый статус установки."},400); return
+                 item.update({"status":state,"detail":str(payload.get("detail",""))[:180],"domain":str(payload.get("domain",""))[:253],"updated_at":int(time.time())})
+                 wpo_pending_save(pending); self.send_json({"ok":True}); return'''
+NEW_PENDING='''payload=self.json_request(16384); digest=wpo_token_hash(payload.get("token",""))
+                 with wpo_node_auto.registry_lock:
+                     pending=wpo_pending_load(); item=pending.get(digest)
+                     if not isinstance(item,dict) or int(item.get("expires_at",0))<int(time.time()): self.send_json({"ok":False,"message":"Ключ установки недействителен или истёк."},403); return
+                     state=str(payload.get("status",""))
+                     if state not in ("installing","registration","error"): self.send_json({"ok":False,"message":"Недопустимый статус установки."},400); return
+                     item.update({"status":state,"detail":str(payload.get("detail",""))[:180],"domain":str(payload.get("domain",""))[:253],"updated_at":int(time.time())})
+                     wpo_pending_save(pending)
+                 self.send_json({"ok":True}); return'''
+
 # A true positive HTTP 201 is issued only after disk persistence is verified.
 OLD_ENROLL='node_api.save_nodes(NODES_FILE,registered)\n                 pending.pop(digest,None); wpo_pending_save(pending)'
 NEW_ENROLL='''node_api.save_nodes(NODES_FILE,registered)
@@ -51,18 +69,19 @@ NEW_ENROLL='''node_api.save_nodes(NODES_FILE,registered)
                      if not any(n.get("id")==added.get("id") and
                                 n.get("url")==info["url"] for n in confirmed):
                          raise node_api.NodeError("Нода не сохранилась в реестре.")
-                 pending.pop(digest,None); wpo_pending_save(pending)'''
+                     pending.pop(digest,None); wpo_pending_save(pending)'''
 
 def patch(source):
     if MARKER in source:
         return source, False
     for old,label in ((OLD_BEGIN,"status snapshot"),(OLD_SAVE,"status stale write"),
-                      (OLD_ENROLL,"enrollment persistence")):
+                      (OLD_ENROLL,"enrollment persistence"),(OLD_PENDING,"pending progress")):
         if source.count(old)!=1:
             raise ValueError(f"WPO controller mismatch ({label}): expected 1 anchor, got {source.count(old)}. No changes.")
     result=source.replace(OLD_BEGIN,NEW_BEGIN,1)
     result=result.replace(OLD_SAVE,NEW_SAVE,1)
     result=result.replace(OLD_ENROLL,NEW_ENROLL,1)
+    result=result.replace(OLD_PENDING,NEW_PENDING,1)
     compile(result,"panel.py","exec")
     return result,True
 
