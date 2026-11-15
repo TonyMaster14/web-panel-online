@@ -14,9 +14,9 @@ class FederationCreationTests(unittest.TestCase):
     def test_exact_installed_v27_anchor_is_supported(self):
         controller=(ROOT/"wpo-node-controller-vpn.sh").read_text()
         self.assertIn(patch.BEFORE,controller)
-        source=("def create():\n    if True:\n        if True:\n"
-                "            chosen_nodes=['local','a'*16,'b'*16]\n"
-                "            connection_specs=[]\n"+patch.BEFORE+"\n")
+        source=("def create():\n    if True:\n        if True:\n            if True:\n"
+                "                chosen_nodes=['local','a'*16,'b'*16]\n"
+                "                connection_specs=[]\n"+patch.BEFORE+"\n")
         result=patch.patch(source)
         ast.parse(result)
         self.assertEqual(result.count(patch.MARKER),1)
