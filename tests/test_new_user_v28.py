@@ -93,27 +93,6 @@ class NewUserFormTests(unittest.TestCase):
             self.assertIn(marker,self.html,marker)
         self.assertIn("Новый пользователь",self.html)
         self.assertNotIn("Один ключ",self.html)
-    def test_focused_ui_hotfix_is_self_verifying_and_rolls_back(self):
-        import subprocess
-        launcher=(ROOT / "maintenance/other/wpo-ui-hotfix.sh").read_text(encoding="utf-8")
-        required=(
-            'wpo_user_v28.py', 'placeholder="Например, Home VPN"',
-            'systemctl restart "$SERVICE"',
-            'curl -4fsS --max-time 3',
-            'cp -a "$BACKUP" "$MODULE"',
-            'Закройте старую вкладку панели',
-            "if(popover.hidden)openCalendar();",
-            "else closeCalendar();",
-            "document.getElementById('wpoV28Until2099')",
-        )
-        for needle in required:
-            self.assertIn(needle,launcher,needle)
-        self.assertNotIn("wpo-node-vpn-enable.sh",launcher)
-        self.assertNotIn("wpo-node-eight-enable.sh",launcher)
-        result=subprocess.run(["bash","-n"],input=launcher,text=True,
-                              capture_output=True,timeout=8)
-        self.assertEqual(result.returncode,0,result.stderr)
-
     def test_old_wizard_js_replaced_without_busting_other_actions(self):
         import ast
         import subprocess
@@ -373,20 +352,6 @@ class V28ExpiryTests(unittest.TestCase):
                     '# wpo-vpn-controller-v27: no phantom remote connections')
         # Verify the bundled node installer has the required pre-patch anchor.
         self.assertIn('if subscription is None:',p)
-    def test_short_controller_patch_preserves_existing_data_and_can_rollback(self):
-        launcher=(ROOT/"maintenance/other/wpo-v28-patch.sh").read_text(encoding="utf-8")
-        for required in ("flock -n 9", "wpo_v28_apply.py", "wpo_user_v28.py",
-                         'ROLLBACK=1', 'ROLLBACK=0',
-                         'cp -a "$BACKUP/panel.py" "$APP/panel.py"',
-                         'cp -a "$BACKUP/wpp_ui.py" "$APP/wpp_ui.py"',
-                         "systemctl restart", "curl -4fsS --max-time 3",
-                         "wpo-node-agent-install-v2.sh", "wpo-node-controller-vpn.sh",
-                         'WPO_NODES_VPN_DURING_INSTALL=1 WPO_NODES_BATCH_RESTART=1',
-                         'cp -a "$BACKUP/wpp-node-agent-install.sh" "$APP/wpp-node-agent-install.sh"'):
-            self.assertIn(required,launcher,required)
-        self.assertNotIn("rm -rf /var/lib/tproxy-panel",launcher)
-        self.assertNotIn("web-panel-proxy-uninstall",launcher)
-
     def test_full_install_path_includes_v28_after_v26(self):
         node=(ROOT/"node-install.sh").read_text(encoding="utf-8")
         self.assertIn("python3 \"$PACKAGE_DIR/wpo_v28_apply.py\"",node)

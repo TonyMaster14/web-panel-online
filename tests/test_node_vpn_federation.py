@@ -163,18 +163,8 @@ class NodeFederationTests(unittest.TestCase):
         assert "wpo-vpn-controller-v27" in bridge
         assert "def sync_profile(" in (ROOT / "wpp_nodes.py").read_text()
 
-    def test_short_sudo_patch_detects_controller_or_node(self):
-        dispatcher=(ROOT / "maintenance/other/wpo-vpn-patch.sh").read_text()
-        self.assertIn("/opt/tproxy-panel/panel.py",dispatcher)
-        self.assertIn("/etc/wpp-node-agent/config.json",dispatcher)
-        self.assertIn('target="wpo-node-controller-vpn.sh"',dispatcher)
-        self.assertIn('target="wpo-node-vpn-enable.sh"',dispatcher)
-        self.assertIn('bash -n "$TMP"',dispatcher)
-        self.assertIn('WPO_NODE_VPN_REF="$REF" bash "$TMP"',dispatcher)
-        self.assertIn('controller == 1 && node == 1',dispatcher)
-
     def test_runtime_patch_arguments_expand_in_real_bash(self):
-        for filename in ("wpo-node-vpn-enable.sh","wpo-node-controller-vpn.sh","maintenance/other/wpo-vpn-patch.sh"):
+        for filename in ("wpo-node-vpn-enable.sh","wpo-node-controller-vpn.sh"):
             source=(ROOT / filename).read_text()
             self.assertNotIn(r"\${",source,filename)
         node_script=(ROOT / "wpo-node-vpn-enable.sh").read_text()

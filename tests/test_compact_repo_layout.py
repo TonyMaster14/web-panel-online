@@ -14,8 +14,8 @@ class CompactLayoutTests(unittest.TestCase):
             "installers/install-final.sh": "#!/bin/bash\nexit 0\n",
             "nodes/wpo-node-eight-enable.sh": "#!/bin/bash\nexit 0\n",
             "docs/THIRD-PARTY-NOTICES.md": "Notices\n",
-            "maintenance/other/wpo-site-zero-profiles-v6.sh": "#!/bin/bash\nexit 0\n",
-            "maintenance/other/wpo-relay-zero-profiles-patch.py": "# archive\n",
+            "installers/site-service-update.sh": "#!/bin/bash\nexit 0\n",
+            "installers/site-relay-module.py": "# archive\n",
             "nodes/README.md": "NODE DOCUMENTATION, NOT A ROOT LINK\n",
             "README.md": "MAIN PROJECT DOCUMENTATION\n",
         }
@@ -40,8 +40,8 @@ class CompactLayoutTests(unittest.TestCase):
                 ("install-final.sh", "installers/install-final.sh"),
                 ("wpo-node-eight-enable.sh", "nodes/wpo-node-eight-enable.sh"),
                 ("THIRD-PARTY-NOTICES.md", "docs/THIRD-PARTY-NOTICES.md"),
-                ("wpo-site-zero-profiles-v6.sh", "maintenance/other/wpo-site-zero-profiles-v6.sh"),
-                ("wpo-relay-zero-profiles-patch.py", "maintenance/other/wpo-relay-zero-profiles-patch.py"),
+                ("wpo-site-zero-profiles-v6.sh", "installers/site-service-update.sh"),
+                ("wpo-relay-zero-profiles-patch.py", "installers/site-relay-module.py"),
             ):
                 link = folder / name
                 self.assertTrue(link.is_symlink(), name)
