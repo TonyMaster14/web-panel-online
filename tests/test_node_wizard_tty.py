@@ -161,7 +161,7 @@ exit 0
         with tempfile.TemporaryDirectory() as tmp:
             code,out=self.exercise(tmp,tap_enter=True)
             self.assertEqual(code,0,out[-1000:])
-            values=[int(p) for p in re.findall(r"(?<!\\d)(\\d{1,3})%",out)]
+            values=[int(p) for p in re.findall(r"(?<!\d)(\d{1,3})%",out)]
             self.assertGreater(len(values),4,values)
             self.assertEqual(values[-1],100,values)
             self.assertTrue(all(0 <= b-a <= 1 for a,b in zip(values,values[1:])),values)
