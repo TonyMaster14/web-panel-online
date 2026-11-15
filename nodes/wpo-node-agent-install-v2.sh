@@ -50,11 +50,31 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
     node_box 'УСТАНОВКА НОДЫ' "$nbold$ncyan"
     printf '%s╰%s╯%s\n' "$nblue" "$nrule" "$nreset"
   }
+  node_commands(){
+    # Give Enter and q equal visual weight on either side of the divider.
+    local ltext='ENTER — установить' rtext='q — выход'
+    local lw=$(((nwidth-1)/2)) rw=$((nwidth-1-lw))
+    local la=$(((lw-${#ltext})/2)) lb ra rb
+    lb=$((lw-${#ltext}-la))
+    ra=$(((rw-${#rtext})/2))
+    rb=$((rw-${#rtext}-ra))
+    local lp le rp re
+    printf -v lp '%*s' "$la" ''
+    printf -v le '%*s' "$lb" ''
+    printf -v rp '%*s' "$ra" ''
+    printf -v re '%*s' "$rb" ''
+    printf '%s│%s%s%s%s%s│%s%s%s%s%s│%s\n' \
+      "$nblue" "$nbold$ncyan" "$lp" "$ltext" "$le" "$nblue" \
+      "$nbold$ncyan" "$rp" "$rtext" "$re" "$nblue" "$nreset"
+  }
   printf '\033[2J\033[H'
   node_banner
-  printf '\n%sДобро пожаловать в установку ноды!%s\n' "$ncyan" "$nreset"
+  # Center the welcome line against the same 62-column frame.
+  node_welcome='Добро пожаловать в установку ноды!'
+  printf -v node_welcome_pad '%*s' "$(((nwidth+2-${#node_welcome})/2))" ''
+  printf '\n%s%s%s%s\n' "$node_welcome_pad" "$ncyan" "$node_welcome" "$nreset"
   printf '%s╭%s╮%s\n' "$nblue" "$nrule" "$nreset"
-  node_box 'ENTER — установить   │   q — выход' "$nbold$ncyan"
+  node_commands
   printf '%s╰%s╯%s\n' "$nblue" "$nrule" "$nreset"
   while true; do
     printf '  '
