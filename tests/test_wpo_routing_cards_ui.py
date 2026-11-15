@@ -40,7 +40,7 @@ class RoutingCardsUITests(unittest.TestCase):
         result,old,updated=render(self.all)
         self.assertEqual(result.count('data-routing-choice='),4)
         self.assertEqual(result.count('aria-pressed="true"'),1)
-        self.assertIn('data-routing-choice="vless" aria-pressed="true"',result)
+        self.assertIn('data-routing-choice="vless" data-routing-enabled="0" aria-pressed="true"',result)
         self.assertIn('class="routing-protocol-card is-selected"',result)
         self.assertLess(result.index('data-routing-choice="vless"'),
                         result.index('data-routing-choice="hyst"'))
