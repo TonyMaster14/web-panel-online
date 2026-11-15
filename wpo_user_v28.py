@@ -65,7 +65,9 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<label class="wpo-v28-node"><input type="checkbox" name="node_local" value="1" checked>'
         '<span class="wpo-v28-radio" aria-hidden="true"><i></i></span>'
         f'<span class="wpo-v28-flag">{flag(location.get("country_code"))}</span>'
-        f'<span><strong>{h(local_label)}</strong><small>Основная · VPN готов</small></span></label>'
+        f'<span class="wpo-v28-node-title"><strong>{h(local_label)}</strong>'
+        '<span class="wpo-v28-node-star" title="Основная нода" aria-label="Основная нода">★</span>'
+        '</span></label>'
     )
     node_cards = [local_card]
     for node in (nodes or []):
@@ -77,13 +79,12 @@ def form(path, csrf, connections, nodes=None, local=None):
         ready = (node.get("enabled", True) and node.get("status", "offline") == "online" and
                  all(p in caps for p in VPN_SUPPORTED) and "federation" in caps)
         name = str(node.get("name") or node.get("country_name") or "Нода")
-        state = "VPN готова" if ready else "VPN пока не готова"
         node_cards.append(
             f'<label class="wpo-v28-node{" unavailable" if not ready else ""}">'
             f'<input type="checkbox" name="node_{node_id}" value="1" {" " if ready else "disabled"}>'
             '<span class="wpo-v28-radio" aria-hidden="true"><i></i></span>'
             f'<span class="wpo-v28-flag">{flag(node.get("country_code"))}</span>'
-            f'<span><strong>{h(name)}</strong><small>{h(state)}</small></span></label>'
+            f'<span class="wpo-v28-node-title"><strong>{h(name)}</strong></span></label>'
         )
     # Existing Clients JS references these DOM ids and adds its own hidden
     # fields. Maintain compatibility; do not replace the existing JS.
@@ -208,7 +209,16 @@ STYLE = """
 .wpo-v28-node>span:last-child,.wpo-v28-option>span:last-child{display:grid;min-width:0;gap:3px}
 .wpo-v28-node strong,.wpo-v28-option strong{font-size:11px;overflow:hidden;text-overflow:ellipsis}
 .wpo-v28-node small,.wpo-v28-option small{font-size:9px;line-height:1.4;color:var(--muted)}
-.wpo-v28-flag{font-size:19px}.wpo-v28-dialog .unavailable{opacity:.48;cursor:not-allowed}
+.wpo-v28-flag{display:inline-flex;align-items:center;justify-content:center;
+ flex:0 0 auto;font-size:19px;line-height:1}
+.wpo-v28-node>span.wpo-v28-node-title{display:inline-flex;align-items:center;
+ gap:7px;min-width:0;line-height:1.25}
+.wpo-v28-node-title strong{display:block;min-width:0;font-size:11px;
+ line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wpo-v28-node-star{display:inline-flex;align-items:center;justify-content:center;
+ flex:0 0 auto;color:var(--accent);font-size:15px;font-weight:750;
+ line-height:1}
+.wpo-v28-dialog .unavailable{opacity:.48;cursor:not-allowed}
 .wpo-v28-dialog .unavailable .wpo-v28-radio i{animation:none}
 .wpo-v28-calendar{position:relative;z-index:8;border:1px solid var(--line);
  border-radius:12px;background:var(--surface)}
