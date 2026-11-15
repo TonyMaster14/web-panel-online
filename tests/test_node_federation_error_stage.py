@@ -22,7 +22,7 @@ class StageTraceTests(unittest.TestCase):
         self.assertIn('phase = "post-restart-health"',patched)
         self.assertIn('WPO_FED_REQUEST_FAILURE',patched)
         self.assertIn('WPO_FED_REQUEST_CRASH',patched)
-        for fragment in ('xray.atomic_json(STATE, {"profiles": updated})',
+        for fragment in ('atomic_json(STATE, {"profiles": updated})',
                          'command("systemctl", "restart", UNIT, timeout=30)',
                          'wpo_node_eight.sync(data)',
                          'fcntl.flock(lock.fileno(), fcntl.LOCK_EX)'):
