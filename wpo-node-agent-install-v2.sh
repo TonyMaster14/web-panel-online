@@ -316,7 +316,8 @@ if ! curl -4fsS --connect-timeout 4 --max-time 12 \
 fi
 # Pin backend scripts and their imported modules to one reviewed Git commit.
 # Avoid moving branch references during long multi-engine installation.
-ENGINE_REV=b4d2691a6e942c0ff1ff4652acd63819cc0e0c6f
+# Includes native_changed, writable backend paths, and readable Xray rollback.
+ENGINE_REV=007c4c1cddc86c900b841c1c0360127eb94c03d7
 # Test-only VPN capability is installed before enrollment. Registration
 # is blocked on failure: controller must never see a "ready" VPN node without
 # working local Xray and authenticated federation API.
@@ -392,6 +393,50 @@ print("✓ Восемь протоколов и Federation подтвержде�
 PY_EIGHT_STATUS
 then
   report error 'API ноды не подтвердил доступность всех восьми протоколов.'
+  exit 4
+fi
+# wpo-node-provision-check-v1: GET readiness alone missed broken POST writes.
+# Create and delete an isolated random VPN identity before publishing the node.
+report installing 'Проверка создания VLESS/Hysteria2 профилей.'
+if ! python3 - <<'PY_PROVISION_CHECK'
+import json, secrets, urllib.request
+from pathlib import Path
+from urllib.parse import urlsplit
+config=json.loads(Path('/etc/wpp-node-agent/config.json').read_text())
+identifier=secrets.token_hex(32)
+opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+def request(operation, data):
+    req=urllib.request.Request('http://127.0.0.1:9089/wpp-api/v1/federation/'+operation,
+        data=json.dumps(data).encode(), method='POST', headers={
+            'Authorization':'Bearer '+config['api_key'], 'Content-Type':'application/json'})
+    with opener.open(req,timeout=90) as response:
+        value=json.loads(response.read(32768))
+    if not isinstance(value,dict) or value.get('ok') is not True:
+        raise RuntimeError('Federation rejected install check')
+    return value
+try:
+    try:
+        data=request('sync',{'external_id':identifier,'name':'WPO install check',
+                             'protocols':['vless','hysteria']})
+        records=data.get('profiles',[])
+        if not isinstance(records,list) or len(records)!=2:
+            raise RuntimeError('Incomplete protocol response')
+        if {p.get('protocol') for p in records}!={'vless','hysteria'}:
+            raise RuntimeError('Incomplete protocol response')
+        for p in records:
+            link=urlsplit(p.get('link',''))
+            expected='vless' if p['protocol']=='vless' else 'hysteria2'
+            if link.scheme!=expected or link.hostname!=config['domain']:
+                raise RuntimeError('Invalid protocol link')
+    finally:
+        request('delete',{'external_id':identifier})
+except Exception as exc:
+    # Never print API keys, generated links, or raw service errors.
+    raise SystemExit('Federation POST check failed: '+type(exc).__name__)
+print('✓ Создание и удаление VLESS/Hysteria2 профилей проверено.')
+PY_PROVISION_CHECK
+then
+  report error 'Не прошла проверка создания VPN-профилей. Нода не зарегистрирована.'
   exit 4
 fi
 report registration 'Все 8 протоколов и HTTPS готовы. Регистрация ноды в панели.'

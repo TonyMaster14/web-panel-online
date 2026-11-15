@@ -246,6 +246,9 @@ panel=once(panel,
                 if now-int(node.get("status_checked_at",0) or 0)<5: continue
                 try:
                     state=node_api.request(node,"GET",node_api.API_PREFIX+"/status",timeout=3)
+                    # wpo-live-node-capabilities-v1
+                    caps=state.get("capabilities",[])
+                    node["capabilities"]=[x for x in caps if isinstance(x,str)][:32] if isinstance(caps,list) else []
                     node["status"]="online"; node["status_detail"]="API отвечает"
                     node["version"]=str(state.get("version",node.get("version","")))[:32]
                     node["status_checked_at"]=now
