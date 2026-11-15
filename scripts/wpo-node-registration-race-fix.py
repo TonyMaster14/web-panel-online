@@ -74,14 +74,30 @@ NEW_ENROLL='''node_api.save_nodes(NODES_FILE,registered)
 def patch(source):
     if MARKER in source:
         return source, False
-    for old,label in ((OLD_BEGIN,"status snapshot"),(OLD_SAVE,"status stale write"),
-                      (OLD_ENROLL,"enrollment persistence"),(OLD_PENDING,"pending progress")):
+    # The controller is assembled from several Nodes Lab versions. The exact
+    # /node-enroll handler differs after template and federation updates, while
+    # the unsafe full-registry write in /nodes-status is the actual bug.
+    # Require ONLY its known status-read/write anchors: never refuse the fix
+    # because an independent enrollment implementation has changed.
+    for old,label in ((OLD_BEGIN,"status snapshot"),(OLD_SAVE,"status stale write")):
         if source.count(old)!=1:
             raise ValueError(f"WPO controller mismatch ({label}): expected 1 anchor, got {source.count(old)}. No changes.")
+    if "with wpo_node_auto.registry_lock:" not in source:
+        raise ValueError("Controller does not provide the registry lock; no changes.")
     result=source.replace(OLD_BEGIN,NEW_BEGIN,1)
     result=result.replace(OLD_SAVE,NEW_SAVE,1)
-    result=result.replace(OLD_ENROLL,NEW_ENROLL,1)
-    result=result.replace(OLD_PENDING,NEW_PENDING,1)
+    if source.count(OLD_ENROLL)==1:
+        result=result.replace(OLD_ENROLL,NEW_ENROLL,1)
+        print("Additional enrollment verification: installed")
+    else:
+        # Do not guess how a newer controller performs enrollment. The fixed
+        # /nodes-status write already prevents it from erasing new nodes.
+        print("Additional enrollment verification: unchanged (controller variant)")
+    if source.count(OLD_PENDING)==1:
+        result=result.replace(OLD_PENDING,NEW_PENDING,1)
+        print("Pending-status locking: installed")
+    else:
+        print("Pending-status locking: unchanged (controller variant)")
     compile(result,"panel.py","exec")
     return result,True
 
