@@ -21,7 +21,7 @@ class TestNodeFastUbuntu(unittest.TestCase):
         self.assertIn('interval=650000',SRC)
         self.assertIn('(( node_percent == 100 )) || sleep 0.012',SRC)
         self.assertIn('curl -fsS --connect-timeout 2 --max-time 4',SRC)
-        self.assertIn('sleep 1\\ndone',SRC)
+        self.assertIn('for i in $(seq 1 180); do',SRC)
         self.assertIn('unzip openssl util-linux xz-utils tar',SRC)
         subprocess.run(["bash","-n",str(AGENT)],check=True)
 
@@ -38,7 +38,7 @@ class TestNodeFastUbuntu(unittest.TestCase):
             'ID='+os_id+'\n'
             'command(){ if [[ "@{1:-}" == -v && "@{2:-}" == caddy ]]; then return 1; fi; builtin command "$@"; }\n'
             'apt-get(){ printf "APT %s\\n" "$*"; }\n'
-            ('apt-cache(){ return 0; }\\n' if distro_package else 'apt-cache(){ return 1; }\\n')
+            ('apt-cache(){ return 0; }\n' if distro_package else 'apt-cache(){ return 1; }\n')
             +START+"\n".join(cleaned)+"\n"
         ).replace("@{","$"+"{")
         return subprocess.run(["bash","-c",script],capture_output=True,text=True,timeout=4)
