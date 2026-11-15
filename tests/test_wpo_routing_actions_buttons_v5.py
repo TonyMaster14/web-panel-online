@@ -44,12 +44,12 @@ class RoutingActionsV5(unittest.TestCase):
 
     def test_aligns_to_main_custom_columns_and_stacks_on_mobile(self):
         html=render()
-        self.assertIn('grid-template-columns:minmax(0,1.5fr) minmax(300px,.65fr)',html)
+        self.assertIn('display:flex;align-items:center;justify-content:flex-end',html)
         self.assertIn('.routing-form .routing-actions-secondary{',html)
         self.assertIn('justify-content:flex-end',html)
-        self.assertIn('grid-template-columns:repeat(2,minmax(0,1fr))',html)
+        self.assertIn('.routing-form .routing-actions-primary,',html)
         self.assertIn('@media(max-width:600px)',html)
-        self.assertIn('grid-template-columns:1fr',html)
+        self.assertIn('flex-direction:column;align-items:stretch;gap:10px',html)
         self.assertIn('border-top:1px solid var(--line)',html)
         self.assertIn('prefers-reduced-motion:reduce',html)
 
