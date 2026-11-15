@@ -23,7 +23,7 @@ class NodeProbeTests(TestCase):
     def test_local_400_proves_safe_routing(self):
         class FakeOpener:
             def open(self, request, timeout):
-                self.assertNotEqual(request.data, b"")
+                assert request.data
                 raise HTTPError(request.full_url,400,"Bad Request",
                                 {},io.BytesIO(json.dumps({
                                      "ok":False,"message":"Invalid federation ID"
