@@ -1672,6 +1672,31 @@ def delete(uid):
         # deletion instead of returning a traceback to the panel.
         return False
     d["users"]=[u for u in d["users"] if u.get("id")!=uid]
+    # wpo-fast-standalone-delete-v1: no expensive full WEB/MTProxy/AWG
+    # unit discovery or firewall table rebuild for an ordinary Xray user.
+    removed=next(u for u in before["users"] if u.get("id")==uid)
+    if removed.get("protocol") in ("vless","hysteria"):
+        old_hysteria=any(u.get("enabled",True) and u.get("protocol")=="hysteria"
+                         for u in before["users"])
+        new_hysteria=any(u.get("enabled",True) and u.get("protocol")=="hysteria"
+                         for u in d["users"])
+        firewall_changed=old_hysteria!=new_hysteria
+        try:
+            if firewall_changed:
+                sync_firewall(d)
+            sync_xray(d)
+            save(d)
+        except Exception:
+            # sync_xray performs its own verified config rollback. Restore
+            # previous credentials and listeners if any later step failed.
+            try:
+                if firewall_changed:
+                    sync_firewall(before)
+                sync_xray(before)
+            except Exception:
+                raise RuntimeError("Не удалось восстановить VPN после ошибки удаления.")
+            raise
+        return True
     save(d)
     try:
         apply(d,True,before)
