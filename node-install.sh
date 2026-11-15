@@ -6,6 +6,9 @@ umask 077
 REF="0ea1afcc2c60620b4ebb089221341012c0b8eb0c"
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF"
 PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$PACKAGE_DIR/scripts/prepare-source-layout.sh" ]]; then
+    bash "$PACKAGE_DIR/scripts/prepare-source-layout.sh" "$PACKAGE_DIR"
+fi
 # Complete first-install bundles already contain all the Nodes Lab source files.
 USE_PACKAGE=0
 if [[ "${WPO_NODES_LOCAL_SOURCE:-0}" == 1 ]] &&

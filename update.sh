@@ -47,6 +47,9 @@ REQUESTED_REF="${WEB_PANEL_PROXY_REF:-}"
 RELEASE_REF="$REQUESTED_REF"
 LOCAL_SOURCE=""
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$SCRIPT_DIR/scripts/prepare-source-layout.sh" ]]; then
+    bash "$SCRIPT_DIR/scripts/prepare-source-layout.sh" "$SCRIPT_DIR"
+fi
 # A complete extracted ZIP is itself the requested release. Prefer it
 # automatically so `bash ./update.sh` never falls back to an older public tag.
 AUTO_LOCAL=0
@@ -410,7 +413,7 @@ if [[ -n "$LOCAL_SOURCE" ]]; then
     install -d -m 0700 "$TEMP_DIR/source/assets"
     install -d -m 0700 "$TEMP_DIR/source/assets/mtproxy-bootstrap"
     for file in mtproxy-download.sh assets/mtproxy-bootstrap/proxy-secret assets/mtproxy-bootstrap/proxy-multi.conf; do
-        cp -a "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
+        cp -aL "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
     done
     for file in install-panel.sh update.sh uninstall-web-proxy.sh repair-landing-pages.sh panel-logo.svg THIRD-PARTY-NOTICES.md wpp_subscriptions.py wpp_subscription_dashboard.py wpp_panel_extras.py wpp_ui.py wpp_metrics.py wpp_update.py wpp_nodes.py wpp_openflux.py wpp_awg.py wpp_extra_protocols.py wpp_firewall.py wpp_components.py wpp_cdn.py wpp_cdn_doctor.py wpp_connections.py wpp_backup.py wpp_routing.py wpp_presets.py; do
         cp -a "$LOCAL_SOURCE/$file" "$TEMP_DIR/source/$file"
@@ -433,6 +436,9 @@ if [[ -n "$LOCAL_SOURCE" ]]; then
     cp -a "$LOCAL_SOURCE/wpp-panel/flags.tar.gz" "$TEMP_DIR/source/wpp-panel/flags.tar.gz"
 else
 git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$TEMP_DIR/source"
+fi
+if [[ -f "$TEMP_DIR/source/scripts/prepare-source-layout.sh" ]]; then
+    bash "$TEMP_DIR/source/scripts/prepare-source-layout.sh" "$TEMP_DIR/source"
 fi
 [[ -f "$TEMP_DIR/source/install-panel.sh" ]] || die "Update package is incomplete."
 chmod 0700 "$TEMP_DIR/source/install-panel.sh"

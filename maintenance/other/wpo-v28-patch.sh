@@ -50,7 +50,7 @@ cleanup() {
 trap cleanup EXIT
 for name in wpo_v28_apply.py wpo_user_v28.py wpo_node_remote_patch.py wpo_node_remote.py wpo-node-controller-vpn.sh wpo-node-agent-install-v2.sh; do
     curl -4fsSL --proto '=https' --proto-redir '=https' --retry 3 \
-        --connect-timeout 12 --max-time 60 "$BASE/$name" -o "$TMP/$name"
+        --connect-timeout 12 --max-time 60 "$BASE/${name/wpo_/src\/wpo_}" -o "$TMP/$name"
 done
 python3 -m py_compile "$TMP/wpo_v28_apply.py" "$TMP/wpo_user_v28.py" "$TMP/wpo_node_remote_patch.py" "$TMP/wpo_node_remote.py"
 bash -n "$TMP/wpo-node-controller-vpn.sh" "$TMP/wpo-node-agent-install-v2.sh"

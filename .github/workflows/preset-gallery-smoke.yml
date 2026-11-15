@@ -8,6 +8,10 @@ on:
       - "wpp_ui.py"
       - "wpp_panel_extras.py"
       - "wpp_presets.py"
+      - "src/wpp_ui.py"
+      - "src/wpp_panel_extras.py"
+      - "src/wpp_presets.py"
+      - "scripts/prepare-source-layout.sh"
       - "wpo-presets-fast-update.sh"
       - ".github/workflows/preset-gallery-smoke.yml"
   workflow_dispatch:
@@ -20,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Restore source module paths in this checkout
+        run: bash scripts/prepare-source-layout.sh
       - name: Verify shell and Python syntax
         run: |
           bash -n install-panel.sh

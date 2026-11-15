@@ -2,6 +2,9 @@
 set -Eeuo pipefail
 BASE="$(cd "$(dirname "$0")" && pwd)"
 umask 077
+if [[ -f "$BASE/scripts/prepare-source-layout.sh" ]]; then
+    bash "$BASE/scripts/prepare-source-layout.sh" "$BASE"
+fi
 
 WPP_PROGRESS_TTY=0 WPP_PROGRESS_ROWS=0 WPP_PROGRESS_LAST=-1 WPP_PROGRESS_ACTIVE=0
 wpp_progress_start() {

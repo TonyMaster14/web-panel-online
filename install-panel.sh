@@ -3,6 +3,9 @@ set -Eeuo pipefail
 umask 077
 
 BASE="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$BASE/scripts/prepare-source-layout.sh" ]]; then
+    bash "$BASE/scripts/prepare-source-layout.sh" "$BASE"
+fi
 APP_DIR="/opt/tproxy-panel"
 DATA_DIR="/var/lib/tproxy-panel"
 DATA_FILE="${DATA_DIR}/data.json"

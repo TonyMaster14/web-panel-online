@@ -4,3 +4,6 @@
 Thumbs.db
 __pycache__/
 *.pyc
+# Generated only by scripts/prepare-source-layout.sh
+/wpp_*.py
+/wpo_*.py

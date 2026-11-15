@@ -11,6 +11,9 @@ LOCAL_BASE=""
 if [[ -n "$SCRIPT_SOURCE" && -f "$SCRIPT_SOURCE" ]]; then
     LOCAL_BASE="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 fi
+if [[ -n "$LOCAL_BASE" && -f "$LOCAL_BASE/scripts/prepare-source-layout.sh" ]]; then
+    bash "$LOCAL_BASE/scripts/prepare-source-layout.sh" "$LOCAL_BASE"
+fi
 
 error(){ printf '\n\033[1;31m✖ %s\033[0m\n' "$*" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || error 'Запускайте установщик с sudo или от root.'
@@ -264,6 +267,9 @@ if (( ! USE_WIZARD )); then
     fi
     WORK="$(mktemp -d /tmp/web-panel-proxy-install.XXXXXXXX)"
     git clone --depth 1 --branch "$RELEASE_REF" "$REPOSITORY" "$WORK/source"
+    if [[ -f "$WORK/source/scripts/prepare-source-layout.sh" ]]; then
+        bash "$WORK/source/scripts/prepare-source-layout.sh" "$WORK/source"
+    fi
     [[ -s "$WORK/source/install-final.sh" ]] || error 'Неполный пакет GitHub.'
     chmod 0700 "$WORK/source"/*.sh
     bash "$WORK/source/install-final.sh"
@@ -417,6 +423,9 @@ else
     fi
     INSTALL_PID=""
     SOURCE="$WORK/source"
+fi
+if [[ -f "$SOURCE/scripts/prepare-source-layout.sh" ]]; then
+    bash "$SOURCE/scripts/prepare-source-layout.sh" "$SOURCE"
 fi
 [[ -s "$SOURCE/install-final.sh" && -s "$SOURCE/node-install.sh" ]] || {
     printf '\n'; error "Неполный пакет установщика. Журнал: $LOG"
