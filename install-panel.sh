@@ -2913,12 +2913,22 @@ def federation_id(subscription_id,device_id):
 def purge_remote_profiles(subscription,device_id=None):
     if not subscription: return
     devices=[d for d in subscription.get("devices",[]) if device_id is None or d.get("id")==device_id]
-    for node in node_api.load_nodes(NODES_FILE):
-        if not node.get("enabled",True): continue
+    # wpo-fast-remote-purge-v1: revoke on different nodes in parallel.
+    # Never start concurrent writes for the SAME node's federation registry.
+    nodes=[node for node in node_api.load_nodes(NODES_FILE)
+           if node.get("enabled",True)]
+    def revoke_node(node):
         for device in devices:
             try: node_api.delete_profile(node,federation_id(subscription.get("id",""),device.get("id","")))
             except node_api.NodeError as exc:
-                print("node profile cleanup failed:",node.get("url"),str(exc),file=sys.stderr,flush=True)
+                print("node profile cleanup failed:",node.get("url"),type(exc).__name__,file=sys.stderr,flush=True)
+    if len(nodes)==1:
+        revoke_node(nodes[0])
+    elif nodes:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=min(len(nodes),4),thread_name_prefix="wpo-revoke") as pool:
+            list(pool.map(revoke_node,nodes))
 def purge_remote_profiles_async(subscription,device_id=None):
     if not subscription: return
     threading.Thread(target=purge_remote_profiles,args=(subscription,device_id),
