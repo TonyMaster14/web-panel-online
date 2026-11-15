@@ -242,7 +242,9 @@ def _mt_unit(record):
 
 
 def _native_connections():
-    return {"connections": list(GROUPED_CONNECTIONS.values())}
+    # wpp_extra_protocols.sync/_connection_map iterate connection dicts,
+    # not a controller-style {"connections": ...} envelope.
+    return list(GROUPED_CONNECTIONS.values())
 
 
 def _update_mtproxy(users, domain):
@@ -423,13 +425,18 @@ def remove(data):
         new = copy.deepcopy(old)
         new.pop(external_id, None)
         if new != old:
+            # Removing a pure VLESS/Hysteria identity must NOT restart WEB,
+            # Naive, Mieru, AWG or MTProxy. Match the sync() native diff.
+            native_changed = assemble(old) != assemble(new)
             try:
                 xray.apply(new)
-                native_apply(new, xray.read_json(SETTINGS))
+                if native_changed:
+                    native_apply(new, xray.read_json(SETTINGS))
             except Exception:
                 try:
                     xray.apply(old)
-                    native_apply(old, xray.read_json(SETTINGS))
+                    if native_changed:
+                        native_apply(old, xray.read_json(SETTINGS))
                 except Exception:
                     pass
                 raise
@@ -445,6 +452,9 @@ def purge():
         old = xray.read_json(STATE, {"profiles": {}}).get("profiles", {})
         if old:
             xray.apply({})
-            native_apply({}, xray.read_json(SETTINGS))
+            # Do not reconfigure unrelated engines when purge only removes
+            # VPN-only subscriptions.
+            if assemble(old):
+                native_apply({}, xray.read_json(SETTINGS))
             xray.atomic_json(STATE, {"profiles": {}})
         return {"ok": True, "deleted": len(old)}
