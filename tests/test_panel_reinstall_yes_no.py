@@ -56,7 +56,7 @@ class TestWPOFreshReinstall(unittest.TestCase):
             "DOMAIN='fresh.example.net'\n"
             "PROGRESS="+repr(str(progress))+"\n"
             "wpo_install_state(){ printf '%s' "+repr(state)+"; }\n"
-            "wpo_clean_partial(){ printf '%s\\n' \"$1\" >> "+repr(str(trace))+"; }\n"
+            "wpo_clean_partial(){ printf '%s\\n' \"${1:-partial}\" >> "+repr(str(trace))+"; }\n"
             "curl(){ printf '%s' '"+ip+"'; }\n"
             "getent(){ printf '%s\\n' '"+dns_ip+" STREAM fresh.example.net'; }\n"
         )
