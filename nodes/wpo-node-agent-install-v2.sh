@@ -362,7 +362,8 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
   node_progress="$(mktemp /run/wpo-node-progress.XXXXXXXX)"
   chmod 0600 "$node_progress"
   printf '1\tПодготовка\n' > "$node_progress"
-  node_confirmed=1 node_percent=1 node_second=-1 node_started=$SECONDS
+  node_confirmed=1 node_percent=1 node_started=$SECONDS
+  node_last_move_us="${EPOCHREALTIME/./}"
   node_last_drawn=''
   node_draw(){
     local percent="$1" elapsed="$2" width full rest a b current
@@ -384,7 +385,8 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
       "$nice" "$((elapsed/3600))" "$(((elapsed%3600)/60))" "$((elapsed%60))" "$nreset"
   }
   node_tick(){
-    local elapsed="$((SECONDS-node_started))" milestone="" detail="" remaining wanted floor
+    local elapsed="$((SECONDS-node_started))" milestone="" detail=""
+    local ceiling interval now_us
     if IFS=$'\t' read -r milestone detail < "$node_progress"; then
       if [[ "$milestone" =~ ^[0-9]+$ ]] &&
          (( milestone > node_confirmed && milestone <= 98 )); then
@@ -393,9 +395,34 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
           "$elapsed" "$node_confirmed" "$detail" >> "$node_log"
       fi
     fi
-    # Only genuine backend milestones are shown as completed. The old ETA
-    # curve displayed 72% even if VPN startup (52%) had never completed.
-    node_percent=$node_confirmed
+    # Never jump to a backend milestone in one frame. A stage may only fill
+    # the band BEFORE the next stage; 100% means real enrollment success.
+    # The 0.2s terminal poll shows at most one additional percent per frame.
+    case "$node_confirmed" in
+      1) ceiling=3 ;;
+      4) ceiling=15 ;;
+      16) ceiling=37 ;;
+      38) ceiling=51 ;;
+      52) ceiling=67 ;;
+      68) ceiling=83 ;;
+      84) ceiling=93 ;;
+      94) ceiling=97 ;;
+      98) ceiling=99 ;;
+      *) ceiling="$node_confirmed" ;;
+    esac
+    now_us="${EPOCHREALTIME/./}"
+    # Catch up gently if work completed faster than the display; otherwise
+    # move at around 1.5% per second while the current stage is running.
+    if (( node_percent < node_confirmed )); then
+      interval=180000
+    else
+      interval=650000
+    fi
+    if (( node_percent < ceiling &&
+          now_us - node_last_move_us >= interval )); then
+      node_percent=$((node_percent+1))
+      node_last_move_us="$now_us"
+    fi
     node_draw "$node_percent" "$elapsed"
   }
   # Domain and email were already entered above; don't duplicate them.
@@ -434,12 +461,13 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
     printf '  Подробности: %s\n' "$node_log"
     exit "$status"
   fi
+  # Worker has exited with code 0: only now may the bar reach 100%.
+  # Smooth the last few frames without adding an artificial two-second hold.
   while (( node_percent < 100 )); do
     node_percent=$((node_percent+1))
     node_draw "$node_percent" "$((SECONDS-node_started))"
-    (( node_percent == 100 )) || sleep 0.08
+    (( node_percent == 100 )) || sleep 0.012
   done
-  sleep 2
   printf '\033[2J\033[H'
   node_banner
   printf '\n%s╭%s╮%s\n' "$nblue" "$nrule" "$nreset"
@@ -473,7 +501,7 @@ report() {
     (( milestone == 0 )) || printf '%s\t%s\n' "$milestone" "$2" > "$WPO_NODE_PROGRESS_FILE"
   fi
   if [[ $# -ge 3 && -n "$3" ]]; then current_domain="$3"; fi
-  python3 - "$TOKEN" "$1" "$2" "$current_domain" <<'PY_STATUS' | curl -fsS --max-time 8 -H 'Content-Type: application/json' --data-binary @- "$STATUS_URL" >/dev/null 2>&1 || true
+  python3 - "$TOKEN" "$1" "$2" "$current_domain" <<'PY_STATUS' | curl -fsS --connect-timeout 2 --max-time 4 -H 'Content-Type: application/json' --data-binary @- "$STATUS_URL" >/dev/null 2>&1 || true
 import json,sys
 print(json.dumps({'token':sys.argv[1],'status':sys.argv[2],'detail':sys.argv[3],'domain':sys.argv[4]}))
 PY_STATUS
@@ -561,20 +589,27 @@ esac
 wpo_node_install_state cleanup
 report installing 'Установка Caddy и подготовка сайта ноды.'
 apt-get update
-apt-get install -y --no-install-recommends curl ca-certificates gnupg python3
+# Install the full Node runtime in one APT transaction. VPN and eight-engine
+# bootstraps can now skip their own apt update/unzip installation on clean VPS.
+apt-get install -y --no-install-recommends \
+  curl ca-certificates gnupg python3 unzip openssl util-linux xz-utils tar \
+  nftables iproute2 wireguard-tools procps
 if ! command -v caddy >/dev/null 2>&1; then
-  # Ubuntu 22.04+/APT already supports HTTPS. Debian archive keyrings aren't
-  # needed to verify Cloudsmith: Caddy has its own separately imported GPG key.
-  # These packages previously blocked Ubuntu 24.04 for ~18 minutes when an
-  # interactive needrestart kernel prompt appeared mid-APT install.
-  if [[ "$ID" == debian ]]; then
-    apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https
+  # Prefer distro Caddy: no Cloudsmith key/network round trips or second
+  # apt update on Ubuntu/Debian with the package in enabled repositories.
+  if apt-cache show caddy >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends caddy
+  else
+    # Official Caddy repository is needed only when distro package is absent.
+    if [[ "$ID" == debian ]]; then
+      apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https
+    fi
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' -o /etc/apt/sources.list.d/caddy-stable.list
+    chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
+    apt-get update
+    apt-get install -y --no-install-recommends caddy
   fi
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' -o /etc/apt/sources.list.d/caddy-stable.list
-  chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
-  apt-get update
-  apt-get install -y --no-install-recommends caddy
 fi
 PUBLIC_IP="$(curl -4fsS --max-time 10 https://api.ipify.org)"
 getent ahostsv4 "$DOMAIN" | awk '{print $1}' | sort -u | grep -Fxq "$PUBLIC_IP" || { report error "DNS A-запись должна указывать на $PUBLIC_IP."; echo "DNS A-запись $DOMAIN должна указывать на $PUBLIC_IP."; exit 3; }
@@ -769,9 +804,9 @@ systemctl enable --now caddy
 systemctl reload caddy || systemctl restart caddy
 report installing 'Ожидание HTTPS-сертификата.'
 TLS_OK=0
-for i in $(seq 1 60); do
-  if curl -fsS --connect-timeout 3 --max-time 5 "https://$DOMAIN/healthz" >/dev/null 2>&1; then TLS_OK=1; break; fi
-  sleep 5
+for i in $(seq 1 180); do
+  if curl -fsS --connect-timeout 2 --max-time 4 "https://$DOMAIN/healthz" >/dev/null 2>&1; then TLS_OK=1; break; fi
+  sleep 1
 done
 [[ "$TLS_OK" == "1" ]] || { report error 'HTTPS не готов. Проверьте DNS и доступность TCP 80/443.'; echo 'HTTPS не готов. Проверьте DNS и доступность TCP 80/443.'; exit 4; }
 # Check the AUTHENTICATED agent status, not just public /healthz.
