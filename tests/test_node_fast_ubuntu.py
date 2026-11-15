@@ -16,7 +16,7 @@ class TestNodeFastUbuntu(unittest.TestCase):
         self.assertIn('stty -echo < /dev/tty',SRC)
         self.assertIn('stty "$node_tty_original" < /dev/tty',SRC)
         self.assertIn('[[ "$current" != "$node_last_drawn" ]] || return 0',SRC)
-        self.assertIn('verified_ceiling=$((node_confirmed+10))',SRC)
+        self.assertIn('node_percent=$node_confirmed',SRC)
         subprocess.run(["bash","-n",str(AGENT)],check=True)
 
     def run_caddy_preflight(self,os_id):
