@@ -369,22 +369,9 @@ if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t
           "$elapsed" "$node_confirmed" "$detail" >> "$node_log"
       fi
     fi
-    remaining=$((420*(100-node_confirmed)/100))
-    (( remaining < 15 )) && remaining=15
-    wanted=$((1+elapsed*98/(elapsed+remaining)))
-    floor=$node_confirmed
-    (( floor > 94 )) && floor=94
-    (( wanted < floor )) && wanted=$floor
-    (( wanted > 98 )) && wanted=98
-    # Estimated progress must never run far ahead of the last verified stage.
-    # When APT is still working at milestone 16, don't claim 75% installed.
-    local verified_ceiling=$((node_confirmed+10))
-    (( verified_ceiling > 98 )) && verified_ceiling=98
-    (( wanted > verified_ceiling )) && wanted=$verified_ceiling
-    if (( node_percent < wanted && elapsed > node_second )); then
-      node_percent=$((node_percent+1))
-      node_second=$elapsed
-    fi
+    # Only genuine backend milestones are shown as completed. The old ETA
+    # curve displayed 72% even if VPN startup (52%) had never completed.
+    node_percent=$node_confirmed
     node_draw "$node_percent" "$elapsed"
   }
   # Domain and email were already entered above; don't duplicate them.
@@ -846,6 +833,44 @@ curl -4fsSL --proto '=https' --proto-redir '=https' \
     --retry 3 --connect-timeout 15 --max-time 90 \
     "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${ENGINE_REV}/wpo-node-vpn-enable.sh" \
     -o "$VPN_SETUP"
+bash -n "$VPN_SETUP"
+# This pinned VPN setup makes only six one-second checks for the localhost
+# federation API after systemd starts it. A service may need longer to bind
+# 127.0.0.1:9089; if it crashes, emit systemd logs instead of bare curl (7).
+python3 - "$VPN_SETUP" <<'PY_WPO_VPN_9089_READY'
+from pathlib import Path
+import sys
+
+path=Path(sys.argv[1])
+source=path.read_text(encoding='utf-8')
+old="""ok=0
+for _ in 1 2 3 4 5 6; do
+    if curl -4fsS --max-time 3 http://127.0.0.1:9089/healthz |
+        grep -q '"ok": true'; then ok=1; break; fi
+    sleep 1
+done
+(( ok == 1 )) || { echo 'VPN health check failed' >&2; exit 3; }"""
+new="""ok=0
+for attempt in $(seq 1 30); do
+    if systemctl is-active --quiet wpo-node-vpn.service &&
+       curl -4fs --noproxy '*' --connect-timeout 1 --max-time 3 \
+           http://127.0.0.1:9089/healthz 2>/dev/null |
+           grep -q '"ok": true'; then
+        ok=1
+        break
+    fi
+    sleep 1
+done
+if (( ok != 1 )); then
+    echo 'VPN API 127.0.0.1:9089 did not become ready. Service diagnostics:' >&2
+    systemctl status wpo-node-vpn.service --no-pager -l >&2 || true
+    journalctl -u wpo-node-vpn.service --no-pager -n 40 >&2 || true
+    exit 4
+fi"""
+if source.count(old)!=1:
+    raise SystemExit('Pinned VPN readiness code changed; refusing unverified patch.')
+path.write_text(source.replace(old,new,1),encoding='utf-8')
+PY_WPO_VPN_9089_READY
 bash -n "$VPN_SETUP"
 WPO_NODE_VPN_REF="$ENGINE_REV" bash "$VPN_SETUP"
 rm -f -- "$VPN_SETUP"
