@@ -168,8 +168,8 @@ class TestNodeInstallState(unittest.TestCase):
             (root/"logs").mkdir()
             log=root/"logs/node-install-20261115T120000Z-1234.log"
             log.write_text(
-                "Registration complete\\n"
-                "Готово: Node Agent зарегистрирован на https://old.example.net\\n"
+                "Registration complete\n"
+                "Готово: Node Agent зарегистрирован на https://old.example.net\n"
             )
             log.chmod(0o600)
             for mode in ("check","cleanup"):
@@ -185,8 +185,8 @@ class TestNodeInstallState(unittest.TestCase):
             (root/"logs").mkdir()
             log=root/"logs/node-install-20261115T120001Z-1234.log"
             log.write_text(
-                "WEB Proxy relay did not become HTTP-ready\\n"
-                "Установка ноды прервана (код 4)\\n"
+                "WEB Proxy relay did not become HTTP-ready\n"
+                "Установка ноды прервана (код 4)\n"
             )
             log.chmod(0o600)
             result=self.run_preflight(code,env,"check")
