@@ -89,6 +89,23 @@ class NodeFederationTests(unittest.TestCase):
                                     "name": "Sweden", "protocols": ["vless"]})
         self.assertFalse(vpn.STATE.exists())
 
+    def test_failed_apply_restores_xray_readable_permissions(self):
+        # Before the fix, rollback wrote root-only 0600 config. Restarting
+        # Xray as user xray then failed, leaving a persistent federation 503.
+        import stat
+        from types import SimpleNamespace
+        old=b'{"old":true}\\n'
+        vpn.XRAY.write_bytes(old)
+        bad=SimpleNamespace(returncode=1,stderr="invalid config")
+        ok=SimpleNamespace(returncode=0,stderr="")
+        with mock.patch.object(vpn,"command",side_effect=[bad,ok]), \\
+             mock.patch.object(vpn.os,"chown"), \\
+             mock.patch("grp.getgrnam",return_value=SimpleNamespace(gr_gid=123)):
+            with self.assertRaisesRegex(RuntimeError,"validation failed"):
+                vpn.apply({})
+        self.assertEqual(vpn.XRAY.read_bytes(),old)
+        self.assertEqual(stat.S_IMODE(vpn.XRAY.stat().st_mode),0o640)
+
     def test_invalid_id_or_protocol_cannot_provision(self):
         for data in [
             {"external_id": "../../etc/passwd", "name": "X", "protocols": ["vless"]},
