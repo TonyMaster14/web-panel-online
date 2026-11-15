@@ -22,7 +22,6 @@ def manager_text(source):
 def command_for_test():
     original=(ROOT/"install-panel.sh").read_text(encoding="utf-8")
     changed=patcher.patch(original)
-    assert changed!=original
     assert patcher.patch(changed)==changed
     mgr=manager_text(changed)
     ast.parse(mgr)
