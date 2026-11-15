@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("node_picker_patch",ROOT/"wpo-node-picker-compact-patch.py")
+spec=importlib.util.spec_from_file_location("node_picker_patch",ROOT/"maintenance/nodes/wpo-node-picker-compact-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

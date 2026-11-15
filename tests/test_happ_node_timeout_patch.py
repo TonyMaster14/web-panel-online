@@ -9,7 +9,7 @@ from unittest import mock
 from urllib.error import HTTPError, URLError
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("wpo_happ_timeout",ROOT/"wpo-happ-node-timeout-patch.py")
+spec=importlib.util.spec_from_file_location("wpo_happ_timeout",ROOT/"maintenance/happ/wpo-happ-node-timeout-patch.py")
 patcher=importlib.util.module_from_spec(spec);spec.loader.exec_module(patcher)
 import wpp_nodes as node_api
 

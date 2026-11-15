@@ -5,7 +5,7 @@ import subprocess
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SCRIPT=ROOT/"wpo-one-vps-multinode-repair.sh"
+SCRIPT=ROOT/"maintenance/happ/wpo-one-vps-multinode-repair.sh"
 SOURCE=SCRIPT.read_text(encoding="utf-8")
 
 

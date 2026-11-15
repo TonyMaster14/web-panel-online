@@ -11,7 +11,7 @@ import unittest
 import urllib.request
 
 ROOT=Path(__file__).resolve().parents[1]
-SCRIPT=(ROOT/"wpo-node-site-template-fix.sh").read_text()
+SCRIPT=(ROOT/"maintenance/nodes/wpo-node-site-template-fix.sh").read_text()
 
 
 def free_port():

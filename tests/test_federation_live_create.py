@@ -5,7 +5,7 @@ import importlib.util
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SCRIPT=ROOT/"wpo-federation-live-create-patch.py"
+SCRIPT=ROOT/"maintenance/users/wpo-federation-live-create-patch.py"
 spec=importlib.util.spec_from_file_location("federation_live_gate",SCRIPT)
 patch=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patch)
@@ -36,7 +36,7 @@ class FederationCreationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"Expected installed"):
             patch.patch("def create(): pass\n")
     def test_main_only_rollback(self):
-        script=(ROOT/"wpo-federation-live-create-install.sh").read_text()
+        script=(ROOT/"maintenance/users/wpo-federation-live-create-install.sh").read_text()
         self.assertIn('! -e /etc/wpp-node-agent/config.json',script)
         self.assertIn('cp -a "$BACKUP" "$PANEL"',script)
         self.assertIn('systemctl restart tproxy-panel.service',script)

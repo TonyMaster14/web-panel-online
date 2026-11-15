@@ -8,7 +8,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location("wpo_routing_cards_patch",
-    ROOT/"wpo-routing-cards-ui-patch.py")
+    ROOT/"maintenance/routing/wpo-routing-cards-ui-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

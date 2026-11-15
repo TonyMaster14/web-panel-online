@@ -6,7 +6,7 @@ from pathlib import Path
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("fast_delete_patch",ROOT/"wpo-fast-delete-manager-patch.py")
+spec=importlib.util.spec_from_file_location("fast_delete_patch",ROOT/"maintenance/users/wpo-fast-delete-manager-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

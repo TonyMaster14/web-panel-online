@@ -11,7 +11,7 @@ from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location(
-    "fast_subs_patch",ROOT/"wpo-fast-subscription-manager-patch.py")
+    "fast_subs_patch",ROOT/"maintenance/users/wpo-fast-subscription-manager-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

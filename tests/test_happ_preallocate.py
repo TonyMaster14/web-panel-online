@@ -4,7 +4,7 @@ import importlib.util
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("wpo_happ_prealloc",ROOT/"wpo-happ-preallocate-patch.py")
+spec=importlib.util.spec_from_file_location("wpo_happ_prealloc",ROOT/"maintenance/happ/wpo-happ-preallocate-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

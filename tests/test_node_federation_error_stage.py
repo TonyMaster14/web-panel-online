@@ -6,7 +6,7 @@ import subprocess
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("fed_trace_patch",ROOT/"wpo-node-federation-error-stage-patch.py")
+spec=importlib.util.spec_from_file_location("fed_trace_patch",ROOT/"maintenance/nodes/wpo-node-federation-error-stage-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 
@@ -35,7 +35,7 @@ class StageTraceTests(unittest.TestCase):
             patcher.patch("def x():\n    pass\n")
 
     def test_installer_only_additional_node_with_rollback(self):
-        src=(ROOT/"wpo-node-federation-error-stage-install.sh").read_text()
+        src=(ROOT/"maintenance/nodes/wpo-node-federation-error-stage-install.sh").read_text()
         result=subprocess.run(["bash","-n"],input=src,text=True,capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr)
         for required in ('! -e /opt/tproxy-panel/panel.py',

@@ -13,7 +13,7 @@ import wpp_routing as routing
 import wpp_ui as ui
 
 spec=importlib.util.spec_from_file_location(
-    "route_batch_patch",ROOT/"wpo-routing-batch-remove-v4-patch.py")
+    "route_batch_patch",ROOT/"maintenance/routing/wpo-routing-batch-remove-v4-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

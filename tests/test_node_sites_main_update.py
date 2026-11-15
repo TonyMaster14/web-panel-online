@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SRC=(ROOT/"wpo-node-sites-main-update.sh").read_text()
+SRC=(ROOT/"maintenance/nodes/wpo-node-sites-main-update.sh").read_text()
 START="python3 - \"$REGISTRY\" > \"$WORK/nodes.tsv\" <<'PY_NODES'\n"
 END="\nPY_NODES"
 assert SRC.count(START)==1

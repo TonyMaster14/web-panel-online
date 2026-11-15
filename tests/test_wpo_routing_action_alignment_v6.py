@@ -12,7 +12,7 @@ import wpp_ui
 import wpp_routing
 
 spec=importlib.util.spec_from_file_location(
-    "wpo_routing_v6", ROOT/"wpo-routing-action-alignment-v6-patch.py")
+    "wpo_routing_v6", ROOT/"maintenance/routing/wpo-routing-action-alignment-v6-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

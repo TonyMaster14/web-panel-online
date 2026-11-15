@@ -4,7 +4,7 @@ import subprocess
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SCRIPT=ROOT/"wpo-node-federation-hotfix.sh"
+SCRIPT=ROOT/"maintenance/nodes/wpo-node-federation-hotfix.sh"
 S=SCRIPT.read_text()
 ENGINE=(ROOT/"wpo_node_eight.py").read_text()
 

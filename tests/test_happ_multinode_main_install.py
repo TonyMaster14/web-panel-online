@@ -5,16 +5,16 @@ import subprocess
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SH=(ROOT/"wpo-happ-multinode-main-install.sh").read_text()
+SH=(ROOT/"maintenance/happ/wpo-happ-multinode-main-install.sh").read_text()
 WORKER=(ROOT/"wpo_happ_async_feed.py").read_text()
 PREP=(ROOT/"wpo_happ_preparer.py").read_text()
-PANEL=(ROOT/"wpo-happ-async-panel-patch.py").read_text()
-SUBS=(ROOT/"wpo-happ-preallocate-patch.py").read_text()
+PANEL=(ROOT/"maintenance/happ/wpo-happ-async-panel-patch.py").read_text()
+SUBS=(ROOT/"maintenance/happ/wpo-happ-preallocate-patch.py").read_text()
 
 
 class MainOnlyUpdate(unittest.TestCase):
     def test_shell_syntax(self):
-        proc=subprocess.run(["bash","-n",str(ROOT/"wpo-happ-multinode-main-install.sh")],
+        proc=subprocess.run(["bash","-n",str(ROOT/"maintenance/happ/wpo-happ-multinode-main-install.sh")],
                             capture_output=True,text=True)
         self.assertEqual(proc.returncode,0,proc.stderr)
 

@@ -6,7 +6,7 @@ from urllib.error import HTTPError
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("wpo_happ_post_diagnostic",ROOT/"wpo-happ-post-diagnostic.py")
+spec=importlib.util.spec_from_file_location("wpo_happ_post_diagnostic",ROOT/"maintenance/happ/wpo-happ-post-diagnostic.py")
 diag=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(diag)
 

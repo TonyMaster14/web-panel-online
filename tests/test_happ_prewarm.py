@@ -11,7 +11,7 @@ import unittest
 from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
-src=ROOT/"wpo-happ-prewarm.py"
+src=ROOT/"maintenance/happ/wpo-happ-prewarm.py"
 spec=importlib.util.spec_from_file_location("wpo_happ_prewarm",src)
 warm=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(warm)

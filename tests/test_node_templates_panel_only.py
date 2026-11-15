@@ -5,16 +5,16 @@ import subprocess
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-SCRIPT=(ROOT/"wpo-node-templates-panel-only.sh").read_text()
+SCRIPT=(ROOT/"maintenance/nodes/wpo-node-templates-panel-only.sh").read_text()
 INSTALLER=(ROOT/"wpo-node-agent-install-v2.sh").read_text()
 EIGHT=(ROOT/"wpo-node-eight-enable.sh").read_text()
-SITE=(ROOT/"wpo-node-site-template-fix.sh").read_text()
+SITE=(ROOT/"maintenance/nodes/wpo-node-site-template-fix.sh").read_text()
 CORE=(ROOT/"node-install.sh").read_text()
 
 
 class PanelOnlyTemplates(unittest.TestCase):
     def test_script_is_syntax_valid_and_no_remote_access(self):
-        p=subprocess.run(["bash","-n",str(ROOT/"wpo-node-templates-panel-only.sh")],
+        p=subprocess.run(["bash","-n",str(ROOT/"maintenance/nodes/wpo-node-templates-panel-only.sh")],
                          capture_output=True,text=True)
         self.assertEqual(p.returncode,0,p.stderr)
         for banned in (

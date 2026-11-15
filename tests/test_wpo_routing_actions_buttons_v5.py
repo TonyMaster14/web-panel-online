@@ -10,7 +10,7 @@ sys.path.insert(0,str(ROOT))
 import wpp_ui
 
 spec=importlib.util.spec_from_file_location(
-    "routing_actions_v5",ROOT/"wpo-routing-actions-buttons-v5-patch.py")
+    "routing_actions_v5",ROOT/"maintenance/routing/wpo-routing-actions-buttons-v5-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

@@ -69,7 +69,7 @@ class RoutingStatusTopRowTest(unittest.TestCase):
     def test_v3_patch_is_idempotent_with_current_source(self):
         import importlib.util
         spec=importlib.util.spec_from_file_location(
-            "routing_status_patch",ROOT/"wpo-routing-status-toprow-v3-patch.py")
+            "routing_status_patch",ROOT/"maintenance/routing/wpo-routing-status-toprow-v3-patch.py")
         module=importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         s=(ROOT/"wpp_ui.py").read_text(encoding="utf-8")

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 ROOT=Path(__file__).resolve().parents[1]
 
 def load(path,name):
-    spec=importlib.util.spec_from_file_location(name,ROOT/path)
+    spec=importlib.util.spec_from_file_location(name,ROOT/"maintenance"/("users" if path.startswith("wpo-federation-") else "happ")/path)
     mod=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

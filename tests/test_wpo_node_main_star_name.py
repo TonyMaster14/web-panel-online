@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location(
-    "wpo_primary_star_patch", ROOT / "wpo-node-main-star-name-patch.py")
+    "wpo_primary_star_patch", ROOT / "maintenance/nodes/wpo-node-main-star-name-patch.py")
 patcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

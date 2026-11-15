@@ -21,7 +21,7 @@ from test_subscription_happ_http import HappSubscription, panel as exact_panel
 
 ROOT=Path(__file__).resolve().parents[1]
 def from_file(name):
-    spec=importlib.util.spec_from_file_location(name,ROOT/(name.replace("_","-")+".py"))
+    spec=importlib.util.spec_from_file_location(name,ROOT/"maintenance/happ"/(name.replace("_","-")+".py"))
     mod=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

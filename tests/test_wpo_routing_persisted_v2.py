@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("routing_persisted_v2",ROOT/"wpo-routing-persisted-rules-v2-patch.py")
+spec=importlib.util.spec_from_file_location("routing_persisted_v2",ROOT/"maintenance/routing/wpo-routing-persisted-rules-v2-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

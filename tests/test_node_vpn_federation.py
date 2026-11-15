@@ -164,7 +164,7 @@ class NodeFederationTests(unittest.TestCase):
         assert "def sync_profile(" in (ROOT / "wpp_nodes.py").read_text()
 
     def test_short_sudo_patch_detects_controller_or_node(self):
-        dispatcher=(ROOT / "wpo-vpn-patch.sh").read_text()
+        dispatcher=(ROOT / "maintenance/other/wpo-vpn-patch.sh").read_text()
         self.assertIn("/opt/tproxy-panel/panel.py",dispatcher)
         self.assertIn("/etc/wpp-node-agent/config.json",dispatcher)
         self.assertIn('target="wpo-node-controller-vpn.sh"',dispatcher)

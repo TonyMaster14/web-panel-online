@@ -7,13 +7,13 @@ from unittest import TestCase, mock
 from urllib.error import HTTPError
 
 ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("wpo_federation_probe",ROOT/"wpo-node-federation-readonly-probe.py")
+spec=importlib.util.spec_from_file_location("wpo_federation_probe",ROOT/"maintenance/nodes/wpo-node-federation-readonly-probe.py")
 probe=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)
 
 class NodeProbeTests(TestCase):
     def test_invalid_profile_cannot_create_a_real_identity(self):
-        source=(ROOT/"wpo-node-federation-readonly-probe.py").read_text()
+        source=(ROOT/"maintenance/nodes/wpo-node-federation-readonly-probe.py").read_text()
         self.assertIn('b\'{"external_id":"invalid"',source)
         self.assertIn('"run","-test","-config"',source)
         self.assertIn("TemporaryDirectory(",source)

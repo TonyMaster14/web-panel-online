@@ -10,7 +10,7 @@ sys.path.insert(0,str(ROOT))
 import wpp_ui
 
 spec=importlib.util.spec_from_file_location(
-    "routing_custom_inset_v8", ROOT/"wpo-routing-custom-inset-v8-patch.py")
+    "routing_custom_inset_v8", ROOT/"maintenance/routing/wpo-routing-custom-inset-v8-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

@@ -8,7 +8,7 @@ import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location(
-    "fast_delete_controller_patch",ROOT/"wpo-fast-delete-controller-patch.py")
+    "fast_delete_controller_patch",ROOT/"maintenance/users/wpo-fast-delete-controller-patch.py")
 patcher=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patcher)
 

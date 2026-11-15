@@ -17,7 +17,7 @@ class Sandbox(unittest.TestCase):
         )
 
     def test_existing_node_updater_merges_permission_allowlist(self):
-        script=(ROOT/"wpo-node-federation-hotfix.sh").read_text()
+        script=(ROOT/"maintenance/nodes/wpo-node-federation-hotfix.sh").read_text()
         self.assertIn("wpo-node-vpn.service.d/10-wpo-native-writes.conf",script)
         self.assertIn(
             "ReadWritePaths=-/etc/systemd/system -/etc/tproxy-server -/etc/web-proxy-panel",
@@ -36,7 +36,7 @@ class Sandbox(unittest.TestCase):
         self.assertIn("xray.apply(new)",src)
 
     def test_main_installer_pins_correct_future_sandbox(self):
-        installer=(ROOT/"wpo-happ-ready-install.sh").read_text()
+        installer=(ROOT/"maintenance/happ/wpo-happ-ready-install.sh").read_text()
         self.assertIn("NODE_INSTALL_REV=0ea1afcc2c60620b4ebb089221341012c0b8eb0c",installer)
         self.assertIn("ENGINE_REV=007c4c1cddc86c900b841c1c0360127eb94c03d7",installer)
         self.assertNotIn("ssh ",installer)

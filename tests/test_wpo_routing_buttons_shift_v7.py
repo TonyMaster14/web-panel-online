@@ -10,7 +10,7 @@ sys.path.insert(0,str(ROOT))
 import wpp_ui
 
 spec=importlib.util.spec_from_file_location(
-    "routing_shift_v7",ROOT/"wpo-routing-buttons-shift-v7-patch.py")
+    "routing_shift_v7",ROOT/"maintenance/routing/wpo-routing-buttons-shift-v7-patch.py")
 patch=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(patch)
 
