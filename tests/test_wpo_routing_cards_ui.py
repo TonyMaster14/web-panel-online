@@ -61,6 +61,8 @@ class RoutingCardsUITests(unittest.TestCase):
         self.assertEqual(result.count('name="operation" value="add-selected"'),2)
         self.assertEqual(result.count('name="operation" value="remove-selected"'),2)
         self.assertIn('Скачать JSON',result)
+        self.assertIn('.routing-form .routing-switches label.routing-toggle{',result)
+        self.assertNotIn('.routing-form .routing-switches .routing-toggle{',result)
         self.assertIn(patcher.MARKER,result)
         self.assertIn('border-radius:13px',result)
         self.assertIn('#3b82f6',result)
