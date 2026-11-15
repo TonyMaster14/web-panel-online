@@ -588,29 +588,67 @@ esac
 # The check at startup already refused an enrolled or live node.
 wpo_node_install_state cleanup
 report installing 'Установка Caddy и подготовка сайта ноды.'
-apt-get update
-# Install the full Node runtime in one APT transaction. VPN and eight-engine
-# bootstraps can now skip their own apt update/unzip installation on clean VPS.
-apt-get install -y --no-install-recommends \
-  curl ca-certificates gnupg python3 unzip openssl util-linux xz-utils tar \
-  nftables iproute2 wireguard-tools procps
-if ! command -v caddy >/dev/null 2>&1; then
-  # Prefer distro Caddy: no Cloudsmith key/network round trips or second
-  # apt update on Ubuntu/Debian with the package in enabled repositories.
-  if apt-cache show caddy >/dev/null 2>&1; then
-    apt-get install -y --no-install-recommends caddy
-  else
-    # Official Caddy repository is needed only when distro package is absent.
-    if [[ "$ID" == debian ]]; then
-      apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https
-    fi
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' -o /etc/apt/sources.list.d/caddy-stable.list
-    chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
-    apt-get update
-    apt-get install -y --no-install-recommends caddy
-  fi
+# On some fresh Ubuntu images unattended upgrades have ALREADY refreshed APT.
+# Repeating apt-get update may consume most of a one-minute installation.
+# Only trust a recent, complete distro index; a failed cached install retries
+# after a fresh update. APT signature validation and package checks stay intact.
+wpo_node_apt_cache_recent(){
+  local lists=/var/lib/apt/lists
+  [[ "${WPO_NODE_FORCE_APT_UPDATE:-0}" != 1 ]] || return 1
+  [[ -d "$lists" ]] || return 1
+  [[ -n "$(find "$lists" -maxdepth 1 -type f -name '*_InRelease' -mmin -180 -print -quit)" ]] || return 1
+  [[ -n "$(find "$lists" -maxdepth 1 -type f -name '*_Packages*' -print -quit)" ]] || return 1
+  apt-cache show curl >/dev/null 2>&1 &&
+  apt-cache show python3 >/dev/null 2>&1 &&
+  apt-cache show wireguard-tools >/dev/null 2>&1
+}
+wpo_node_prep_started=$SECONDS
+wpo_node_cached_apt=0
+if wpo_node_apt_cache_recent; then
+  wpo_node_cached_apt=1
+  echo '[WPO node timing] apt-index: reused validated recent metadata'
+else
+  apt-get update
+  echo "[WPO node timing] apt-index: refreshed in $((SECONDS-wpo_node_prep_started))s"
 fi
+# One transaction: common prerequisites + distro Caddy (when available).
+# This avoids two dpkg/needrestart transactions on Ubuntu 24.04.
+wpo_node_packages=(
+  curl ca-certificates gnupg python3 unzip openssl util-linux xz-utils tar
+  nftables iproute2 wireguard-tools procps
+)
+wpo_node_caddy_distro=0
+if ! command -v caddy >/dev/null 2>&1 &&
+   apt-cache show caddy >/dev/null 2>&1; then
+  wpo_node_packages+=(caddy)
+  wpo_node_caddy_distro=1
+fi
+wpo_node_apt_started=$SECONDS
+if ! apt-get install -y --no-install-recommends "${wpo_node_packages[@]}"; then
+  if (( wpo_node_cached_apt != 1 )); then
+    echo 'APT install failed after fresh update.' >&2
+    exit 4
+  fi
+  # The mirror may have rotated .deb files since the cached index was made.
+  echo 'APT cache was stale; refreshing index and retrying packages.' >&2
+  apt-get update
+  apt-get install -y --no-install-recommends "${wpo_node_packages[@]}"
+fi
+echo "[WPO node timing] packages: $((SECONDS-wpo_node_apt_started))s (distro-caddy=$wpo_node_caddy_distro)"
+if ! command -v caddy >/dev/null 2>&1; then
+  # Cloudsmith fallback is needed only where the distro has no Caddy.
+  wpo_node_caddy_started=$SECONDS
+  if [[ "$ID" == debian ]]; then
+    apt-get install -y --no-install-recommends debian-keyring debian-archive-keyring apt-transport-https
+  fi
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' -o /etc/apt/sources.list.d/caddy-stable.list
+  chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg /etc/apt/sources.list.d/caddy-stable.list
+  apt-get update
+  apt-get install -y --no-install-recommends caddy
+  echo "[WPO node timing] caddy-external: $((SECONDS-wpo_node_caddy_started))s"
+fi
+echo "[WPO node timing] preparation-total: $((SECONDS-wpo_node_prep_started))s"
 PUBLIC_IP="$(curl -4fsS --max-time 10 https://api.ipify.org)"
 getent ahostsv4 "$DOMAIN" | awk '{print $1}' | sort -u | grep -Fxq "$PUBLIC_IP" || { report error "DNS A-запись должна указывать на $PUBLIC_IP."; echo "DNS A-запись $DOMAIN должна указывать на $PUBLIC_IP."; exit 3; }
 install -d -m 0755 /opt/wpp-node-agent /var/www/wpp-node-site
