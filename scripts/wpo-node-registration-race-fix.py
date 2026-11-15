@@ -71,6 +71,26 @@ NEW_ENROLL='''node_api.save_nodes(NODES_FILE,registered)
                          raise node_api.NodeError("Нода не сохранилась в реестре.")
                      pending.pop(digest,None); wpo_pending_save(pending)'''
 
+def _reindent_replace(source, old, template, template_indent):
+    """Match the controller's real indentation, never the patch author's.
+
+    In deployed WPO the nodes-status method uses 12 spaces. Older fixtures
+    and some handler revisions use 13 or 16. Hard-coded multi-line additions
+    used to raise IndentationError before any file was changed.
+    """
+    offset=source.index(old)
+    start=source.rfind("\n",0,offset)+1
+    indent=source[start:offset]
+    if indent.strip() or any(char not in " \t" for char in indent):
+        raise ValueError("WPO patch anchor is not at the start of a statement.")
+    lines=template.split("\n")
+    rendered=[lines[0]]
+    for line in lines[1:]:
+        if line and not line.startswith(" "*template_indent):
+            raise ValueError("Invalid Python indentation in patch template.")
+        rendered.append(indent+line[template_indent:])
+    return source.replace(old,"\n".join(rendered),1)
+
 def patch(source):
     if MARKER in source:
         return source, False
@@ -84,17 +104,17 @@ def patch(source):
             raise ValueError(f"WPO controller mismatch ({label}): expected 1 anchor, got {source.count(old)}. No changes.")
     if "with wpo_node_auto.registry_lock:" not in source:
         raise ValueError("Controller does not provide the registry lock; no changes.")
-    result=source.replace(OLD_BEGIN,NEW_BEGIN,1)
-    result=result.replace(OLD_SAVE,NEW_SAVE,1)
+    result=_reindent_replace(source,OLD_BEGIN,NEW_BEGIN,13)
+    result=_reindent_replace(result,OLD_SAVE,NEW_SAVE,13)
     if source.count(OLD_ENROLL)==1:
-        result=result.replace(OLD_ENROLL,NEW_ENROLL,1)
+        result=_reindent_replace(result,OLD_ENROLL,NEW_ENROLL,21)
         print("Additional enrollment verification: installed")
     else:
         # Do not guess how a newer controller performs enrollment. The fixed
         # /nodes-status write already prevents it from erasing new nodes.
         print("Additional enrollment verification: unchanged (controller variant)")
     if source.count(OLD_PENDING)==1:
-        result=result.replace(OLD_PENDING,NEW_PENDING,1)
+        result=_reindent_replace(result,OLD_PENDING,NEW_PENDING,17)
         print("Pending-status locking: installed")
     else:
         print("Pending-status locking: unchanged (controller variant)")
