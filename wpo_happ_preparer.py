@@ -134,9 +134,38 @@ def prepare():
             links=feed.verified_links(api,node,ext,label,protocols,timeout=90)
             return key,node,True,len(links),time.monotonic()-started
         except Exception as exc:
-            # Do not print raw remote messages, tokens or credential-bearing URIs.
-            code=getattr(getattr(exc,"__cause__",None),"code",None)
-            status=("HTTP "+str(code)) if isinstance(code,int) else type(exc).__name__
+            # Classify the remote HTTP error, never expose raw JSON or
+            # credentials in panel logs/installer output.
+            cause=getattr(exc,"__cause__",None)
+            code=getattr(cause,"code",None)
+            if isinstance(code,int):
+                status="HTTP "+str(code)
+                try:
+                    body=json.loads(cause.read(8192))
+                    message=body.get("message","") if isinstance(body,dict) else ""
+                    if isinstance(message,str):
+                        reasons=(
+                            ("Xray configuration validation failed","Xray: конфигурация отклонена"),
+                            ("Xray did not become ready","Xray: не запустился"),
+                            ("Node engine command failed","Служба ноды: отказ"),
+                            ("VPN service is not ready","VPN-служба: не готова"),
+                            ("Node protocols not ready","VPN-протокол: не готов"),
+                            ("permission denied","Служба ноды: запрет записи"),
+                            ("Permission denied","Служба ноды: запрет записи"),
+                            ("Invalid federation ID","Неверный идентификатор профиля"),
+                        )
+                        for needle,reason in reasons:
+                            if needle in message:
+                                status+=" ("+reason+")"
+                                break
+                except (OSError,ValueError,TypeError,UnicodeError):
+                    pass
+            elif isinstance(cause,TimeoutError):
+                status="Тайм-аут ответа ноды"
+            elif isinstance(exc,api.NodeError):
+                status="NodeError (нет HTTP-ответа или ошибка протокола)"
+            else:
+                status=type(exc).__name__
             return key,node,False,status,time.monotonic()-started
     passed=True
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
