@@ -100,6 +100,29 @@ class TestNodeEnrollmentRace(unittest.TestCase):
         self.assertIn(fix.MARKER,modified)
         compile(modified,"installed_controller.py","exec")
 
+    def test_deployed_12_space_status_indent_compiles(self):
+        # Reproduce the real VPS trace: panel.py at node_status_snapshot
+        # had 12 spaces but the previous patch hard-coded 13.
+        original=fixture()
+        first,tail=original.split("    def poll(self):\n",1)
+        poll,rest=tail.split("    def update(self):\n",1)
+        poll=poll.replace("             ","            ")
+        source=first+"    def poll(self):\n"+poll+"    def update(self):\n"+rest
+        self.assertEqual(source.count(fix.OLD_BEGIN),1)
+        self.assertEqual(source.count(fix.OLD_SAVE),1)
+        fixed,changed=fix.patch(source)
+        self.assertTrue(changed)
+        self.assertIn(fix.MARKER,fixed)
+        compile(fixed,"deployed_panel.py","exec")
+        # All injected lines stay at the host method's indentation.
+        self.assertIn(
+            '            node_status_snapshot=',fixed)
+        self.assertNotIn(
+            '             node_status_snapshot=',fixed)
+        self.assertIn(
+            '            if changed:\n'
+            '                # # wpo-node-enrollment-race-v1',fixed)
+
     def run_poll(self,scenario):
         source,_=fix.patch(fixture())
         registry=FakeRegistry()
