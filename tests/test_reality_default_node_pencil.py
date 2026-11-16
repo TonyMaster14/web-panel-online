@@ -39,7 +39,7 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
         contents=script.read_text()
         self.assertIn("wpp-node-agent-install.sh",contents)
         self.assertIn("nodes/wpo-node-agent-install-v2.sh",contents)
-        self.assertIn("REALITY_REV=f0d6344c76cfb3df1bd9a44f6902da61ac419d8e",contents)
+        self.assertIn("REV=7b673ffd20d256d8fb2204ea1cca9637b4707f94",contents)
         self.assertIn('systemctl restart "$SERVICE"',contents)
         self.assertIn('cp -a "$BACKUP/$name" "$APP/$name"',contents)
 
