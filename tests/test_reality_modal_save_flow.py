@@ -24,6 +24,26 @@ class RealityModalSaveTests(unittest.TestCase):
         self.assertIn('systemctl restart "$SERVICE"',source)
         self.assertNotIn("systemctl restart wpo-node-xray",source)
 
+    def test_fast_save_installer_checks_rounded_scrollbars_and_parallel_safety(self):
+        path=ROOT/"scripts/wpo-reality-scroll-fast-save-v2.sh"
+        result=subprocess.run(["bash","-n",str(path)],capture_output=True,text=True,timeout=5)
+        self.assertEqual(result.returncode,0,result.stderr)
+        source=path.read_text()
+        self.assertIn("REV=e8ad60d687df6045b1cad09945fcba57a52d95d6",source)
+        self.assertIn("Promise.allSettled(nodes.map",source)
+        self.assertIn("Promise.allSettled(changing.map",source)
+        self.assertIn("border-radius:999px",source)
+        self.assertIn('cp -a "$BACKUP/wpo_reality_ui.py" "$MODULE"',source)
+        self.assertNotIn("systemctl restart wpo-node-xray",source)
+
+    def test_rounded_scrollbars_leave_space_and_stable_buttons(self):
+        source=(ROOT/"src/wpo_reality_ui.py").read_text()
+        self.assertIn("margin-right:7px;scrollbar-width:thin",source)
+        self.assertIn("border-radius:999px;border:2px solid transparent",source)
+        self.assertIn(".wpo-reality-checks-list::-webkit-scrollbar",source)
+        self.assertIn("min-height:62px;margin-top:auto",source)
+        self.assertIn("padding:12px 13px 18px 2px",source)
+
     @unittest.skipUnless(shutil.which("node"),"node not installed")
     def test_real_browser_handler_reuses_check_then_saves_and_rolls_back_cancel(self):
         source=(ROOT/"src/wpo_reality_ui.py").read_text()
