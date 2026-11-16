@@ -65,7 +65,7 @@ def patch_panel(source):
     if source.count(anchor)!=1: raise ValueError('Authenticated connection route changed')
     handler='''        if path==PANEL_PATH+"/reality-action":
             try:
-                request={"preset":form.get("preset","microsoft"),"sni":form.get("sni",""),
+                request={"preset":form.get("preset","nvidia"),"sni":form.get("sni",""),
                          "fingerprint":form.get("fingerprint","firefox"),"check_only":form.get("check_only")=="1"}
                 uid=form.get("node_id","local")
                 if uid!="local":
