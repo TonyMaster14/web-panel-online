@@ -34,7 +34,7 @@ class FleetUI(unittest.TestCase):
         self.assertIn('type="submit" class="primary">Сохранить</button>',html)
         self.assertNotIn("Проверить и сохранить",html)
         self.assertIn("Сохранение прервано",html)
-        self.assertIn("const stored=await send(n.id,{read_only:'1'})",html)
+        self.assertIn("const actual=await send(n.id,{read_only:'1'})",html)
         self.assertIn("const oldPreset=(presets[old.preset]",html)
         self.assertIn("Сохранение отменено",html)
 
