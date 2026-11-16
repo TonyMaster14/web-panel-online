@@ -33,7 +33,7 @@ class FleetUI(unittest.TestCase):
         self.assertIn('data-reality-check>Проверить цель',html)
         self.assertIn('type="submit" class="primary">Сохранить</button>',html)
         self.assertNotIn("Проверить и сохранить",html)
-        self.assertIn("Применение прервано",html)
+        self.assertIn("Сохранение прервано",html)
         self.assertIn("const stored=await send(n.id,{read_only:'1'})",html)
         self.assertIn("const oldPreset=(presets[old.preset]",html)
         self.assertIn("Сохранение отменено",html)
@@ -74,10 +74,17 @@ class FleetUI(unittest.TestCase):
         source=(ROOT/"src/wpo_reality_ui.py").read_text()
         self.assertIn("wpp_nodes.load_nodes('/var/lib/tproxy-panel/nodes.json')",source)
         self.assertIn("editor(path,csrf,public_nodes,fleet=True)",source)
-        self.assertIn("await send(n.id,{...request,check_only:'1'})",source)
+        self.assertIn("await send(n.id,{...request,check_only:'1'},{signal:activeAbort.signal})",source)
         self.assertIn("await send(n.id,{...request,check_only:'0'})",source)
         self.assertIn("for(const n of attempted.reverse())",source)
         self.assertIn("Нода не подтвердила настоящий REALITY-туннель",source)
+        self.assertIn("const reuse=save&&verified?.key===key",source)
+        self.assertIn("function requestStop()",source)
+        self.assertIn("d.querySelector('[data-reality-close]').disabled=false",source)
+        self.assertIn("if(closeAfterStop&&!restoreFailed)d.close()",source)
+        self.assertIn("height:min(700px,calc(100dvh - 30px))",source)
+        self.assertIn("overflow-y:auto;overscroll-behavior:contain",source)
+        self.assertNotIn("outline:2px solid var(--accent)",source)
 
 class RealTunnelVerification(unittest.TestCase):
     def test_server_requires_actual_tunnel_not_only_tls(self):
