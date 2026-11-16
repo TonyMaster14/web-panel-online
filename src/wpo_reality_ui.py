@@ -143,24 +143,32 @@ async function execute(save){
   }
   // Reuse the result of Check. Each mutating POST still tests the REALITY
   // tunnel on its node, but does not restart the UI's full preflight loop.
-  phase='saving';activeAbort=null;
-  for(const n of nodes){
+  // Remote nodes have separate agents. Read previous settings concurrently,
+  // then apply independent writes concurrently; total latency is bounded by
+  // the slowest node rather than the sum of all nodes.
+  phase='reading';activeAbort=new AbortController();
+  await Promise.all(nodes.map(async n=>{
    ensureActive();const row=rows.get(n.id);
    update(row,'pending','Получаем прежние параметры');
-   const old=await send(n.id,{read_only:'1'});
+   const old=await send(n.id,{read_only:'1'},{signal:activeAbort.signal});
    original.set(n.id,old.profile);
-  }
+  }));
+  ensureActive();
+  phase='saving';activeAbort=null;
+  const changing=[];
   for(const n of nodes){
-   ensureActive();const row=rows.get(n.id),before=original.get(n.id);
+   const row=rows.get(n.id),before=original.get(n.id);
    if(before.sni===request.sni&&before.fingerprint===request.fingerprint){
     update(row,'ok','Уже сохранено',['SNI','REALITY']);
-    continue;
-   }
-   update(row,'pending','Сохраняем и проверяем ноду');
-   attempted.push(n);
+   }else changing.push(n);
+  }
+  // Mutating requests must NEVER be aborted halfway: Promise.allSettled
+  // waits for every in-flight node before starting a compensating rollback.
+  const statuses=await Promise.allSettled(changing.map(async n=>{
+   ensureActive();const row=rows.get(n.id);
+   attempted.push(n);update(row,'pending','Сохраняем и проверяем ноду');
    try{
     const saved=await send(n.id,{...request,check_only:'0'});
-    // Never abort a mutating POST: finish it, then roll back on cancellation.
     if(!isFullCheck(saved))throw Error('Нода не подтвердила REALITY при сохранении');
     const actual=await send(n.id,{read_only:'1'});
     if(actual.profile?.sni!==request.sni||actual.profile?.fingerprint!==request.fingerprint)
@@ -168,7 +176,10 @@ async function execute(save){
     update(row,'ok','Сохранено и подтверждено',['SNI','REALITY','HTTP 204']);
     ensureActive();
    }catch(err){update(row,'error','Ошибка сохранения: '+err.message);throw err}
-  }
+  }));
+  const failure=statuses.find(item=>item.status==='rejected');
+  if(failure)throw failure.reason;
+  ensureActive();
   verified=null;
   out.textContent='Сохранено на всех '+nodes.length+' нод(ах). Обновите подписки после смены SNI.';
  }catch(err){
