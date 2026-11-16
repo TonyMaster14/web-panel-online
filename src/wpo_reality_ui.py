@@ -40,46 +40,166 @@ const out=document.getElementById('wpoRealityResult'),area=document.getElementBy
 const list=document.getElementById('wpoRealityChecksList'),selector=f?.querySelector('[data-reality-list]');
 if(!d||!f)return;
 const presets=PRESETS, allNodes=NODES, fleet=FLEET;
-const actions=Array.from(f.querySelectorAll('.actions button, [data-reality-close]'));
-let running=false;
+const actions=Array.from(f.querySelectorAll('.actions button'));
+let running=false,cancelRequested=false,closeAfterStop=false,phase='idle',activeAbort=null,verified=null,restoreFailed=false;
+function requestKey(nodes,request){return JSON.stringify([nodes.map(n=>n.id),request.preset,request.sni,request.fingerprint])}
+function ensureActive(){if(cancelRequested)throw Error('Операция отменена пользователем')}
+function requestStop(){
+ if(!running){d.close();return}
+ cancelRequested=true;closeAfterStop=true;
+ if(activeAbort)activeAbort.abort();
+ if(phase==='saving'||phase==='rollback'){
+  out.textContent='Отмена запрошена. Завершаем текущий запрос и возвращаем прежние настройки. Не закрывайте вкладку.';
+ }else{
+  out.textContent='Проверка остановлена. Настройки не изменены.';
+  d.close();
+ }
+}
 function selected(){return presets[f.elements.preset.value]||null}
 function displayPreset(){const p=selected();f.querySelector('[data-reality-label]').textContent=p?p[0]:'Свой домен';f.elements.sni.readOnly=!!p;if(p)f.elements.sni.value=p[1];selector.querySelectorAll('[data-reality-choice]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.realityChoice===f.elements.preset.value)))}
 function togglePicker(open){selector.hidden=!open;f.querySelector('[data-reality-toggle]').setAttribute('aria-expanded',String(open))}
 f.querySelector('[data-reality-toggle]').addEventListener('click',()=>togglePicker(selector.hidden));
-selector.querySelectorAll('[data-reality-choice]').forEach(b=>b.addEventListener('click',()=>{f.elements.preset.value=b.dataset.realityChoice;displayPreset();togglePicker(false);f.elements.sni.focus()}));
+selector.querySelectorAll('[data-reality-choice]').forEach(b=>b.addEventListener('click',()=>{f.elements.preset.value=b.dataset.realityChoice;displayPreset();togglePicker(false);verified=null}));
 d.addEventListener('click',e=>{if(!e.target.closest('.wpo-reality-picker'))togglePicker(false)});
-d.addEventListener('keydown',e=>{if(e.key==='Escape'){togglePicker(false);if(running)e.preventDefault()}});
-d.addEventListener('cancel',e=>{if(running)e.preventDefault()});
+d.addEventListener('keydown',e=>{if(e.key==='Escape')togglePicker(false)});
+d.addEventListener('cancel',e=>{if(running){e.preventDefault();requestStop()}});
 function resetChecks(){area.hidden=true;list.replaceChildren();out.textContent=''}
 function nodeRow(title){const row=document.createElement('div'),head=document.createElement('div'),state=document.createElement('span'),caption=document.createElement('strong'),details=document.createElement('div');
 row.className='wpo-reality-check-row pending';head.className='wpo-reality-check-row-head';state.className='wpo-reality-led';
 caption.textContent=title;head.append(state,caption);details.className='wpo-reality-check-row-details';row.append(head,details);list.append(row);return {row,details}}
 function update(row,status,message,chips=[]){row.row.className='wpo-reality-check-row '+status;row.details.replaceChildren();if(message){const text=document.createElement('small');text.textContent=message;row.details.append(text)}for(const chip of chips){const tag=document.createElement('span');tag.className='wpo-reality-chip';tag.textContent=chip;row.details.append(tag)}}
-function setRunning(value){running=value;actions.forEach(x=>x.disabled=value);f.querySelector('[data-reality-toggle]').disabled=value;selector.querySelectorAll('button').forEach(x=>x.disabled=value);if(f.elements.node_id?.tagName==='SELECT')f.elements.node_id.disabled=value}
-async function send(id,data){const body=new URLSearchParams({csrf:f.elements.csrf.value,node_id:id,...data});const response=await fetch(ACTION,{method:'POST',headers:{'X-WPP-Async':'1'},body});if(response.redirected)throw Error('Сессия завершена. Обновите страницу.');let result;try{result=await response.json()}catch(_){throw Error('Неверный ответ сервера')};if(!response.ok||!result.ok)throw Error(result.message||'Ошибка REALITY');return result}
+function setRunning(value){
+ running=value;actions.forEach(x=>x.disabled=value);
+ f.querySelector('[data-reality-toggle]').disabled=value;
+ selector.querySelectorAll('button').forEach(x=>x.disabled=value);
+ if(f.elements.node_id?.tagName==='SELECT')f.elements.node_id.disabled=value;
+ d.querySelector('[data-reality-close]').disabled=false;
+ if(!value){phase='idle';activeAbort=null}
+}
+async function send(id,data,options={}){const body=new URLSearchParams({csrf:f.elements.csrf.value,node_id:id,...data});const response=await fetch(ACTION,{method:'POST',headers:{'X-WPP-Async':'1'},body,signal:options.signal});if(response.redirected)throw Error('Сессия завершена. Обновите страницу.');let result;try{result=await response.json()}catch(_){throw Error('Неверный ответ сервера')};if(!response.ok||!result.ok)throw Error(result.message||'Ошибка REALITY');return result}
 function currentNodes(){return fleet?[{id:'local',name:'Основная нода'},...allNodes]:[{id:f.elements.node_id.value,name:f.elements.node_id.selectedOptions?.[0]?.textContent||'Нода'}]}
 function isFullCheck(j){return Array.isArray(j.checks)&&j.checks.some(x=>x.status==='ok'&&x.name.includes('REALITY'))&&j.checks.some(x=>x.status==='ok'&&x.name.includes('HTTPS'))}
-async function load(){if(running)return;resetChecks();togglePicker(false);const id=fleet?'local':f.elements.node_id.value;try{setRunning(true);const j=await send(id,{read_only:'1'});const p=j.profile;f.elements.preset.value=(presets[p.preset]&&presets[p.preset][1]===p.sni)?p.preset:(Object.entries(presets).find(([k,v])=>v[1]===p.sni)?.[0]||'custom');f.elements.sni.value=p.sni;f.elements.fingerprint.value=p.fingerprint;f.elements.public_key.value=p.public_key;f.elements.short_id.value=p.short_id;document.getElementById('wpoRealityAddress').value=p.address||'';displayPreset();if(f.elements.preset.value==='custom')f.elements.sni.value=p.sni}catch(err){out.textContent=err.message}finally{setRunning(false)}}
+async function load(){
+ if(running)return;
+ resetChecks();togglePicker(false);verified=null;cancelRequested=false;closeAfterStop=false;restoreFailed=false;
+ const id=fleet?'local':f.elements.node_id.value;
+ setRunning(true);phase='reading';activeAbort=new AbortController();
+ try{
+  const j=await send(id,{read_only:'1'},{signal:activeAbort.signal});
+  ensureActive();
+  const p=j.profile;
+  f.elements.preset.value=(presets[p.preset]&&presets[p.preset][1]===p.sni)?p.preset:(Object.entries(presets).find(([k,v])=>v[1]===p.sni)?.[0]||'custom');
+  f.elements.sni.value=p.sni;f.elements.fingerprint.value=p.fingerprint;
+  f.elements.public_key.value=p.public_key;f.elements.short_id.value=p.short_id;
+  document.getElementById('wpoRealityAddress').value=p.address||'';
+  displayPreset();if(f.elements.preset.value==='custom')f.elements.sni.value=p.sni;
+ }catch(err){if(!cancelRequested)out.textContent=err.message}
+ finally{setRunning(false)}
+}
 if(!fleet)f.elements.node_id.addEventListener('change',load);
 const editForm=document.getElementById('wpoEditNodeForm');if(editForm){const b=document.createElement('button');b.type='button';b.textContent='Настройки REALITY';b.onclick=()=>{f.elements.node_id.value=editForm.elements.id.value;editForm.closest('dialog').close();d.showModal();load()};editForm.append(b)}
 document.querySelectorAll('[data-reality-open]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('dialog[open]').forEach(x=>x.close());if(!fleet)f.elements.node_id.value='local';d.showModal();load()}));
-d.querySelector('[data-reality-close]').addEventListener('click',()=>{if(!running)d.close()});
-async function execute(save){if(running)return;resetChecks();togglePicker(false);area.hidden=false;setRunning(true);
-const request={preset:f.elements.preset.value,sni:f.elements.sni.value.trim(),fingerprint:f.elements.fingerprint.value};
-const nodes=currentNodes(),rows=new Map(),original=new Map(),attempted=[];let unsupported=false;
-try{
- for(const n of nodes){const row=nodeRow(n.name);rows.set(n.id,row);update(row,'pending','Читаем текущие настройки');try{const old=await send(n.id,{read_only:'1'});original.set(n.id,old.profile);update(row,'pending','TLS 1.3 → HTTP/2 → REALITY Vision → HTTPS');
- const result=await send(n.id,{...request,check_only:'1'});if(!isFullCheck(result)){unsupported=true;update(row,'warning','Нода не подтвердила настоящий REALITY-туннель (HTTP 204)');continue}
- update(row,'ok','Проверка пройдена',['TLS 1.3','HTTP/2','REALITY','HTTP 204'+(result.latency_ms!=null?' · '+result.latency_ms+' мс':'')]);
- }catch(e){update(row,'error',e.message);unsupported=true}}
- if(unsupported){out.textContent=save?'Сохранение отменено: сначала исправьте ошибки проверки на нодах. Ничего не изменено.':'Проверка завершена: не все ноды подтвердили работу REALITY.';return}
- if(!save){out.textContent='REALITY подтверждён на '+nodes.length+' нод(ах). Настройки не изменены.';return}
- for(const n of nodes){const row=rows.get(n.id);update(row,'pending','Применение настроек и проверка служб');try{attempted.push(n);const res=await send(n.id,{...request,check_only:'0'});if(!isFullCheck(res))throw Error('Сервер не подтвердил REALITY-туннель при сохранении');const stored=await send(n.id,{read_only:'1'});if(stored.profile?.sni!==request.sni||stored.profile?.fingerprint!==request.fingerprint)throw Error('Нода не сохранила новый SNI или fingerprint');update(row,'ok','Сохранено и подтверждено',['SNI','REALITY','HTTP 204'])}
- catch(err){update(row,'error','Ошибка сохранения: '+err.message);throw err}}
- out.textContent='Сохранено на '+nodes.length+' нод(ах). Обновите подписки: SNI мог измениться.';
- }catch(err){for(const n of attempted.reverse()){const old=original.get(n.id),row=rows.get(n.id);if(!old)continue;try{update(row,'pending','Восстановление предыдущего SNI');const oldPreset=(presets[old.preset]&&presets[old.preset][1]===old.sni)?old.preset:'custom';await send(n.id,{preset:oldPreset,sni:old.sni,fingerprint:old.fingerprint,check_only:'0'});const saved=await send(n.id,{read_only:'1'});if(saved.profile?.sni!==old.sni)throw Error('Не удалось подтвердить прежний SNI');update(row,'warning','Восстановлено прежнее значение')}catch(e){update(row,'error','Не удалось откатить: '+e.message)}}
- out.textContent='Применение прервано. Предпринят откат всех затронутых нод; проверьте красные статусы и SNI.'}
- finally{setRunning(false)}
+d.querySelector('[data-reality-close]').addEventListener('click',requestStop);
+async function execute(save){
+ if(running)return;
+ cancelRequested=false;closeAfterStop=false;restoreFailed=false;
+ resetChecks();togglePicker(false);area.hidden=false;setRunning(true);
+ const request={preset:f.elements.preset.value,sni:f.elements.sni.value.trim(),fingerprint:f.elements.fingerprint.value};
+ const nodes=currentNodes(),key=requestKey(nodes,request),rows=new Map(),original=new Map(),attempted=[];
+ let operationFailed=false;
+ const reuse=save&&verified?.key===key&&Date.now()-verified.at<120000;
+ for(const n of nodes){
+  const row=nodeRow(n.name);rows.set(n.id,row);
+  if(reuse)update(row,'ok','Цель уже проверена',['REALITY','HTTP 204']);
+  else update(row,'pending','Ожидание проверки');
+ }
+ try{
+  if(!reuse){
+   phase='checking';activeAbort=new AbortController();
+   for(const n of nodes){
+    ensureActive();const row=rows.get(n.id);
+    try{
+     update(row,'pending','TLS 1.3 → HTTP/2 → REALITY Vision → HTTPS');
+     const result=await send(n.id,{...request,check_only:'1'},{signal:activeAbort.signal});
+     ensureActive();
+     if(!isFullCheck(result))throw Error('Нода не подтвердила настоящий REALITY-туннель (HTTP 204)');
+     update(row,'ok','Проверка пройдена',['TLS 1.3','HTTP/2','REALITY','HTTP 204'+(result.latency_ms!=null?' · '+result.latency_ms+' мс':'')]);
+    }catch(err){
+     if(cancelRequested)throw err;
+     operationFailed=true;update(row,'error',err.message||'Ошибка проверки REALITY');
+    }
+   }
+   activeAbort=null;
+   if(operationFailed){
+    verified=null;
+    out.textContent=save?'Сохранение отменено: не все ноды прошли проверку. Настройки не менялись.':'Не все ноды подтвердили REALITY. Настройки не менялись.';
+    return;
+   }
+   verified={key,at:Date.now()};
+  }
+  if(!save){
+   out.textContent='REALITY подтверждён на '+nodes.length+' нод(ах). Теперь можно нажать «Сохранить».';
+   return;
+  }
+  // Reuse the result of Check. Each mutating POST still tests the REALITY
+  // tunnel on its node, but does not restart the UI's full preflight loop.
+  phase='saving';activeAbort=null;
+  for(const n of nodes){
+   ensureActive();const row=rows.get(n.id);
+   update(row,'pending','Получаем прежние параметры');
+   const old=await send(n.id,{read_only:'1'});
+   original.set(n.id,old.profile);
+  }
+  for(const n of nodes){
+   ensureActive();const row=rows.get(n.id),before=original.get(n.id);
+   if(before.sni===request.sni&&before.fingerprint===request.fingerprint){
+    update(row,'ok','Уже сохранено',['SNI','REALITY']);
+    continue;
+   }
+   update(row,'pending','Сохраняем и проверяем ноду');
+   attempted.push(n);
+   try{
+    const saved=await send(n.id,{...request,check_only:'0'});
+    // Never abort a mutating POST: finish it, then roll back on cancellation.
+    if(!isFullCheck(saved))throw Error('Нода не подтвердила REALITY при сохранении');
+    const actual=await send(n.id,{read_only:'1'});
+    if(actual.profile?.sni!==request.sni||actual.profile?.fingerprint!==request.fingerprint)
+      throw Error('Нода не сохранила SNI или fingerprint');
+    update(row,'ok','Сохранено и подтверждено',['SNI','REALITY','HTTP 204']);
+    ensureActive();
+   }catch(err){update(row,'error','Ошибка сохранения: '+err.message);throw err}
+  }
+  verified=null;
+  out.textContent='Сохранено на всех '+nodes.length+' нод(ах). Обновите подписки после смены SNI.';
+ }catch(err){
+  verified=null;
+  if(attempted.length){
+   phase='rollback';activeAbort=null;out.textContent='Возвращаем прежние настройки затронутых нод…';
+   for(const n of attempted.reverse()){
+    const old=original.get(n.id),row=rows.get(n.id);
+    if(!old){restoreFailed=true;update(row,'error','Нет прежних параметров для отката');continue}
+    try{
+     update(row,'pending','Восстанавливаем прежний SNI');
+     const oldPreset=(presets[old.preset]&&presets[old.preset][1]===old.sni)?old.preset:'custom';
+     await send(n.id,{preset:oldPreset,sni:old.sni,fingerprint:old.fingerprint,check_only:'0'});
+     const actual=await send(n.id,{read_only:'1'});
+     if(actual.profile?.sni!==old.sni||actual.profile?.fingerprint!==old.fingerprint)
+       throw Error('Не удалось подтвердить восстановление');
+     update(row,'warning','Прежние настройки восстановлены');
+    }catch(failure){
+     restoreFailed=true;update(row,'error','Откат не удался: '+failure.message);
+    }
+   }
+   out.textContent=restoreFailed?
+     'Часть изменений не удалось откатить. Проверьте красные статусы перед закрытием.':
+     (cancelRequested?'Сохранение отменено. Прежние настройки восстановлены.':'Сохранение прервано. Прежние настройки восстановлены.');
+  }else if(!cancelRequested){
+   out.textContent='Сохранение не выполнено: '+(err.message||'Ошибка соединения')+'. Настройки не изменены.';
+  }
+ }finally{
+  setRunning(false);
+  if(closeAfterStop&&!restoreFailed)d.close();
+ }
 }
 f.addEventListener('submit',e=>{e.preventDefault();execute(true)});
 f.querySelector('[data-reality-check]').addEventListener('click',()=>execute(false));
