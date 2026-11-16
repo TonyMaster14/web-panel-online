@@ -100,7 +100,7 @@ def jobs():
 def hostname(node):
  parsed=urlsplit(str(node.get('url','')))
  host=parsed.hostname
- if (parsed.scheme!='https' or not host or parsed.username or parsed.password
+ if (parsed.scheme!='https' or not host or '.' not in host or parsed.username or parsed.password
      or not re.fullmatch(r'[a-z0-9][a-z0-9.-]{0,251}[a-z0-9]',host)):
   raise ValueError('Invalid WPO node hostname')
  return host
