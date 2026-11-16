@@ -57,7 +57,7 @@ function setup(cancelDuringSave,simulateSlowWrites=false){
  const entries=[{id:'local',name:'Основная нода'},{id:'node1',name:'Нидерланды'}];
  const store={local:{preset:'nvidia',sni:'www.nvidia.com',fingerprint:'firefox'},
               node1:{preset:'nvidia',sni:'www.nvidia.com',fingerprint:'firefox'}};
- const calls={preflight:0,save:0,read:0,rollback:0,events:[],inflight:0,maxInflight:0,checking:0,maxChecking:0};
+ const calls={preflight:0,save:0,read:0,rollback:0,events:[],timeline:[],inflight:0,maxInflight:0,checking:0,maxChecking:0};
  const ctx={
    running:false,cancelRequested:false,closeAfterStop:false,restoreFailed:false,
    activeAbort:null,phase:'idle',verified:null,
@@ -82,8 +82,9 @@ function setup(cancelDuringSave,simulateSlowWrites=false){
    }
  };
  ctx.send=async (id,data)=>{
-  if(data.read_only==='1'){calls.read++;return {ok:true,profile:{...store[id]}}}
+  if(data.read_only==='1'){calls.read++;calls.timeline.push('read:'+id);return {ok:true,profile:{...store[id]}}}
   if(data.check_only==='1'){
+    calls.timeline.push('check:'+id);
     calls.preflight++;
     if(simulateSlowWrites){
       calls.checking++;calls.maxChecking=Math.max(calls.maxChecking,calls.checking);
@@ -93,6 +94,7 @@ function setup(cancelDuringSave,simulateSlowWrites=false){
                              {name:'HTTPS через туннель',status:'ok'}],latency_ms:62};
   }
   if(data.check_only==='0'){
+    calls.timeline.push((data.sni==='www.nvidia.com'?'rollback:':'save:')+id);
     calls.save++;
     if(data.sni==='www.nvidia.com')calls.rollback++;
     if(simulateSlowWrites&&data.sni==='www.apple.com'){
@@ -137,13 +139,20 @@ function setup(cancelDuringSave,simulateSlowWrites=false){
  const c=setup(false,true);
  await c.execute(false);
  await c.execute(true);
- assert.equal(c.calls.maxInflight,2,'Independent remote writes must run concurrently');
- assert.equal(c.calls.maxChecking,2,'Independent REALITY target checks must run concurrently');
+ assert.equal(c.calls.maxInflight,1,'Save requests must be strictly sequential');
+ assert.equal(c.calls.maxChecking,1,'REALITY target checks must be strictly sequential');
+ assert.deepEqual(c.calls.timeline.filter(x=>x.startsWith('check:')),
+                  ['check:local','check:node1'],'Check follows displayed node order');
+ assert.deepEqual(c.calls.timeline.filter(x=>x.startsWith('save:')),
+                  ['save:local','save:node1'],'Save follows same displayed node order');
+ assert.deepEqual(c.calls.timeline.filter(x=>x.startsWith('read:')),
+                  ['read:local','read:node1','read:local','read:node1'],
+                  'Read each previous profile first, then confirm each saved profile');
  assert.equal(c.calls.preflight,2,'Save must not repeat completed verification');
  assert.equal(c.calls.save,2);
  assert.equal(c.store.local.sni,'www.apple.com');
  assert.equal(c.store.node1.sni,'www.apple.com');
- console.log('REALITY UI: Save, parallel requests and cancellation rollback passed');
+ console.log('REALITY UI: ordered check/save and cancellation rollback passed');
 })().catch(e=>{console.error(e);process.exit(1)});
 ''';
         # The mock uses the same network API surface but deliberately no DOM.
@@ -156,7 +165,7 @@ function setup(cancelDuringSave,simulateSlowWrites=false){
         js=js.replace("SOURCE_JS",json.dumps(body,ensure_ascii=False))
         result=subprocess.run(["node","-e",js],capture_output=True,text=True,timeout=15)
         self.assertEqual(result.returncode,0,result.stderr[:2500])
-        self.assertIn("parallel requests and cancellation rollback passed",result.stdout)
+        self.assertIn("ordered check/save and cancellation rollback passed",result.stdout)
 
 if __name__=="__main__":
     unittest.main()
