@@ -36,6 +36,24 @@ class RealityModalSaveTests(unittest.TestCase):
         self.assertIn('cp -a "$BACKUP/wpo_reality_ui.py" "$MODULE"',source)
         self.assertNotIn("systemctl restart wpo-node-xray",source)
 
+    def test_ordered_modal_updater_is_pinned_reversible_and_scoped(self):
+        script=ROOT/"scripts/wpo-reality-sequential-update.sh"
+        result=subprocess.run(["bash","-n",str(script)],capture_output=True,text=True,timeout=5)
+        self.assertEqual(result.returncode,0,result.stderr)
+        shell=script.read_text()
+        self.assertIn("REV=e6ba37ae3774c31f398ca9a58295ea47c57aebc3",shell)
+        self.assertIn("Walk the visible node list in order",shell)
+        self.assertIn("Apply and read back one node at a time",shell)
+        self.assertIn('cp -a "$BACKUP/wpo_reality_ui.py" "$MODULE"',shell)
+        self.assertIn('systemctl restart "$SERVICE"',shell)
+        self.assertNotIn("systemctl restart wpo-node-xray",shell)
+        self.assertNotIn("systemctl restart wpo-tls-router",shell)
+        source=(ROOT/"src/wpo_reality_ui.py").read_text()
+        self.assertNotIn("Promise.all(",source)
+        self.assertNotIn("Promise.allSettled(",source)
+        self.assertIn("for(const n of nodes){",source)
+        self.assertIn("for(const n of attempted.reverse())",source)
+
     def test_rounded_scrollbars_leave_space_and_stable_buttons(self):
         source=(ROOT/"src/wpo_reality_ui.py").read_text()
         self.assertIn("margin-right:7px;scrollbar-width:thin",source)
