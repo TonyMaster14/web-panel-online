@@ -9,7 +9,7 @@ APP=/opt/wpp-node-agent
 VPN=/etc/wpp-node-vpn
 REALITY=/etc/web-proxy-panel/reality
 XRAY=/opt/web-panel-proxy/xray/xray
-REV=1d165774d088978a60fb2366e298a93a3e73af48
+REV=a3d7a3084cbe09b2fb7d5fe23321393930659b3a
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/src"
 for f in "$APP/wpo_node_vpn.py" "$APP/wpo_reality.py" "$VPN/xray.json" "$VPN/profiles.json" "$VPN/settings.json" "$REALITY/profile.json" "$REALITY/private.key" "$REALITY/haproxy.cfg"; do
     [[ -s "$f" && ! -L "$f" ]] || { echo "Нет существующей REALITY ноды: $f" >&2; exit 2; }
@@ -44,6 +44,9 @@ done
 grep -Fq "def reality_routes(" "$WORK/wpo_reality.py" &&
 grep -Fq "inbounds.extend(wpo_reality.inbounds(reality_clients))" "$WORK/wpo_node_vpn.py" ||
     { echo "Получена неподходящая версия Node Agent." >&2; exit 3; }
+curl -4fsSL --retry 3 --connect-timeout 12 --max-time 75 --proto '=https' \
+    "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/scripts/wpo-reality-compat-smoke.py" -o "$WORK/compat-smoke.py"
+python3 -m py_compile "$WORK/compat-smoke.py"
 PYTHONPATH="$WORK:$APP" python3 - "$WORK" <<'PY'
 import json,sys
 from pathlib import Path
@@ -89,6 +92,9 @@ systemctl restart wpo-node-vpn.service
 for unit in wpo-node-xray.service wpo-node-vpn.service wpo-tls-router.service; do
     systemctl is-active --quiet "$unit" || { echo "Служба $unit неактивна после обновления." >&2; exit 4; }
 done
+# Confirm real HTTPS 204 through the LIVE HAProxy/Xray with existing UUID.
+# On failure the trap restores all original modules and running configs.
+python3 -u "$WORK/compat-smoke.py"
 # Verify every configured SNI actually routes to a *different matching*
 # Xray backend. This is config/readiness validation, not a client-side ping.
 PYTHONPATH="$APP" python3 - <<'PY'
