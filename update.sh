@@ -577,9 +577,10 @@ if [[ ! -s /etc/web-proxy-panel/caddy-owned ]]; then
     printf '%s\n' 'WEB_PANEL_PROXY_V2_CADDY_SHARED' > /etc/web-proxy-panel/caddy-owned
 fi
 if [[ "$RELEASE_KIND" == branch ]]; then
-    # dpkg-compatible test version sorts below a later stable release.
+    # Keep the test build newer than the same stable version, so an automatic
+    # stable-tag check cannot downgrade Reality by mistake.
     INSTALLED_REF_SHA="$(git -C "$TEMP_DIR/source" rev-parse --short=10 HEAD)"
-    printf '3.0.0~test.%s\n' "$INSTALLED_REF_SHA" > /etc/web-proxy-panel/version
+    printf '3.0.0+test.%s\n' "$INSTALLED_REF_SHA" > /etc/web-proxy-panel/version
     printf '%s@%s\n' "$RELEASE_REF" "$INSTALLED_REF_SHA" > /etc/web-proxy-panel/source-ref
     chmod 0600 /etc/web-proxy-panel/source-ref
 else
