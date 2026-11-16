@@ -191,7 +191,7 @@ class ConnectionJSON(unittest.TestCase):
         self.assertEqual(inactive[0]['settings']['clients'],[])
 
     def test_hysteria_port_and_tls_readback_are_consistent(self):
-        row=copy.deepcopy(self.registry['connections'][1])
+        row=copy.deepcopy(next(c for c in self.registry['connections'] if c['protocol']=='hysteria'))
         row['advanced']={'inbound':{'tag':'my-hysteria','port':18443,'protocol':'hysteria','listen':'0.0.0.0',
             'settings':{'version':2},'streamSettings':{'network':'hysteria','security':'tls'}}}
         connections.validate(row,existing=row)

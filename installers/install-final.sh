@@ -190,6 +190,7 @@ if ! WPO_NODES_LOCAL_SOURCE=1 WPO_NODES_BATCH_RESTART=1 bash "$BASE/node-install
     die "Nodes Lab v26 завершился ошибкой; журнал: $NODE_LOG"
 fi
 echo "Nodes Lab v26: 26 встроенных этапов, один финальный запуск панели."
+bash "$BASE/install-reality.sh"
 wpp_progress 99 "Проверка подключения Xray"
 [[ -s /etc/web-panel-proxy-xray/config.json ]] || die 'Xray config отсутствует.'
 [[ -s /etc/systemd/system/web-panel-proxy-xray.service ]] || die 'Xray service не установлен.'

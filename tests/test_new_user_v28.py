@@ -53,7 +53,7 @@ class NewUserFormTests(unittest.TestCase):
             self.assertIn(name,self.html)
         self.assertNotIn('name="connection_web"',self.html)
         self.assertNotIn('name="connection_awg20"',self.html)
-    def test_eight_protocols_are_selectable_if_real_local_templates_exist(self):
+    def test_nine_protocols_are_selectable_if_real_local_templates_exist(self):
         import wpp_connections
         all_template_connections=wpp_connections.defaults()
         html=wpo_user_v28.form("/panel-demo","token",all_template_connections,
@@ -62,7 +62,7 @@ class NewUserFormTests(unittest.TestCase):
             cid=spec["id"]
             self.assertIn(f'name="connection_{cid}"',html)
             self.assertIn(f'data-protocol="{spec["protocol"]}"',html)
-        self.assertEqual(html.count('class="wpo-v28-protocol"'),8)
+        self.assertEqual(html.count('class="wpo-v28-protocol"'),9)
         self.assertIn("Отдельные протоколы создаются по одному",html)
         self.assertIn("kind.value=native[0].dataset.protocol",html)
         self.assertIn("connection.value=native[0].dataset.connectionId",html)

@@ -41,7 +41,7 @@ def verified_links(api, node, external_id, name, protocols, timeout=90):
             raise api.NodeError("Нода вернула некорректный профиль")
         protocol = entry.get("protocol")
         uri = entry.get("link")
-        expected_scheme = {"vless": "vless", "hysteria": "hysteria2"}.get(protocol)
+        expected_scheme = {"vless": "vless", "reality": "vless", "hysteria": "hysteria2"}.get(protocol)
         if (protocol not in protocols or protocol in matches
                 or not isinstance(uri, str) or len(uri) > 8192
                 or not expected_scheme):

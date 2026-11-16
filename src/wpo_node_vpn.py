@@ -30,7 +30,12 @@ KEY = ROOT / "tls" / "private.key"
 LOCK = ROOT / ".federation.lock"
 XRAY_BIN = "/opt/web-panel-proxy/xray/xray"
 UNIT = "wpo-node-xray.service"
-SUPPORTED = frozenset(("vless", "hysteria"))
+try:
+    import wpo_reality
+    REALITY_READY = wpo_reality.PUBLIC.is_file() and wpo_reality.PRIVATE.is_file()
+except ImportError:
+    REALITY_READY = False
+SUPPORTED = frozenset(("vless", "hysteria", "reality") if REALITY_READY else ("vless", "hysteria"))
 IDENTIFIER = re.compile(r"^[a-f0-9]{64}$")
 VALID_NAME = re.compile(r"^[^\x00-\x1f\x7f]{1,80}$")
 
@@ -79,7 +84,7 @@ def valid_params(data):
         raise ValueError("Invalid federation ID")
     if not isinstance(name, str) or not VALID_NAME.fullmatch(name.strip()):
         raise ValueError("Invalid profile name")
-    if not isinstance(protocols, list) or not protocols or len(protocols) > 2:
+    if not isinstance(protocols, list) or not protocols or len(protocols) > len(SUPPORTED):
         raise ValueError("Select supported VPN protocols")
     if any(not isinstance(p, str) or p not in SUPPORTED for p in protocols):
         raise ValueError("VPN protocols supported here: VLESS XHTTP and Hysteria2")
@@ -89,7 +94,7 @@ def valid_params(data):
 def render_xray(state, settings):
     domain = settings["domain"]
     path = settings["xhttp_path"]
-    vless, hysteria = [], []
+    vless, hysteria, reality_clients = [], [], []
     for external_id, item in state.items():
         if not IDENTIFIER.fullmatch(external_id):
             raise ValueError("Invalid stored federation ID")
@@ -106,9 +111,13 @@ def render_xray(state, settings):
                 raise ValueError("Noncanonical VPN key")
             if protocol == "vless":
                 vless.append({"id": secret, "email": "node:" + external_id, "level": 0})
+            elif protocol == "reality":
+                reality_clients.append({"id":secret,"email":"node:"+external_id,"level":0,"flow":"xtls-rprx-vision"})
             else:
                 hysteria.append({"auth": secret, "email": "node:" + external_id, "level": 0})
     inbounds = []
+    if REALITY_READY:
+        inbounds.append(wpo_reality.inbound(reality_clients))
     if vless:
         inbounds.append({
             "tag": "wpo-vless-xhttp", "listen": "127.0.0.1", "port": 19000,
@@ -134,11 +143,17 @@ def render_xray(state, settings):
             "sniffing": {"enabled": True, "destOverride": ["http", "tls", "quic"],
                          "routeOnly": True}
         })
-    return {"log": {"loglevel": "warning"}, "inbounds": inbounds,
+    return {"api":{"tag":"api","listen":"127.0.0.1:19090","services":["HandlerService"]},
+            "log": {"loglevel": "warning"}, "inbounds": inbounds,
             "outbounds": [{"tag": "direct", "protocol": "freedom"}]}
 
 
 def link(protocol, secret, name, settings):
+    if protocol == "reality":
+        profile=wpo_reality.read_profile()
+        # Use the enrolled node hostname for authenticated federation validation.
+        profile['address']=settings['domain']
+        return wpo_reality.link(secret,name,profile)
     domain = settings["domain"]
     title = quote(name + (" · XHTTP" if protocol == "vless" else " · Hysteria2"), safe="")
     if protocol == "vless":
@@ -164,6 +179,14 @@ def apply(state):
     settings = read_json(SETTINGS)
     config = render_xray(state, settings)
     previous = XRAY.read_bytes() if XRAY.is_file() else None
+    if previous is not None:
+        try:
+            if json.loads(previous)==config and live(): return
+        except (ValueError, UnicodeError): pass
+    try:
+        import wpo_xray_live
+        if wpo_xray_live.try_apply(config,XRAY,XRAY_BIN,UNIT,'127.0.0.1:19090'):return
+    except ImportError:pass
     atomic_json(XRAY, config)
     # The Xray daemon runs as a locked-down xray user, not root.
     import grp
@@ -274,6 +297,13 @@ class API(BaseHTTPRequestHandler):
             all_ready = bool(online and installed and installed.full_ready())
             self.respond({"ok": online, "all_protocols_ready": all_ready,
                           "capabilities": (["federation"] + protocols) if online else []})
+        elif self.path == "/wpp-api/v1/federation/reality":
+            if not self.authorized():
+                self.respond({"ok": False}, 401)
+            elif not REALITY_READY:
+                self.respond({"ok": False, "message": "Обновите установку ноды для REALITY"}, 409)
+            else:
+                self.respond({"ok": True, "profile": wpo_reality.read_profile()})
         elif self.path == "/wpp-api/v1/federation/status":
             if not self.authorized():
                 self.respond({"ok": False}, 401)
@@ -284,6 +314,7 @@ class API(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path not in ("/wpp-api/v1/federation/sync",
+                             "/wpp-api/v1/federation/reality",
                              "/wpp-api/v1/federation/delete",
                              "/wpp-api/v1/federation/purge"):
             self.respond({"ok": False}, 404)
@@ -301,6 +332,14 @@ class API(BaseHTTPRequestHandler):
                 self.respond({"ok": False, "message": "VPN service is not ready"}, 503)
                 return
             operation = self.path.rsplit("/", 1)[-1]
+            if operation == "reality":
+                if not REALITY_READY:
+                    self.respond({"ok": False, "message": "Обновите установку ноды для REALITY"}, 409)
+                    return
+                with open(LOCK, "a+", encoding="ascii") as lock:
+                    fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+                    self.respond(wpo_reality.configure(data, lambda: apply(read_json(STATE, {"profiles": {}})["profiles"])))
+                return
             try:
                 import wpo_node_eight
             except ImportError:

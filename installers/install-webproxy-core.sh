@@ -356,7 +356,7 @@ apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 update
 apt-get -o Acquire::ForceIPv4=true -o DPkg::Lock::Timeout=600 install -y --no-install-recommends \
     ca-certificates curl git openssl dnsutils nftables \
     build-essential libssl-dev util-linux zlib1g-dev \
-    python3 iproute2 unzip xz-utils tar qrencode
+    python3 iproute2 unzip xz-utils tar qrencode haproxy
 echo "      APT: $((SECONDS-WPO_APT_CLOCK)) сек."
 echo "      OK"
 
@@ -373,7 +373,11 @@ chmod 0600 /etc/web-proxy-panel/mtproto-host
 echo
 echo "[3/10] Checking ports..."
 wpo_emit_stage 20 "Проверка сетевых портов"
-check_install_port 443 caddy
+if systemctl is-active --quiet wpo-tls-router.service; then
+    check_install_port 443 haproxy
+else
+    check_install_port 443 caddy
+fi
 if EXISTING_MTPROXY_PORT="$(find_mtproxy_port 2>/dev/null)"; then
     MT_PORT="$EXISTING_MTPROXY_PORT"
     echo "      Existing MTProxy detected on :${MT_PORT}; continuing."
@@ -908,6 +912,14 @@ tls_block = [
 lines[site_start + 1:site_start + 1] = tls_block
 Path(path).write_text("".join(lines), encoding="utf-8")
 PY
+if systemctl is-active --quiet wpo-tls-router && [[ -s /opt/tproxy-panel/wpo_reality.py ]]; then
+    PYTHONPATH=/opt/tproxy-panel python3 - <<'PY_REALITY_FRONT'
+from pathlib import Path
+import wpo_reality
+p=Path('/etc/caddy/Caddyfile')
+p.write_text(wpo_reality.caddy_internal(p.read_text()))
+PY_REALITY_FRONT
+fi
 test -s /etc/caddy/Caddyfile || die "Caddyfile was not configured."
 grep -Eq '^[[:space:]]*auto_https[[:space:]]+disable_redirects' /etc/caddy/Caddyfile ||
     die "Caddy HTTP redirects were not disabled."

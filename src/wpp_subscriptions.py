@@ -61,7 +61,7 @@ def limits(value):
 
 
 def protocols(value):
-    supported = ('vless', 'hysteria')
+    supported = ('vless', 'reality', 'hysteria')
     if not isinstance(value, list) or not value or any(p not in supported for p in value):
         raise SubscriptionError('Выберите хотя бы один поддерживаемый протокол.')
     return list(dict.fromkeys(value))
@@ -70,8 +70,8 @@ def protocols(value):
 def connection_specs(value, fallback_protocols=None):
     """Validate the inbound list stored on a client subscription."""
     if value is None:
-        value=[{'id':('vless-direct' if p=='vless' else 'hysteria-primary'),
-                'name':('VLESS XHTTP · напрямую' if p=='vless' else 'Hysteria2 · основной'),
+        value=[{'id':({'vless':'vless-direct','reality':'reality-primary','hysteria':'hysteria-primary'}[p]),
+                'name':({'vless':'VLESS XHTTP','reality':'VLESS REALITY','hysteria':'Hysteria2'}[p]),
                 'protocol':p} for p in protocols(fallback_protocols or ['vless','hysteria'])]
     if not isinstance(value,list) or not value or len(value)>16:
         raise SubscriptionError('Выберите от 1 до 16 подключений клиента.')
@@ -80,7 +80,7 @@ def connection_specs(value, fallback_protocols=None):
         if not isinstance(raw,dict): raise SubscriptionError('Некорректное подключение клиента.')
         cid=str(raw.get('id',''))
         protocol=str(raw.get('protocol',''))
-        if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{2,63}',cid) or protocol not in ('vless','hysteria'):
+        if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{2,63}',cid) or protocol not in ('vless','reality','hysteria'):
             raise SubscriptionError('Подписки поддерживают подключения VLESS и Hysteria2.')
         if cid in seen: continue
         seen.add(cid)
@@ -117,7 +117,7 @@ def provision(data, sub, device):
             raise SubscriptionError('Достигнут общий лимит профилей подписок.', 503, 'capacity')
         uid = secrets.token_hex(8)
         sub.setdefault('profile_ids', []).append(uid)
-        ports = {'vless': 443, 'hysteria': 8443}
+        ports = {'vless': 443, 'reality': 443, 'hysteria': 8443}
         profile = {
             'id': uid, 'name': sub['name'] + ' / ' + device['name'],
             'protocol': protocol, 'enabled': sub['enabled'], 'secret': str(uuid.uuid4()),
@@ -129,6 +129,23 @@ def provision(data, sub, device):
         if protocol=='vless' and isinstance(connection.get('cdn'),dict):
             profile['cdn']=copy.deepcopy(connection['cdn'])
         data['users'].append(profile)
+
+
+def prepare_slots(data, sub):
+    """Allocate real keys before import; unclaimed slots do not count as devices."""
+    if not sub.get('enabled', True): return
+    claimed = [d for d in sub['devices'] if not d.get('revoked') and not d.get('preallocated')]
+    pending = [d for d in sub['devices'] if d.get('preallocated') and not d.get('revoked')]
+    desired = max(0, (sub['max_devices'] or 1) - len(claimed))
+    for device in pending[desired:]:
+        drop_profiles(data, sub['id'], device['id'])
+        sub['devices'].remove(device)
+    for _ in range(max(0, desired - len(pending))):
+        did = secrets.token_hex(8)
+        device = {'id':did, 'hwid_hash':'pending:' + did, 'name':'Свободное устройство',
+                  'created_at':int(time.time()), 'last_seen':0, 'revoked':False, 'preallocated':True}
+        sub['devices'].append(device)
+        provision(data, sub, device)
 
 
 def mutate(data, request):
@@ -158,7 +175,7 @@ def mutate(data, request):
             return data, {'ok': True}
         if operation == 'update':
             limit = limits(request.get('max_devices', sub['max_devices']))
-            active = [d for d in sub['devices'] if not d.get('revoked')]
+            active = [d for d in sub['devices'] if not d.get('revoked') and not d.get('preallocated')]
             if bool(limit) != bool(sub['max_devices']):
                 # Switching to/from a shared subscription must revoke the old keys.
                 drop_profiles(data, sub['id'])
@@ -216,6 +233,7 @@ def mutate(data, request):
                 sub['devices'].remove(device)
         else:
             raise SubscriptionError('Неизвестная операция.')
+    prepare_slots(data, sub)
     return data, {'ok': True, 'id': sub['id']}
 
 
@@ -240,20 +258,25 @@ def issue(data, request):
     if device is not None and device.get('revoked'):
         raise SubscriptionError('Доступ этого устройства отозван.', 403, 'revoked')
     if device is None:
-        active = sum(not d.get('revoked') for d in sub['devices'])
+        active = sum(not d.get('revoked') and not d.get('preallocated') for d in sub['devices'])
         if sub['max_devices'] and active >= sub['max_devices']:
             raise SubscriptionError('Лимит устройств исчерпан. Обратитесь к администратору.', 403, 'device_limit')
         if len(sub['devices']) >= 100:
             raise SubscriptionError('Нужна ротация подписки: слишком много отозванных устройств.', 403, 'device_limit')
-        did = secrets.token_hex(8)
+        device = next((d for d in sub['devices'] if d.get('preallocated') and not d.get('revoked')), None)
         suggested=str(request.get('device_name','')).strip()
         if not suggested or len(suggested)>40 or any(ord(c)<32 for c in suggested):
-            suggested='Устройство ' + did[:6]
-        device = {'id': did, 'hwid_hash': digest,
-                  'name': 'Общий профиль' if digest == 'shared' else suggested,
-                  'created_at': int(time.time()), 'last_seen': 0, 'revoked': False}
-        sub['devices'].append(device)
+            suggested='Устройство'
+        if device is None:
+            did=secrets.token_hex(8)
+            device={'id':did,'created_at':int(time.time()),'last_seen':0,'revoked':False}
+            sub['devices'].append(device)
+        device.update({'hwid_hash':digest,'name':'Общий профиль' if digest=='shared' else suggested})
+        device.pop('preallocated',None)
         provision(data, sub, device)
+        for user in data['users']:
+            if user.get('subscription_id')==sub['id'] and user.get('device_id')==device['id']:
+                user['name']=sub['name']+' / '+device['name']
     device['last_seen'] = int(time.time())
     users = [u for u in data['users'] if u.get('subscription_id') == sub['id']
              and u.get('device_id') == device['id'] and u.get('enabled', True)]

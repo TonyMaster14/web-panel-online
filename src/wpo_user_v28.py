@@ -11,15 +11,16 @@ import json
 # node VPN capability is not implied just because a protocol is displayed.
 CATALOG = (
     ("vless", "VLESS XHTTP", "Happ · HTTPS 443", "happ"),
-    ("hysteria", "Hysteria2", "Happ · QUIC/UDP 8443", "happ"),
+    ("reality", "VLESS REALITY", "Happ · TCP 443 · Vision", "happ"),
     ("web", "WEB Proxy", "Telegram", "telegram"),
     ("mtproto", "MTProto", "Telegram", "telegram"),
     ("awg20", "AmneziaWG 2.0", "Amnezia · конфигурация", "amnezia"),
     ("awg31", "AmneziaWG 3.1", "Amnezia · конфигурация", "amnezia"),
     ("naive", "NaiveProxy", "Naive · отдельный профиль", "other"),
     ("mieru", "Mieru", "Mieru · отдельный профиль", "other"),
+    ("hysteria", "Hysteria2", "Happ · QUIC/UDP 8443", "happ"),
 )
-VPN_SUPPORTED = ("vless", "hysteria")
+VPN_SUPPORTED = ("vless", "reality", "hysteria")
 
 
 def flag(code):
@@ -47,7 +48,7 @@ def form(path, csrf, connections, nodes=None, local=None):
             native = protocol not in VPN_SUPPORTED
             subtitle = "Telegram" if protocol in ("web", "mtproto") else description + (" · одна выбранная нода" if native else " · выбранные ноды")
             choices.append(
-                f'<label class="wpo-v28-option"><input class="wpo-v28-protocol" type="checkbox" '
+                f'<label class="wpo-v28-option{" wpo-reality-hysteria" if protocol == "hysteria" else ""}"><input class="wpo-v28-protocol" type="checkbox" '
                 f'name="connection_{h(cid)}" value="1" data-connection-id="{h(cid)}" '
                 f'data-protocol="{h(protocol)}" data-label="{h(title)}" '
                 f'><span class="wpo-v28-radio" aria-hidden="true"><i></i></span>'
@@ -77,7 +78,7 @@ def form(path, csrf, connections, nodes=None, local=None):
             continue
         caps = set(str(s) for s in node.get("capabilities", []) if isinstance(s, str))
         ready = (node.get("enabled", True) and node.get("status", "offline") == "online" and
-                 all(p in caps for p in VPN_SUPPORTED) and "federation" in caps)
+                 all(p in caps for p in ("vless", "hysteria")) and "federation" in caps)
         name = str(node.get("name") or node.get("country_name") or "Нода")
         node_cards.append(
             f'<label class="wpo-v28-node{" unavailable" if not ready else ""}">'
@@ -95,7 +96,7 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<section class="create-step" id="quickFields" hidden></section>'
     )
     return (
-        '<dialog id="createAccount" class="create-dialog wpo-v28-dialog">'
+        '<style>@media(min-width:561px){.wpo-v28-option.wpo-reality-hysteria{grid-column:2}}</style><dialog id="createAccount" class="create-dialog wpo-v28-dialog">'
         '<div class="dialog-head"><div><h2>Новый пользователь</h2>'
         '<small>Конфигурация · выбранные ноды и протоколы</small></div>'
         '<button type="button" data-close-dialog aria-label="Закрыть">×</button></div>'
@@ -525,7 +526,7 @@ setInterval(()=>{
 },1000);
 function choice(){
   const selectedProtocols=[...f.querySelectorAll('.wpo-v28-protocol:checked')];
-  const native=selectedProtocols.filter(el=>!['vless','hysteria'].includes(el.dataset.protocol));
+  const native=selectedProtocols.filter(el=>!['vless','reality','hysteria'].includes(el.dataset.protocol));
   const checkedNodes=[...f.querySelectorAll('.wpo-v28-node input:checked')];
   return {selected:selectedProtocols,native,checkedNodes};
 }
@@ -668,3 +669,5 @@ def replace_legacy_create_js(source):
     if end <= start:
         raise ValueError("Old wizard boundaries are reversed")
     return source[:start] + LEGACY_CREATE_JS + "\n" + source[end:]
+
+CSS_REALITY = """@media(min-width:561px){.wpo-v28-option.wpo-reality-hysteria{grid-column:2}}"""

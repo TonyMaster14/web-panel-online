@@ -418,6 +418,15 @@ def _vless_outbound(link):
         raise RoutingError("Маршрутизация поддерживается только для VLESS.")
     query = parse_qs(parsed.query)
     one = lambda key, default="": query.get(key, [default])[0]
+    if one("security") == "reality":
+        if one("type", "tcp") not in ("tcp", "raw") or one("flow") != "xtls-rprx-vision":
+            raise RoutingError("Некорректный транспорт REALITY Vision")
+        return {"tag":"proxy", "protocol":"vless", "settings":{"vnext":[{
+            "address":parsed.hostname,"port":parsed.port or 443,
+            "users":[{"id":unquote(parsed.username),"encryption":"none","flow":"xtls-rprx-vision"}]}]},
+            "streamSettings":{"network":"tcp","security":"reality","realitySettings":{
+                "serverName":one("sni"),"fingerprint":one("fp","firefox"),
+                "publicKey":one("pbk"),"shortId":one("sid")}}}
     extra = {}
     if one("extra"):
         try:
@@ -602,7 +611,7 @@ def routed_configs(users, link_builder, profiles, name_prefix="WPP"):
     result = []
     for user in users:
         profile = profiles.get(str(user.get("connection_id", "")))
-        if user.get("protocol") not in ("vless", "hysteria") or not profile or not profile.get("enabled", True):
+        if user.get("protocol") not in ("vless", "reality", "hysteria") or not profile or not profile.get("enabled", True):
             continue
         link = link_builder(user)
         result.append(xray_config(link, profile, name_prefix + " · " + str(user.get("connection_name") or user.get("name") or "VLESS")))

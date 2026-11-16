@@ -505,6 +505,14 @@ if [[ "$MIGRATING_LEGACY" == 1 ]]; then
 else
     WEB_PANEL_PROXY_UPDATE=1 bash "$TEMP_DIR/source/install-panel.sh"
 fi
+# Keep the installed Nodes Lab and REALITY/Happ migrations in normal updates.
+# Previously install-panel.sh replaced their generated handlers with the base UI.
+if [[ -s "$TEMP_DIR/source/node-install.sh" ]]; then
+    WPO_NODES_LOCAL_SOURCE=1 WPO_NODES_BATCH_RESTART=1 bash "$TEMP_DIR/source/node-install.sh"
+fi
+if [[ -s "$TEMP_DIR/source/install-reality.sh" ]]; then
+    bash "$TEMP_DIR/source/install-reality.sh"
+fi
 install -o root -g root -m 0755 \
     "$TEMP_DIR/source/uninstall-web-proxy.sh" \
     /usr/local/sbin/web-panel-proxy-uninstall

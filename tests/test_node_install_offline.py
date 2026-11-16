@@ -51,4 +51,10 @@ with tempfile.TemporaryDirectory(prefix='wpo-node-offline-') as folder:
         compile((app/name).read_text(),name,'exec')
     assert '# wpo-node-country-v13' in (app/'panel.py').read_text()
     assert '__WPO_CONTROLLER_ENROLL_URL__' in (app/'wpp-node-agent-install.sh').read_text()
+    import wpo_reality_apply
+    wpo_reality_apply.apply(app,manager,root/'src')
+    wpo_reality_apply.apply(app,manager,root/'src')
+    for path in (app/'panel.py',app/'wpp_ui.py',manager):compile(path.read_text(),str(path),'exec')
+    assert 'wpo_reality.install_happ(globals())' in (app/'panel.py').read_text()
+    assert 'len(chosen)>1' in (app/'panel.py').read_text()
 print('PASS: complete bundled node installation and repeat run, without legacy files or external downloads')

@@ -86,7 +86,7 @@ def tasks():
             continue
         connections=sub.get("connections",[])
         protocols=tuple(dict.fromkeys(c.get("protocol") for c in connections
-            if isinstance(c,dict) and c.get("protocol") in ("vless","hysteria")))
+            if isinstance(c,dict) and c.get("protocol") in ("vless","reality","hysteria")))
         if not protocols:
             continue
         devices=sub.get("devices",[])

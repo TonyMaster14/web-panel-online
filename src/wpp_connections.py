@@ -16,7 +16,7 @@ import time
 import wpp_cdn
 
 SCHEMA = 1
-PROTOCOLS = {"vless", "hysteria", "mtproto", "web", "awg20", "awg31", "naive", "mieru"}
+PROTOCOLS = {"reality", "vless", "hysteria", "mtproto", "web", "awg20", "awg31", "naive", "mieru"}
 AWG_PROTOCOLS = {"awg20", "awg31"}
 EXTERNAL_PROTOCOLS = {"naive", "mieru"}
 AWG_PORT_FIRST = 52000
@@ -43,6 +43,7 @@ def _base(cid, name, protocol, **config):
 def defaults():
     return [
         _base("vless-direct", "VLESS XHTTP · напрямую", "vless", route="direct", fingerprint="chrome", mode="auto", uplink_method="POST"),
+        _base("reality-primary", "VLESS REALITY · TCP Vision", "reality", port=443),
         _base("hysteria-primary", "Hysteria2 · основной", "hysteria", port=8443),
         _base("mtproto-primary", "MTProto · отдельный порт", "mtproto", port=0),
         _base("web-primary", "Web Proxy · HTTPS", "web", port=0),
@@ -87,7 +88,7 @@ def save(path, data):
         value=str(value)
         if re.fullmatch(r"[a-z0-9][a-z0-9_-]{2,63}",value) and value not in deleted:
             deleted.append(value)
-    clean = {"schema": SCHEMA, "connections": [validate(item, existing=item) for item in data.get("connections", [])],
+    clean = {"reality_ordered": bool(data.get("reality_ordered")), "schema": SCHEMA, "connections": [validate(item, existing=item) for item in data.get("connections", [])],
              "deleted": deleted}
     _atomic(path, clean)
     return clean
@@ -347,6 +348,10 @@ def validate(raw, existing=None):
             "padding": str(config.get("padding", "100-1000"))[:40],
             "xmux": bool(config.get("xmux", provider in ("beget", "selectel", "timeweb"))),
             "no_sse_header": bool(config.get("no_sse_header", False))}
+    elif protocol == "reality":
+        result["config"] = {"port":443}
+        if raw.get("advanced"):
+            raise ConnectionError("Настройки REALITY изменяются в настройках ноды.")
     else:
         result["config"] = {"port": _integer(config.get("port"), "Порт", 0, 65535)}
         if protocol in EXTERNAL_PROTOCOLS and result["config"]["port"] and result["config"]["port"] < 1025:
@@ -382,7 +387,7 @@ def _from_user(user):
             mode=cdn.get("mode", "packet-up"), uplink_method=cdn.get("uplink_method", "GET"),
             padding=cdn.get("padding", "100-1000"), xmux=cdn.get("xmux", provider in ("beget", "selectel", "timeweb")),
             no_sse_header=cdn.get("no_sse_header", False))
-    mapping = {"vless": "vless-direct", "hysteria": "hysteria-primary", "mtproto": "mtproto-primary", "web": "web-primary",
+    mapping = {"reality": "reality-primary", "vless": "vless-direct", "hysteria": "hysteria-primary", "mtproto": "mtproto-primary", "web": "web-primary",
                "awg20": "awg20-primary", "awg31": "awg31-primary",
                "naive": "naive-primary", "mieru": "mieru-primary"}
     return next((item for item in defaults() if item["id"] == mapping.get(protocol)), None)
@@ -413,7 +418,14 @@ def ensure(path, users=None, persist=True):
         if connection["id"] in deleted: continue
         if connection["id"] not in current: current[connection["id"]] = connection; changed = True
         if user.get("connection_id") != connection["id"]: user["connection_id"] = connection["id"]
-    data = {"schema": SCHEMA, "connections": list(current.values()), "deleted": sorted(deleted)}
+    ordered = list(current.values())
+    # One-time migration only: subsequent operator drag ordering is preserved.
+    if not data.get('reality_ordered'):
+        reality = [x for x in ordered if x['id']=='reality-primary']
+        ordered = [x for x in ordered if x['id']!='reality-primary']
+        ordered[1:1] = reality
+        changed = True
+    data = {"reality_ordered": True, "schema": SCHEMA, "connections": ordered, "deleted": sorted(deleted)}
     if persist and changed: data = save(path, data)
     return data
 

@@ -14,9 +14,9 @@ class ProtocolPlanningTests(unittest.TestCase):
         self.se = node(*plan.CATALOG)
         self.registry = {"nl": self.nl, "se": self.se}
 
-    def test_exactly_eight_protocol_backends(self):
+    def test_exactly_nine_protocol_backends(self):
         self.assertEqual([p.key for p in plan.PROTOCOLS],
-            ["vless", "hysteria", "web", "mtproto",
+            ["vless", "reality", "hysteria", "web", "mtproto",
              "awg20", "awg31", "naive", "mieru"])
 
     def test_two_nodes_two_happ_protocols_make_four_connections_one_feed(self):
@@ -41,10 +41,10 @@ class ProtocolPlanningTests(unittest.TestCase):
                          [("se", "awg20"), ("se", "awg31")])
         self.assertEqual(p["connection_count"], 2)
 
-    def test_all_eight_are_routed_to_matching_client_formats(self):
+    def test_all_nine_are_routed_to_matching_client_formats(self):
         p = plan.plan_subscription(["nl"], list(plan.CATALOG), self.registry)
-        self.assertEqual(p["connection_count"], 8)
-        self.assertEqual(len(p["happ_subscription"]["connections"]), 2)
+        self.assertEqual(p["connection_count"], 9)
+        self.assertEqual(len(p["happ_subscription"]["connections"]), 3)
         self.assertEqual([x["protocol"] for x in p["telegram_links"]],
                          ["web", "mtproto"])
         self.assertEqual([x["protocol"] for x in p["amnezia_profiles"]],
@@ -78,7 +78,7 @@ class ProtocolPlanningTests(unittest.TestCase):
         attempts = [
             (["nl", "nl"], ["vless"]),
             (["nl"], ["vless", "vless"]),
-            (["nl"], ["reality"]),
+            (["nl"], ["invalid-protocol"]),
             ([], ["vless"]),
             (["other"], ["vless"]),
             (["nl"], []),

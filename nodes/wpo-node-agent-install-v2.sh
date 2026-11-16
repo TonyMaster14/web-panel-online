@@ -827,6 +827,14 @@ $DOMAIN {
     }
 }
 CADDY
+if systemctl is-active --quiet wpo-tls-router && [[ -s /opt/wpp-node-agent/wpo_reality.py ]]; then
+    PYTHONPATH=/opt/wpp-node-agent python3 - <<'PY_KEEP_REALITY'
+from pathlib import Path
+import wpo_reality
+p=Path('/etc/caddy/Caddyfile')
+p.write_text(wpo_reality.caddy_internal(p.read_text()))
+PY_KEEP_REALITY
+fi
 chmod 0644 /etc/caddy/Caddyfile
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
   ufw allow 80/tcp >/dev/null || true

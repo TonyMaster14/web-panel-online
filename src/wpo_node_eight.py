@@ -34,8 +34,9 @@ RELAY_CONFIG = Path("/etc/tproxy-server/profiles.json")
 RELAY_SERVICE = "wpo-node-relay.service"
 MT_SERVICE_PREFIX = "wpo-node-mtproxy-"
 KNOWN = frozenset(("vless", "hysteria", "web", "mtproto", "awg20", "awg31", "naive", "mieru"))
+KNOWN = KNOWN | xray.SUPPORTED
 NATIVE = KNOWN - xray.SUPPORTED
-PROTOCOLS_ORDER = ("vless", "hysteria", "web", "mtproto", "awg20", "awg31", "naive", "mieru")
+PROTOCOLS_ORDER = tuple(p for p in ("vless", "reality", "hysteria", "web", "mtproto", "awg20", "awg31", "naive", "mieru") if p in KNOWN)
 GROUPED_CONNECTIONS = {
     "naive": {"id": "naive-primary", "name": "NaiveProxy", "protocol": "naive",
               "enabled": True, "config": {"port": 53000}},
@@ -107,7 +108,7 @@ def validate(data):
         "protocols": list(xray.SUPPORTED),
     })
     raw = data.get("protocols")
-    if (not isinstance(raw, list) or not raw or len(raw) > 8 or
+    if (not isinstance(raw, list) or not raw or len(raw) > len(KNOWN) or
             any(not isinstance(v, str) or v not in KNOWN for v in raw)):
         raise ValueError("Invalid node protocol selection")
     if len(set(raw)) != len(raw):

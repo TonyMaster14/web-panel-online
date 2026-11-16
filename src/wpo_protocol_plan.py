@@ -22,6 +22,7 @@ class Protocol:
 
 PROTOCOLS = (
     Protocol("vless", "VLESS XHTTP", "happ", "Happ", "xray", True),
+    Protocol("reality", "VLESS REALITY", "happ", "Happ", "xray", True),
     Protocol("hysteria", "Hysteria2", "happ", "Happ", "xray", True),
     Protocol("web", "WEB Proxy", "telegram", "Telegram", "https-proxy", False),
     Protocol("mtproto", "MTProto", "telegram", "Telegram", "mtproxy", False),
@@ -33,7 +34,7 @@ PROTOCOLS = (
 
 CATALOG = {item.key: item for item in PROTOCOLS}
 CAPABILITY_SET = frozenset(CATALOG)
-if len(CATALOG) != 8:
+if len(CATALOG) != 9:
     raise RuntimeError("The WPO eight-protocol catalog must have unique keys")
 
 
