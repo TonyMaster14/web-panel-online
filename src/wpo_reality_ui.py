@@ -245,13 +245,39 @@ displayPreset();
 #wpoRealityDialog .dialog-head{flex:0 0 auto}
 #wpoRealityDialog .connection-pane{
  flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
- align-content:start;scrollbar-gutter:stable
+ align-content:start;scrollbar-gutter:stable;
+ margin-right:7px;scrollbar-width:thin;
+ scrollbar-color:color-mix(in srgb,var(--muted) 55%,transparent)
+   color-mix(in srgb,var(--raised) 40%,transparent)
 }
 #wpoRealityDialog .actions{
  flex:0 0 auto;display:flex;justify-content:flex-end;align-items:center;
  min-height:62px;margin-top:auto;padding:10px 0 0;border-top:1px solid var(--line)
 }
-#wpoRealityDialog .connection-pane{gap:13px;padding:12px 2px 18px}
+#wpoRealityDialog .connection-pane{gap:13px;padding:12px 13px 18px 2px}
+#wpoRealityDialog .connection-pane::-webkit-scrollbar,
+#wpoRealityDialog .wpo-reality-checks-list::-webkit-scrollbar{
+ width:8px;background:transparent
+}
+#wpoRealityDialog .connection-pane::-webkit-scrollbar-track,
+#wpoRealityDialog .wpo-reality-checks-list::-webkit-scrollbar-track{
+ background:color-mix(in srgb,var(--raised) 55%,transparent);
+ border-radius:999px;border:2px solid transparent;background-clip:padding-box
+}
+#wpoRealityDialog .connection-pane::-webkit-scrollbar-thumb,
+#wpoRealityDialog .wpo-reality-checks-list::-webkit-scrollbar-thumb{
+ background:color-mix(in srgb,var(--muted) 65%,transparent);
+ border-radius:999px;border:2px solid transparent;background-clip:padding-box
+}
+#wpoRealityDialog .connection-pane::-webkit-scrollbar-thumb:hover,
+#wpoRealityDialog .wpo-reality-checks-list::-webkit-scrollbar-thumb:hover{
+ background:color-mix(in srgb,var(--muted) 85%,transparent);
+ background-clip:padding-box
+}
+#wpoRealityDialog [data-reality-close]:focus,
+#wpoRealityDialog [data-reality-close]:focus-visible{
+ outline:1px solid var(--line)!important;outline-offset:0!important;box-shadow:none!important
+}
 #wpoRealityDialog .connection-pane>label{position:relative;min-width:0}
 #wpoRealityDialog .wpo-reality-picker{position:relative;width:100%;min-width:0}
 #wpoRealityDialog .wpo-reality-picker-toggle{display:flex;width:100%;height:41px;justify-content:space-between;text-align:left;padding:0 13px;background:var(--input);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:12px}
@@ -268,7 +294,13 @@ displayPreset();
 #wpoRealityDialog .wpo-reality-checks-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 #wpoRealityDialog .wpo-reality-checks-head strong{font-size:11px}
 #wpoRealityDialog .wpo-reality-checks-head span{font-size:10px;color:var(--muted)}
-#wpoRealityDialog .wpo-reality-checks-list{display:grid;gap:7px;max-height:200px;overflow-y:auto}
+#wpoRealityDialog .wpo-reality-checks-list{
+ display:grid;gap:7px;max-height:200px;min-height:0;overflow-y:auto;
+ margin-right:3px;padding-right:10px;border-radius:12px;
+ scrollbar-width:thin;scrollbar-gutter:stable;
+ scrollbar-color:color-mix(in srgb,var(--muted) 55%,transparent)
+   color-mix(in srgb,var(--raised) 40%,transparent)
+}
 #wpoRealityDialog .wpo-reality-check-row{padding:9px 10px;border:1px solid var(--line);background:var(--surface);border-radius:9px}
 #wpoRealityDialog .wpo-reality-check-row-head{display:flex;gap:8px;align-items:center;font-size:11px}
 #wpoRealityDialog .wpo-reality-led{display:block;flex:0 0 8px;width:8px;height:8px;background:var(--muted);border-radius:50%}
@@ -284,7 +316,9 @@ displayPreset();
 @media(max-width:580px){
  #wpoRealityDialog{width:calc(100vw - 24px);height:calc(100dvh - 26px);max-height:calc(100dvh - 26px);padding:15px 16px;overflow:hidden}
  #wpoRealityDialog .wpo-reality-picker-menu{max-height:190px}
- #wpoRealityDialog .connection-pane{padding:12px 0 16px;scrollbar-gutter:auto}
+ #wpoRealityDialog .connection-pane{
+ padding:12px 12px 16px 0;margin-right:3px;scrollbar-gutter:stable
+}
 }
 
 </style>'''
