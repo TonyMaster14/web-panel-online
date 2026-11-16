@@ -30,7 +30,7 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
         self.assertIn("r.initialize(",main)
         self.assertIn("r.initialize(",node)
         agent=(ROOT/"nodes/wpo-node-agent-install-v2.sh").read_text()
-        self.assertIn("REALITY_REV=f0d6344c76cfb3df1bd9a44f6902da61ac419d8e",agent)
+        self.assertIn("REALITY_REV=1d165774d088978a60fb2366e298a93a3e73af48",agent)
         # This pinned revision already contains the shared NVIDIA default.
 
     def test_small_controller_updater_includes_new_node_installer_and_rollback(self):
