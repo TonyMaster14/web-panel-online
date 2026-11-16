@@ -1066,6 +1066,15 @@ PY_WPO_NODE_NATIVE_FIX
 bash -n "$EIGHT_SETUP"
 WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"
 rm -f -- "$EIGHT_SETUP"
+# REALITY uses the same external TCP/443; keep sources immutable during install.
+REALITY_REV=27ba7d2b9433faef0c47c6cf3912c5c0b367ac4d
+REALITY_SETUP="$(mktemp /tmp/wpo-node-reality.XXXXXXXX.sh)"
+curl -4fsSL --retry 3 --connect-timeout 15 --max-time 90 \
+    "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${REALITY_REV}/nodes/wpo-node-reality-enable.sh" \
+    -o "$REALITY_SETUP"
+bash -n "$REALITY_SETUP"
+WPO_NODE_VPN_REF="$REALITY_REV" bash "$REALITY_SETUP"
+rm -f -- "$REALITY_SETUP"
 # Refuse to enroll unless the AUTHENTICATED agent reports the exact expected
 # set; component files alone do not prove that the serving API is ready.
 # wpo-eight-agent-ready-retry-v1: systemd Type=simple may report active
@@ -1105,12 +1114,12 @@ fi
 if ! NODE_STATUS="$NODE_STATUS" python3 - <<'PY_EIGHT_STATUS'
 import json,os
 data=json.loads(os.environ.get("NODE_STATUS","{}"))
-expected={"federation","vless","hysteria","web","mtproto","awg20","awg31","naive","mieru"}
+expected={"federation","vless","reality","hysteria","web","mtproto","awg20","awg31","naive","mieru"}
 actual=set(data.get("capabilities",[]))
 missing=sorted(expected-actual)
 if not data.get("ok") or missing:
     raise SystemExit("Node API lacks live engines: "+", ".join(missing))
-print("✓ Восемь протоколов и Federation подтверждены живым API Node Agent.")
+print("✓ Девять протоколов и Federation подтверждены живым API Node Agent.")
 PY_EIGHT_STATUS
 then
   report error 'API ноды не подтвердил доступность всех восьми протоколов.'

@@ -66,13 +66,13 @@ class ExactNodeSelection(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"persist"):
             patch.verify_subscriptions('def mutate(data, request): pass')
 
-    def test_node_agent_installer_pins_dependencies_and_checks_eight(self):
+    def test_node_agent_installer_pins_dependencies_and_checks_nine(self):
         installer=(ROOT/"wpo-node-agent-install-v2.sh").read_text()
         required=(
             "ENGINE_REV=", 'WPO_NODE_VPN_REF="$ENGINE_REV"',
             '"https://$DOMAIN/wpp-api/v1/status"',
             '"Authorization: Bearer $API_KEY"',
-            'expected={"federation","vless","hysteria","web","mtproto",'
+            'expected={"federation","vless","reality","hysteria","web","mtproto",'
             '"awg20","awg31","naive","mieru"}',
             "Node API lacks live engines:",
         )
