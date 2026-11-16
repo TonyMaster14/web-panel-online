@@ -113,6 +113,8 @@ def apply(app, manager, source):
         if new!=old:
             shutil.copy2(path,str(path)+'.before-reality')
             path.write_text(new)
+    import wpo_fast_actions_apply
+    wpo_fast_actions_apply.apply(app,manager,source)
 
 if __name__=='__main__':
     import argparse
