@@ -106,7 +106,7 @@ def patch_ui(source):
     ast.parse(source); return source
 
 def apply(app, manager, source):
-    for name in ('wpo_reality.py','wpo_reality_ui.py','wpo_xray_live.py','wpo_happ_async_feed.py','wpo_happ_preparer.py'):
+    for name in ('wpo_reality.py','wpo_reality_probe.py','wpo_reality_ui.py','wpo_xray_live.py','wpo_happ_async_feed.py','wpo_happ_preparer.py'):
         shutil.copy2(source/name, app/name)
     for path, fn in ((app/'panel.py',patch_panel),(manager,patch_manager),(app/'wpp_ui.py',patch_ui)):
         old=path.read_text(); new=fn(old)
