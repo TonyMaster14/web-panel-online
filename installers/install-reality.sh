@@ -34,7 +34,7 @@ rollback(){
     exit "$rc"
 }
 trap rollback EXIT
-install -m 0644 "$MODULES/wpo_reality.py" "$MODULES/wpo_reality_ui.py" "$APP/"
+install -m 0644 "$MODULES/wpo_reality.py" "$MODULES/wpo_reality_probe.py" "$MODULES/wpo_reality_ui.py" "$APP/"
 python3 "$MODULES/wpo_reality_apply.py" --app "$APP"
 PYTHONPATH="$APP" python3 - <<'PY'
 import ipaddress
