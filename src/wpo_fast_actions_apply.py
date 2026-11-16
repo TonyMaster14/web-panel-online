@@ -22,6 +22,8 @@ def patch_manager(source):
 
 
 def patch_panel(source):
+    source=source.replace('("vless","hysteria","awg20","awg31")',
+                          '("vless","reality","hysteria","awg20","awg31")')
     if MARKER in source:return source
     if source.count('ctl_manager_json("connections-refresh",{})')!=3:
         raise ValueError('Unknown panel connection handlers')
@@ -32,6 +34,14 @@ def patch_panel(source):
 
 
 def patch_ui(source):
+    source=source.replace("('vless','hysteria','awg20','awg31')",
+                          "('vless','reality','hysteria','awg20','awg31')")
+    source=source.replace("{'vless':0,'hysteria':1,'awg20':2,'awg31':3}",
+                          "{'vless':0,'reality':1,'hysteria':2,'awg20':3,'awg31':4}")
+    source=source.replace("(('vless','VLESS XHTTP'),('hysteria','Hysteria2'),",
+                          "(('vless','VLESS XHTTP'),('reality','VLESS TCP REALITY Vision'),('hysteria','Hysteria2'),")
+    source=source.replace('.routing-protocol-section .routing-protocol-grid{{\n    grid-template-columns:repeat(5,minmax(0,1fr));gap:8px',
+                          '.routing-protocol-section .routing-protocol-grid{{\n    grid-template-columns:repeat(6,minmax(0,1fr));gap:8px')
     marker='# wpo-quiet-client-pending-v2'
     if marker not in source:
         source+='\n'+marker+"\nCSS += '\\n.clients-table tr.client-pending .client-name:after{content:none!important}\\n'\n"

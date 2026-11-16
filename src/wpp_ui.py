@@ -977,8 +977,8 @@ def routing_ui(connections, state, path, csrf):
     awg_profiles=state.get('awg_profiles',{}) if isinstance(state,dict) else {}
     choices=sorted(
         (item for item in connections if selectable_connection(item)
-         and item.get('enabled') and item.get('protocol') in ('vless','hysteria','awg20','awg31')),
-        key=lambda item: {'vless':0,'hysteria':1,'awg20':2,'awg31':3}.get(item.get('protocol'),4))
+         and item.get('enabled') and item.get('protocol') in ('vless','reality','hysteria','awg20','awg31')),
+        key=lambda item: {'vless':0,'reality':1,'hysteria':2,'awg20':3,'awg31':4}.get(item.get('protocol'),4))
 
     if not choices:
         return f'''<section class="card empty"><div><h3>Нет доступных подключений</h3><p>Сначала создайте VLESS, Hysteria2 или AWG в разделе «Подключения».</p><a class="btn primary" href="{esc(path)}/connections">Перейти к подключениям</a></div></section>'''
@@ -994,7 +994,7 @@ def routing_ui(connections, state, path, csrf):
             return bool(saved.get('allowed_ips',[]))
         return bool(saved.get('enabled'))
     routing_tabs=[]
-    for protocol,title in (('vless','VLESS XHTTP'),('hysteria','Hysteria2'),
+    for protocol,title in (('vless','VLESS XHTTP'),('reality','VLESS TCP REALITY Vision'),('hysteria','Hysteria2'),
                            ('awg20','AmneziaWG 2.0'),('awg31','AmneziaWG 3.1')):
         available=[item for item in choices if item.get('protocol')==protocol]
         if not available:
@@ -1140,7 +1140,7 @@ def routing_ui(connections, state, path, csrf):
 
 /* wpo-routing-status-toprow-v3 */
 .routing-protocol-section .routing-protocol-grid{{
-    grid-template-columns:repeat(5,minmax(0,1fr));gap:8px
+    grid-template-columns:repeat(6,minmax(0,1fr));gap:8px
 }}
 .routing-protocol-section .routing-protocol-card{{
     min-height:62px;padding:10px 11px;gap:8px
@@ -2065,3 +2065,6 @@ CSS += '''
 '''
 
 CSS += '\n.client-deleting{display:none!important}\n'
+
+# wpo-quiet-client-pending-v2
+CSS += '\n.clients-table tr.client-pending .client-name:after{content:none!important}\n'
