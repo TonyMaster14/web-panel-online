@@ -51,7 +51,7 @@ class RealityTests(unittest.TestCase):
         actual=reality.caddy_internal(caddy)
         self.assertEqual(actual,reality.caddy_internal(actual))
         self.assertIn('https_port 19443',actual)
-        router=reality.haproxy_config('www.microsoft.com')
+        router=reality.haproxy_config('www.nvidia.com')
         self.assertIn('default_backend website',router)
         self.assertIn('server reality 127.0.0.1:19444',router)
         self.assertNotIn('ssl crt',router)
