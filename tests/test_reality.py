@@ -55,6 +55,19 @@ class RealityTests(unittest.TestCase):
         self.assertIn('default_backend website',router)
         self.assertIn('server reality 127.0.0.1:19444',router)
         self.assertNotIn('ssl crt',router)
+    def test_existing_servers_options_are_preserved_without_duplicate(self):
+        original='{\n admin off\n servers {\n  protocols h1 h2 h3\n  max_header_size 2MB\n }\n}\nnode.example.com {\n respond "ok"\n}\n'
+        actual=reality.caddy_internal(original)
+        self.assertEqual(actual.count('servers {'),1)
+        self.assertIn('max_header_size 2MB',actual)
+        self.assertNotIn('protocols h1 h2 h3',actual)
+        self.assertEqual(actual,reality.caddy_internal(actual))
+    def test_legacy_duplicate_fragment_is_repaired(self):
+        old='{\n    # wpo-reality-front\n    https_port 19443\n    default_bind 127.0.0.1\n    servers {\n        protocols h1 h2\n    }\n servers {\n max_header_size 2MB\n }\n}\nnode.example.com { respond "ok" }\n'
+        actual=reality.caddy_internal(old)
+        self.assertEqual(actual.count('servers {'),1)
+        self.assertIn('max_header_size 2MB',actual)
+        self.assertEqual(actual,reality.caddy_internal(actual))
     def test_installed_python_migrations_compile_and_repeat(self):
         src=(ROOT/'installers/install-panel.sh').read_text()
         for anchor,fn in [('cat > "$MANAGER"',migration.patch_manager),('cat > "$APP_FILE"',migration.patch_panel)]:

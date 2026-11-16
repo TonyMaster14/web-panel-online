@@ -46,7 +46,7 @@ try:
         'streamSettings':{'network':'xhttp','xhttpSettings':{'path':'/wpo-test'}}})
     config=root/'server.json';config.write_text(json.dumps(server));run(xray,'run','-test','-config',str(config))
     server_proc=start(xray,'run','-config',str(config))
-    website='{\n admin off\n auto_https disable_redirects\n}\nhttps://node.example.com {\n tls '+str(root/'cert.pem')+' '+str(root/'key.pem')+'\n handle /wpo-test/* {\n reverse_proxy h2c://127.0.0.1:19450\n }\n handle {\n respond "WPO website OK"\n }\n}\n'
+    website='{\n admin off\n auto_https disable_redirects\n servers {\n protocols h1 h2 h3\n max_header_size 2MB\n }\n}\nhttps://node.example.com {\n tls '+str(root/'cert.pem')+' '+str(root/'key.pem')+'\n handle /wpo-test/* {\n reverse_proxy h2c://127.0.0.1:19450\n }\n handle {\n respond "WPO website OK"\n }\n}\n'
     (root/'Caddyfile').write_text(reality.caddy_internal(website));run(caddy,'validate','--config',str(root/'Caddyfile'),'--adapter','caddyfile');start(caddy,'run','--config',str(root/'Caddyfile'),'--adapter','caddyfile')
     front=reality.haproxy_config(profile['sni']).replace('    user haproxy\n','').replace('    group haproxy\n','').replace('0.0.0.0:443','127.0.0.1:19446').replace('    bind [::]:443 v6only\n','')
     (root/'haproxy.cfg').write_text(front);run(haproxy,'-c','-f',str(root/'haproxy.cfg'));start(haproxy,'-db','-f',str(root/'haproxy.cfg'))

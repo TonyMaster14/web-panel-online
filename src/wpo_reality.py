@@ -114,14 +114,53 @@ backend website
     server caddy 127.0.0.1:19443
 '''
 
+def _caddy_block_end(text, start):
+    """Find a block boundary without counting braces in strings or comments."""
+    depth=0; quote=None; escaped=False; comment=False
+    for index in range(start,len(text)):
+        ch=text[index]
+        if comment:
+            if ch=='\n':comment=False
+            continue
+        if quote:
+            if escaped:escaped=False
+            elif ch=='\\' and quote=='"':escaped=True
+            elif ch==quote:quote=None
+            continue
+        if ch=='#':comment=True
+        elif ch in ('"','`'):quote=ch
+        elif ch=='{':depth+=1
+        elif ch=='}':
+            depth-=1
+            if depth==0:return index
+    raise ValueError('Незакрытый блок Caddyfile')
+
+
 def caddy_internal(text):
     text = re.sub(r'(?m)^([^\s{}][^{}\n]*\{)', lambda m: re.sub(r':443(?=[,\s{])', ':19443', m[0]), text)
-    if '# wpo-reality-front' in text: return text
-    options = '\n    # wpo-reality-front\n    https_port 19443\n    default_bind 127.0.0.1\n    servers {\n        protocols h1 h2\n    }\n'
-    if re.match(r'\s*\{', text):
-        pos=text.index('{')+1; text=text[:pos]+options+text[pos:]
-    else: text='{'+options+'}\n'+text
-    return text
+    # Replace our previous fragment, including the legacy standalone servers
+    # block. Preserve the rest of the existing global configuration.
+    text=re.sub(r'\n[ \t]*# wpo-reality-front\n[ \t]*https_port 19443\n[ \t]*default_bind 127\.0\.0\.1\n(?:[ \t]*# wpo-reality-front-end\n|[ \t]*servers \{\n[ \t]*protocols h1 h2\n[ \t]*\}\n)','\n',text,count=1)
+    match=re.match(r'(?:\s|#[^\n]*\n)*\{',text)
+    if not match:
+        text='{\n}\n'+text;start=0
+    else:start=match.end()-1
+    end=_caddy_block_end(text,start)
+    body=text[start+1:end]
+    # Respect existing servers options: adding a second catch-all servers
+    # block is rejected by Caddy as duplicate listener addresses.
+    server=re.search(r'(?m)^[ \t]*servers[ \t]*\{',body)
+    if server:
+        opening=server.end()-1;closing=_caddy_block_end(body,opening)
+        content=body[opening+1:closing]
+        content=re.sub(r'(?m)^[ \t]*protocols[ \t]+[^\n#]+','',content)
+        content='\n        protocols h1 h2\n'+'\n'.join(line for line in content.splitlines() if line.strip())
+        body=body[:opening+1]+content.rstrip('\n')+'\n    '+body[closing:]
+    else:
+        body+='    servers {\n        protocols h1 h2\n    }\n'
+    body=re.sub(r'(?m)^[ \t]*(?:https_port|default_bind)[ \t]+[^\n]+\n?','',body)
+    options='\n    # wpo-reality-front\n    https_port 19443\n    default_bind 127.0.0.1\n    # wpo-reality-front-end\n'
+    return text[:start+1]+options+body.lstrip('\n')+text[end:]
 
 def install_manager(ns):
     original=ns['sync_xray']; activate=ns['activate_xray_config']

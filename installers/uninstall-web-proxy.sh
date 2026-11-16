@@ -173,7 +173,7 @@ source,target,domain=sys.argv[1:]
 text=open(source,encoding="utf-8").read()
 # Restore shared Caddy to public HTTPS when removing WPO's SNI router.
 if '# wpo-reality-front' in text:
-    text=re.sub(r'\n[ \t]*# wpo-reality-front\n[ \t]*https_port 19443\n[ \t]*default_bind 127\.0\.0\.1\n[ \t]*servers \{\n[ \t]*protocols h1 h2\n[ \t]*\}\n','\n',text,count=1)
+    text=re.sub(r'\n[ \t]*# wpo-reality-front\n[ \t]*https_port 19443\n[ \t]*default_bind 127\.0\.0\.1\n(?:[ \t]*# wpo-reality-front-end\n|[ \t]*servers \{\n[ \t]*protocols h1 h2\n[ \t]*\}\n)','\n',text,count=1)
     text=re.sub(r'(?m)^([^\s{}][^{}\n]*\{)',lambda m:re.sub(r':19443(?=[,\s{])',':443',m[0]),text)
 
 text=re.sub(r"\n?[ \t]*# WPP NAIVE GLOBAL BEGIN\n.*?\n[ \t]*# WPP NAIVE GLOBAL END\n?","\n",text,flags=re.S)
