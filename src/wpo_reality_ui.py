@@ -66,19 +66,19 @@ document.querySelectorAll('[data-reality-open]').forEach(b=>b.addEventListener('
 d.querySelector('[data-reality-close]').addEventListener('click',()=>{if(!running)d.close()});
 async function execute(save){if(running)return;resetChecks();togglePicker(false);area.hidden=false;setRunning(true);
 const request={preset:f.elements.preset.value,sni:f.elements.sni.value.trim(),fingerprint:f.elements.fingerprint.value};
-const nodes=currentNodes(),rows=new Map(),original=new Map(),applied=[];let unsupported=false;
+const nodes=currentNodes(),rows=new Map(),original=new Map(),attempted=[];let unsupported=false;
 try{
  for(const n of nodes){const row=nodeRow(n.name);rows.set(n.id,row);update(row,'pending','Читаем текущие настройки');try{const old=await send(n.id,{read_only:'1'});original.set(n.id,old.profile);update(row,'pending','TLS 1.3 → HTTP/2 → REALITY Vision → HTTPS');
- const result=await send(n.id,{...request,check_only:'1'});if(!isFullCheck(result)){unsupported=true;update(row,'warning','TLS доступен, но нода не поддерживает полную проверку REALITY');continue}
+ const result=await send(n.id,{...request,check_only:'1'});if(!isFullCheck(result)){unsupported=true;update(row,'warning','Нода не подтвердила настоящий REALITY-туннель (HTTP 204)');continue}
  update(row,'ok','Проверка пройдена',['TLS 1.3','HTTP/2','REALITY','HTTP 204'+(result.latency_ms!=null?' · '+result.latency_ms+' мс':'')]);
  }catch(e){update(row,'error',e.message);unsupported=true}}
  if(unsupported){out.textContent=save?'Сохранение отменено: сначала исправьте ошибки проверки на нодах. Ничего не изменено.':'Проверка завершена: не все ноды подтвердили работу REALITY.';return}
  if(!save){out.textContent='REALITY подтверждён на '+nodes.length+' нод(ах). Настройки не изменены.';return}
- for(const n of nodes){const row=rows.get(n.id);update(row,'pending','Применение настроек и проверка служб');try{const res=await send(n.id,{...request,check_only:'0'});if(!isFullCheck(res))throw Error('Сервер не подтвердил REALITY-туннель после сохранения');applied.push(n);update(row,'ok','Сохранено',['REALITY','HTTP 204'])}
+ for(const n of nodes){const row=rows.get(n.id);update(row,'pending','Применение настроек и проверка служб');try{attempted.push(n);const res=await send(n.id,{...request,check_only:'0'});if(!isFullCheck(res))throw Error('Сервер не подтвердил REALITY-туннель при сохранении');const stored=await send(n.id,{read_only:'1'});if(stored.profile?.sni!==request.sni||stored.profile?.fingerprint!==request.fingerprint)throw Error('Нода не сохранила новый SNI или fingerprint');update(row,'ok','Сохранено и подтверждено',['SNI','REALITY','HTTP 204'])}
  catch(err){update(row,'error','Ошибка сохранения: '+err.message);throw err}}
  out.textContent='Сохранено на '+nodes.length+' нод(ах). Обновите подписки: SNI мог измениться.';
- }catch(err){for(const n of applied.reverse()){const old=original.get(n.id),row=rows.get(n.id);if(!old)continue;try{update(row,'pending','Восстановление предыдущего SNI');await send(n.id,{preset:old.preset,sni:old.sni,fingerprint:old.fingerprint,check_only:'0'});update(row,'warning','Восстановлено прежнее значение')}catch(e){update(row,'error','Не удалось откатить: '+e.message)}}
- out.textContent='Применение прервано. Проверьте красные статусы и значения SNI на нодах.'}
+ }catch(err){for(const n of attempted.reverse()){const old=original.get(n.id),row=rows.get(n.id);if(!old)continue;try{update(row,'pending','Восстановление предыдущего SNI');const oldPreset=(presets[old.preset]&&presets[old.preset][1]===old.sni)?old.preset:'custom';await send(n.id,{preset:oldPreset,sni:old.sni,fingerprint:old.fingerprint,check_only:'0'});const saved=await send(n.id,{read_only:'1'});if(saved.profile?.sni!==old.sni)throw Error('Не удалось подтвердить прежний SNI');update(row,'warning','Восстановлено прежнее значение')}catch(e){update(row,'error','Не удалось откатить: '+e.message)}}
+ out.textContent='Применение прервано. Предпринят откат всех затронутых нод; проверьте красные статусы и SNI.'}
  finally{setRunning(false)}
 }
 f.addEventListener('submit',e=>{e.preventDefault();execute(true)});
@@ -129,7 +129,7 @@ displayPreset();
 #wpoRealityDialog .wpo-reality-chip{padding:3px 6px;border-radius:6px;background:color-mix(in srgb,var(--green) 12%,transparent);border:1px solid color-mix(in srgb,var(--green) 25%,var(--line));color:var(--green);font-size:9px}
 @keyframes wpo-real-pulse{to{opacity:.25;transform:scale(.7)}}
 #wpoRealityDialog .actions{justify-content:flex-end}
-@media(max-width:580px){#wpoRealityDialog{max-height:88dvh;overflow-y:auto}#wpoRealityDialog .wpo-reality-picker-menu{position:relative;top:3px}}
+@media(max-width:580px){#wpoRealityDialog{max-height:88dvh;overflow-y:auto}#wpoRealityDialog .wpo-reality-picker-menu{max-height:190px}}
 
 </style>'''
     return style+html+script
