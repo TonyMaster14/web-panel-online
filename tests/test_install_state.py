@@ -20,7 +20,8 @@ def isolated_script(tmp):
     s = DETECTOR
     for root in ("/var/lib/tproxy-panel", "/etc/systemd/system",
                  "/etc/web-proxy-panel", "/opt/tproxy-panel",
-                 "/usr/local/sbin", "/etc/tproxy-server"):
+                 "/usr/local/sbin", "/etc/tproxy-server", "/etc/wpp-node-agent",
+                 "/opt/wpp-node-agent", "/etc/wpp-node-vpn"):
         s = s.replace(root, str(tmp) + root)
     return "set -Eeuo pipefail\n" + s + "\nwpo_install_state\n"
 
@@ -38,6 +39,12 @@ class InstallStateTests(unittest.TestCase):
                                 text=True, capture_output=True, timeout=4)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
+    def test_separate_node_is_not_a_panel(self):
+        self.f('/etc/wpp-node-agent/config.json','{}')
+        self.assertEqual(self.state(),'node')
+    def test_orphan_reality_router_is_detected(self):
+        self.f('/etc/systemd/system/wpo-tls-router.service')
+        self.assertEqual(self.state(),'partial')
     def test_clean_vps(self):
         self.assertEqual(self.state(), "clean")
     def test_interrupted_with_marker_and_data(self):
@@ -103,6 +110,24 @@ class SafetyContractTests(unittest.TestCase):
         self.assertIn('[[ "$after" == clean ]]', cleaner)
         self.assertIn("error 'Очистка WPO не удалась", cleaner)
         self.assertIn('WPO_REINSTALL_STAGED_SOURCE', cleaner)
+    def test_shared_caddy_returns_to_public_port_after_reality_removal(self):
+        import sys
+        sys.path.insert(0,str(Path('src').resolve()))
+        import wpo_reality
+        marker='python3 - /etc/caddy/Caddyfile "$CADDY_TMP" "$DOMAIN" <<\'PY\'\n'
+        logic=UNINSTALL.split(marker,1)[1].split('\nPY\n',1)[0]
+        with tempfile.TemporaryDirectory() as temp:
+            source=Path(temp)/'source';target=Path(temp)/'target'
+            source.write_text(wpo_reality.caddy_internal('own.example.com {\n respond "own"\n}\nother.example.com {\n respond "KEEP"\n}\n'))
+            r=subprocess.run(['python3','-c',logic,str(source),str(target),'own.example.com'],capture_output=True,text=True)
+            self.assertEqual(r.returncode,0,r.stderr)
+            text=target.read_text()
+            self.assertIn('other.example.com',text);self.assertIn('KEEP',text)
+            self.assertNotIn('own.example.com',text);self.assertNotIn('19443',text)
+            self.assertNotIn('default_bind 127.0.0.1',text)
+        self.assertIn('systemctl is-active --quiet wpo-tls-router.service',UNINSTALL)
+        self.assertIn('/etc/systemd/system/wpo-tls-router.service',UNINSTALL)
+
     def test_remover_stops_component_update_timers(self):
         self.assertIn("web-panel-proxy-component-auto-update.timer web-panel-proxy-component-auto-update.service", UNINSTALL)
         self.assertIn("/etc/systemd/system/web-panel-proxy-component-auto-update.timer", UNINSTALL)

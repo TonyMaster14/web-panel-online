@@ -162,6 +162,9 @@ ask_password(){
 # A version file and systemd units may exist before Nodes Lab completes.
 # Never treat them alone as proof that the WPO setup succeeded.
 wpo_install_state() {
+    if [[ -e /etc/wpp-node-agent || -e /opt/wpp-node-agent || -e /etc/wpp-node-vpn ]]; then
+        printf 'node'; return
+    fi
     local data=/var/lib/tproxy-panel/data.json
     local unit=/etc/systemd/system/tproxy-panel.service
     local completed=/var/lib/tproxy-panel/.wpo-install-complete
@@ -187,7 +190,9 @@ wpo_install_state() {
         fi
         return
     fi
-    if [[ -e /etc/web-proxy-panel/version ||
+    if [[ -e /etc/web-proxy-panel/reality ||
+          -e /etc/systemd/system/wpo-tls-router.service ||
+          -e /etc/web-proxy-panel/version ||
           -e /etc/systemd/system/tproxy-panel.service ||
           -e /opt/tproxy-panel/panel.py ||
           -e /usr/local/sbin/web-panel-proxy-uninstall ||
@@ -260,7 +265,7 @@ wpo_clean_partial() {
 # "yes". Do not use automatic -y flags or infer consent from redirected stdin.
 WPO_REINSTALL_APPROVED=0
 wpo_offer_reinstall(){
-    printf '\n%sWEB PANEL ONLINE уже установлена на этом VPS.%s\n' "$cyan" "$reset"
+    printf '\n%sНа VPS обнаружена установленная или незавершённая WEB PANEL ONLINE.%s\n' "$cyan" "$reset"
     printf '%sВНИМАНИЕ: новая установка удалит ВСЕ данные и компоненты WPO:%s\n' "$red" "$reset"
     printf 'пользователей, подписки, пароли, ключи, ноды и настройки.\n'
     printf 'Ubuntu, SSH и посторонние проекты не удаляются.\n'
@@ -318,10 +323,8 @@ wpo_reinstall_stage(){
 WPO_INSTALL_STATE="$(wpo_install_state)"
 case "$WPO_INSTALL_STATE" in
     installed) wpo_offer_reinstall ;;
-    protected)
-        error 'Обнаружены данные прежней WPO с неизвестным состоянием. Автоматическая очистка отменена, чтобы не потерять данные.'
-        ;;
-    partial) wpo_clean_partial ;;
+    partial|protected) wpo_offer_reinstall ;;
+    node) error 'На VPS обнаружена отдельная нода WPO. Для её переустановки используйте команду из раздела «Ноды».' ;;
     clean) ;;
     *) error 'Неизвестное состояние установленной панели.' ;;
 esac

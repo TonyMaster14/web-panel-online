@@ -94,6 +94,7 @@ for unit in \
   web-panel-proxy-component-auto-update.timer web-panel-proxy-component-auto-update.service \
   web-panel-proxy-component-update.service \
   web-panel-proxy-metrics.timer web-panel-proxy-metrics.service \
+  wpo-tls-router.service \
   tproxy-panel.service web-proxy-panel.service web-proxy-panel-mtproxy.service \
   web-proxy-panel-firewall.service web-proxy-panel-firewall-maintenance.timer web-proxy-panel-firewall-maintenance.service \
   web-proxy-panel-traffic.timer web-proxy-panel-traffic.service web-panel-proxy-xray.service \
@@ -104,6 +105,11 @@ for unit in \
 do
   systemctl disable --now "$unit" 2>/dev/null || true
 done
+# The REALITY frontend owns TCP/443; never remove its config while it is running.
+if systemctl is-active --quiet wpo-tls-router.service; then
+  echo 'Не удалось остановить маршрутизатор REALITY. Очистка прервана.' >&2
+  exit 1
+fi
 for unit in $(systemctl list-units --all 'web-panel-proxy-awg@*.service' --no-legend 2>/dev/null | awk '{print $1}'); do
   systemctl disable --now "$unit" 2>/dev/null || true
 done
@@ -165,6 +171,11 @@ if [[ "$((CADDY_OWNED + CADDY_SHARED))" -gt 0 && -n "$DOMAIN" && -f /etc/caddy/C
 import re,sys
 source,target,domain=sys.argv[1:]
 text=open(source,encoding="utf-8").read()
+# Restore shared Caddy to public HTTPS when removing WPO's SNI router.
+if '# wpo-reality-front' in text:
+    text=re.sub(r'\n[ \t]*# wpo-reality-front\n[ \t]*https_port 19443\n[ \t]*default_bind 127\.0\.0\.1\n[ \t]*servers \{\n[ \t]*protocols h1 h2\n[ \t]*\}\n','\n',text,count=1)
+    text=re.sub(r'(?m)^([^\s{}][^{}\n]*\{)',lambda m:re.sub(r':19443(?=[,\s{])',':443',m[0]),text)
+
 text=re.sub(r"\n?[ \t]*# WPP NAIVE GLOBAL BEGIN\n.*?\n[ \t]*# WPP NAIVE GLOBAL END\n?","\n",text,flags=re.S)
 text=re.sub(r"\n?[ \t]*# WPP NAIVE BEGIN\n.*?\n[ \t]*# WPP NAIVE END\n?","\n",text,flags=re.S)
 text=re.sub(r"(?m)^\s*:443,\s*"+re.escape(domain)+r"\s*\{\s*$",domain+" {",text,count=1)
@@ -263,6 +274,7 @@ rm -f -- \
   /etc/systemd/system/web-panel-proxy-component-auto-update.timer \
   /etc/systemd/system/web-panel-proxy-metrics.service \
   /etc/systemd/system/web-panel-proxy-metrics.timer \
+  /etc/systemd/system/wpo-tls-router.service \
   /etc/systemd/system/tproxy-panel.service \
   /etc/systemd/system/web-proxy-panel.service \
   /etc/systemd/system/web-proxy-panel-mtproxy.service \
@@ -305,6 +317,7 @@ rm -f -- \
   /usr/local/libexec/web-proxy-user-backend.py
 
 rm -rf -- \
+  /etc/systemd/system/wpo-tls-router.service.d \
   /var/lib/web-panel-proxy-update \
   /var/lib/web-panel-proxy-components \
   /etc/systemd/system/mtproxy.service.d \

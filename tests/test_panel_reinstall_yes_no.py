@@ -163,16 +163,22 @@ class TestWPOFreshReinstall(unittest.TestCase):
 
     def test_ambiguous_panel_is_never_automatically_deleted(self):
         with tempfile.TemporaryDirectory() as td:
-            status,out,trace=self.run_gate(td,state="protected",reply=None)
-            self.assertNotEqual(status,0)
-            self.assertIn("неизвестным состоянием",out)
+            status,out,trace=self.run_gate(td,state="protected",reply=b"no\n")
+            self.assertEqual(status,0)
+            self.assertIn("сохранены",out)
             self.assertEqual(trace,"")
 
-    def test_partial_still_uses_existing_recovery_path(self):
+    def test_partial_requires_yes_before_staged_cleanup(self):
         with tempfile.TemporaryDirectory() as td:
-            status,out,trace=self.run_gate(td,state="partial",reply=None)
+            status,out,trace=self.run_gate(td,state="partial",reply=b"yes\n")
             self.assertEqual(status,0,out)
-            self.assertEqual(trace,"partial\n")
+            self.assertEqual(trace,"installed\n")
+
+    def test_partial_no_leaves_all_files_untouched(self):
+        with tempfile.TemporaryDirectory() as td:
+            status,out,trace=self.run_gate(td,state="partial",reply=b"no\n")
+            self.assertEqual(status,0,out);self.assertEqual(trace,"")
+            self.assertNotIn("INSTALL_WOULD_START",out)
 
     def test_clean_machine_installs_without_consent(self):
         with tempfile.TemporaryDirectory() as td:
