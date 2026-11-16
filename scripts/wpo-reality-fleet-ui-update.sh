@@ -6,7 +6,7 @@ umask 077
 [[ $EUID -eq 0 ]] || { echo 'Запустите с sudo на основном VPS WPO.' >&2; exit 2; }
 APP=/opt/tproxy-panel
 SERVICE=tproxy-panel.service
-REV=231199787ef668c2d23451af8274c8327fb40f71
+REV=7b673ffd20d256d8fb2204ea1cca9637b4707f94
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV"
 for name in panel.py wpo_reality.py wpo_reality_ui.py wpp-node-agent-install.sh; do
     [[ -s "$APP/$name" && ! -L "$APP/$name" ]] ||
