@@ -116,7 +116,9 @@ async function execute(save){
  try{
   if(!reuse){
    phase='checking';activeAbort=new AbortController();
-   for(const n of nodes){
+   // Every node has its own REALITY endpoint. Check in parallel, too:
+   // one slow node must not add its latency to all the other nodes.
+   const assessments=await Promise.allSettled(nodes.map(async n=>{
     ensureActive();const row=rows.get(n.id);
     try{
      update(row,'pending','TLS 1.3 → HTTP/2 → REALITY Vision → HTTPS');
@@ -128,8 +130,10 @@ async function execute(save){
      if(cancelRequested)throw err;
      operationFailed=true;update(row,'error',err.message||'Ошибка проверки REALITY');
     }
-   }
+   }));
    activeAbort=null;
+   ensureActive();
+   if(assessments.some(x=>x.status==='rejected'))operationFailed=true;
    if(operationFailed){
     verified=null;
     out.textContent=save?'Сохранение отменено: не все ноды прошли проверку. Настройки не менялись.':'Не все ноды подтвердили REALITY. Настройки не менялись.';
