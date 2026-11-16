@@ -49,13 +49,13 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
         self.assertEqual(ui.selected_preset({"preset":"custom","sni":"www.nvidia.com"}),"nvidia")
         with patch.object(ui.reality,"read_profile",return_value=dict(profile(),**legacy)):
             html=ui.editor("/panel","csrf")
-        self.assertIn('<option value="custom" selected>',html)
+        self.assertIn('name="preset" value="custom"',html)
         self.assertIn('name="sni" value="www.microsoft.com"',html)
 
     def test_dialog_has_no_microsoft_preset_or_brand_label(self):
         with patch.object(ui.reality,"read_profile",return_value=profile()):
             html=ui.editor("/panel","csrf")
-        self.assertIn('<option value="nvidia" selected>',html)
+        self.assertIn('data-reality-choice="nvidia" aria-selected="true"',html)
         self.assertNotIn("Microsoft",html)
         self.assertNotIn("www.microsoft.com",html)
         self.assertIn("Edge · проверить в клиенте",html)
