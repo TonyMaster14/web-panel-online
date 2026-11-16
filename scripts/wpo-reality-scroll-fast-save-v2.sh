@@ -7,7 +7,7 @@ if (( EUID != 0 )); then echo "Запустите с sudo на основной 
 APP=/opt/tproxy-panel
 MODULE="$APP/wpo_reality_ui.py"
 SERVICE=tproxy-panel.service
-REV=dc10f020fe5b12e598388a809f615719c8257c4d
+REV=e8ad60d687df6045b1cad09945fcba57a52d95d6
 URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/src/wpo_reality_ui.py"
 if [[ ! -f "$APP/panel.py" || ! -f "$MODULE" || -L "$MODULE" ]]; then
   echo "Не найдена основная панель с модулями REALITY. Ничего не изменено." >&2
@@ -39,6 +39,7 @@ grep -Fq "const reuse=save&&verified?.key===key" "$TMP/wpo_reality_ui.py" &&
 grep -Fq "function requestStop()" "$TMP/wpo_reality_ui.py" &&
 grep -Fq "overflow-y:auto;overscroll-behavior:contain" "$TMP/wpo_reality_ui.py" &&
 grep -Fq "Promise.allSettled(changing.map" "$TMP/wpo_reality_ui.py" &&
+grep -Fq "Promise.allSettled(nodes.map" "$TMP/wpo_reality_ui.py" &&
 grep -Fq "border-radius:999px;border:2px solid transparent;background-clip:padding-box" "$TMP/wpo_reality_ui.py" &&
 grep -Fq "if(closeAfterStop&&!restoreFailed)d.close()" "$TMP/wpo_reality_ui.py" ||
   { echo "Скачан неподходящий модуль REALITY. Ничего не изменено." >&2; exit 3; }
@@ -75,7 +76,7 @@ fi
 INSTALLED=0
 echo "✓ Полоса прокрутки в настройках REALITY: тонкая, скруглённая и с отступом."
 echo "✓ Результаты проверки: отдельная скруглённая прокрутка без прыжков кнопок."
-echo "✓ Сохранение всех нод ускорено параллельной отправкой; повторная проверка не запускается."
+echo "✓ Проверка и сохранение всех нод выполняются параллельно, а не по очереди."
 echo "✓ При ошибке или отмене возврат прежних настроек запускается после завершения запросов."
 echo "Профили пользователей, UUID, ключи, SNI и настройки нод не изменялись."
 echo "Время сохранения зависит от VPN-служб и сети; 1 секунда не гарантируется."
