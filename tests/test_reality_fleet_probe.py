@@ -80,7 +80,7 @@ class FleetUI(unittest.TestCase):
 class RealTunnelVerification(unittest.TestCase):
     def test_server_requires_actual_tunnel_not_only_tls(self):
         with patch.object(wpo_reality,"check_target",return_value=True), \
-             patch.object(wpo_reality_probe,"probe",return_value={
+             patch.object(probe,"probe",return_value={
                   "ok":True,"checks":[{"name":"REALITY Vision","status":"ok"},
                     {"name":"HTTPS через туннель","status":"ok"}],"latency_ms":108}) as verify:
             result=wpo_reality.configure({"preset":"nvidia","sni":"www.nvidia.com",
@@ -91,7 +91,7 @@ class RealTunnelVerification(unittest.TestCase):
         self.assertTrue(result["checks"])
     def test_failed_real_tunnel_rejects_even_with_valid_tls(self):
         with patch.object(wpo_reality,"check_target",return_value=True), \
-             patch.object(wpo_reality_probe,"probe",side_effect=probe.ProbeError("TLS есть, REALITY нет")):
+             patch.object(probe,"probe",side_effect=probe.ProbeError("TLS есть, REALITY нет")):
             with self.assertRaisesRegex(ValueError,"REALITY нет"):
                 wpo_reality.configure({"preset":"nvidia","sni":"www.nvidia.com",
                                        "fingerprint":"firefox","check_only":True},lambda:None)
