@@ -3,12 +3,22 @@ from html import escape
 import json
 import wpo_reality as reality
 
+def selected_preset(profile):
+    # An older saved target can remain functional until explicitly changed;
+    # never silently replace its SNI when the dialog is opened.
+    value=str(profile.get('preset',''))
+    sni=str(profile.get('sni',''))
+    if value in reality.PRESETS and reality.PRESETS[value][1]==sni:
+        return value
+    return next((key for key,(_,host) in reality.PRESETS.items() if host==sni), 'custom')
+
 def editor(path, csrf, nodes=()):
     try: profile=reality.read_profile()
     except (OSError,ValueError): return ''
     e=lambda x:escape(str(x),quote=True)
-    options=''.join('<option value="'+key+'"'+(' selected' if profile.get('preset')==key else '')+'>'+title+' · '+domain+'</option>' for key,(title,domain) in reality.PRESETS.items())
-    options+='<option value="custom"'+(' selected' if profile.get('preset')=='custom' else '')+'>Свой домен</option>'
+    chosen=selected_preset(profile)
+    options=''.join('<option value="'+key+'"'+(' selected' if chosen==key else '')+'>'+title+' · '+domain+'</option>' for key,(title,domain) in reality.PRESETS.items())
+    options+='<option value="custom"'+(' selected' if chosen=='custom' else '')+'>Свой домен</option>'
     node_options='<option value="local">Основная нода</option>'+''.join('<option value="'+e(n['id'])+'">'+e(n.get('name') or n.get('url') or n['id'])+'</option>' for n in nodes)
     html='''<dialog id="wpoRealityDialog" class="connection-editor"><form id="wpoRealityForm">
 <div class="dialog-head"><div><h2>VLESS TCP REALITY Vision</h2><small>TCP · Vision · общий внешний порт 443</small></div><button type="button" data-reality-close>×</button></div>
@@ -16,14 +26,14 @@ def editor(path, csrf, nodes=()):
 <section class="connection-pane"><label>Нода<select name="node_id">'''+node_options+'''</select></label><label>IP-адрес<input id="wpoRealityAddress" value="'''+e(profile.get('address',''))+'''" readonly aria-readonly="true" spellcheck="false"></label>
 <label>Сайт для REALITY<select name="preset">'''+options+'''</select></label>
 <label>SNI<input name="sni" value="'''+e(profile['sni'])+'''" required></label>
-<label>TLS fingerprint<select name="fingerprint"><option value="firefox">Mozilla Firefox</option><option value="edge">Microsoft Edge · проверить в клиенте</option></select></label>
+<label>TLS fingerprint<select name="fingerprint"><option value="firefox">Mozilla Firefox</option><option value="edge">Edge · проверить в клиенте</option></select></label>
 <small>Шаблон сайта на вашем домене настраивается отдельно. Изменения REALITY применяются ко всем его подключениям на этой ноде. После смены параметров обновите подписки.</small>
 <details><summary>Параметры доступа</summary><label>Public key<input name="public_key" readonly value="'''+e(profile['public_key'])+'''"></label><label>Short ID<input name="short_id" readonly value="'''+e(profile['short_id'])+'''"></label></details>
 <p id="wpoRealityResult" role="status"></p></section><div class="actions"><button type="button" data-reality-check>Проверить цель</button><button type="submit" class="primary">Проверить и сохранить</button></div></form></dialog>'''
     script='''<script>(()=>{const d=document.getElementById('wpoRealityDialog'),f=document.getElementById('wpoRealityForm'),out=document.getElementById('wpoRealityResult');if(!d||!f)return;
 const presets=PRESETS;f.elements.fingerprint.value=FINGERPRINT;
 function preset(){const p=presets[f.elements.preset.value];f.elements.sni.readOnly=Boolean(p);if(p)f.elements.sni.value=p[1]}preset();f.elements.preset.addEventListener('change',preset);
-async function load(){out.textContent='';f.querySelectorAll('button').forEach(b=>b.disabled=true);try{const body=new URLSearchParams({csrf:f.elements.csrf.value,node_id:f.elements.node_id.value,read_only:'1'});const r=await fetch(ACTION,{method:'POST',body});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.message||'Не удалось загрузить REALITY');const p=j.profile;['preset','sni','fingerprint','public_key','short_id'].forEach(k=>f.elements[k].value=p[k]);document.getElementById('wpoRealityAddress').value=p.address||'';preset();f.querySelectorAll('button').forEach(b=>b.disabled=false)}catch(e){out.textContent=e.message;d.querySelector('[data-reality-close]').disabled=false}}
+async function load(){out.textContent='';f.querySelectorAll('button').forEach(b=>b.disabled=true);try{const body=new URLSearchParams({csrf:f.elements.csrf.value,node_id:f.elements.node_id.value,read_only:'1'});const r=await fetch(ACTION,{method:'POST',body});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.message||'Не удалось загрузить REALITY');const p=j.profile;['preset','sni','fingerprint','public_key','short_id'].forEach(k=>f.elements[k].value=p[k]);const selected=Object.entries(presets).find(([key,entry])=>entry[1]===p.sni);f.elements.preset.value=(presets[p.preset]&&presets[p.preset][1]===p.sni)?p.preset:(selected?selected[0]:'custom');document.getElementById('wpoRealityAddress').value=p.address||'';preset();f.querySelectorAll('button').forEach(b=>b.disabled=false)}catch(e){out.textContent=e.message;d.querySelector('[data-reality-close]').disabled=false}}
 f.elements.node_id.addEventListener('change',load);
 const editForm=document.getElementById('wpoEditNodeForm');if(editForm){const b=document.createElement('button');b.type='button';b.textContent='Настройки REALITY';b.onclick=()=>{f.elements.node_id.value=editForm.elements.id.value;editForm.closest('dialog').close();d.showModal();load()};editForm.append(b)}
 document.querySelectorAll('[data-reality-open]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('dialog[open]').forEach(x=>x.close());f.elements.node_id.value="local";d.showModal();load()}));d.querySelector('[data-reality-close]').onclick=()=>d.close();
@@ -60,7 +70,13 @@ def install(ns):
     def nodes_ui(*args,**kwargs):
         html=nodes(*args,**kwargs)
         path=args[3] if len(args)>3 else kwargs['path'];csrf=args[4] if len(args)>4 else kwargs['csrf']
-        # First article is the primary node; no expansion of the compact grid.
-        html=html.replace('</article>','<button type="button" class="icon-btn wpo-node-icon" data-reality-open title="Настройки REALITY" aria-label="Настройки REALITY">'+ns['icon']('edit')+'</button></article>',1)
+        # Place the primary-node pencil inside the SAME bottom-right actions
+        # row as the remote nodes' edit/delete buttons, not below the card.
+        anchor='<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p></div>'
+        if html.count(anchor)!=1:
+            raise RuntimeError("WPO: основная карточка изменилась; карандаш не добавлен.")
+        pencil='<button type="button" class="icon-btn wpo-node-icon" data-reality-open title="Настройки REALITY" aria-label="Настройки REALITY">'+ns['icon']('edit')+'</button>'
+        row='<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p><div class="wpo-node-actions">'+pencil+'</div></div>'
+        html=html.replace(anchor,row,1)
         return html+editor(path,csrf,args[0] if args else kwargs.get('nodes',[]))
     ns['connections_ui']=connections_ui;ns['nodes_ui']=nodes_ui
