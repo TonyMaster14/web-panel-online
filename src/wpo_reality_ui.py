@@ -37,8 +37,8 @@ def install(ns):
         html=connections(*args,**kwargs)
         path=args[2] if len(args)>2 else kwargs['path'];csrf=args[3] if len(args)>3 else kwargs['csrf']
         # The same shared node settings are reachable from the connection pencil.
-        html=html.replace('<div class="actions"><button type="button" data-close-connection>',
-            '<div data-reality-settings hidden><button type="button" data-reality-open>Настройки REALITY основной ноды</button><p>IP автоматически · TCP 443 · Mozilla Firefox</p></div><div class="actions"><button type="button" data-close-connection>',1)
+        html=html.replace('</div></section><div class="actions"><button type="button" data-close-connection>',
+            '<div class="cdn-settings-box" data-reality-settings hidden><button type="button" data-reality-open>Настройки REALITY основной ноды</button><small style="display:block;margin-top:8px;color:var(--muted);line-height:1.5">IP автоматически · TCP 443 · SNI и TLS fingerprint</small></div></div></section><div class="actions"><button type="button" data-close-connection>',1)
         html+='''<script>(()=>{const f=document.getElementById('connectionForm'),d=document.getElementById('connectionEditor'),b=f?.querySelector('[data-reality-settings]');if(!b)return;function sync(){b.hidden=f.elements.protocol.value!=='reality'}f.elements.protocol.addEventListener('change',sync);new MutationObserver(sync).observe(d,{attributes:true,attributeFilter:['open']});sync()})();</script>'''
         return html+editor(path,csrf)
     def nodes_ui(*args,**kwargs):
