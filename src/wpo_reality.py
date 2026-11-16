@@ -198,7 +198,12 @@ def install_panel(ns):
 def configure(request, apply_xray):
     value=normalize(request)
     check_target(value['sni'])
-    if request.get('check_only'): return {'ok':True,'message':'TLS 1.3, HTTP/2 и сертификат проверены'}
+    # End-to-end proof: TLS 1.3/HTTP2 success alone is not sufficient. Some
+    # decoys (formerly Microsoft) return a >8192-byte certificate TLS record,
+    # making REALITY fail despite apparently valid certificates.
+    import wpo_reality_probe
+    result=wpo_reality_probe.probe(value['sni'],value['fingerprint'],__import__(__name__))
+    if request.get('check_only'): return result
     old=read_profile()
     new=dict(old, **value)
     config_path=ROOT/'haproxy.cfg'
@@ -214,7 +219,7 @@ def configure(request, apply_xray):
         apply_xray()
         subprocess.run(['systemctl','reload','wpo-tls-router'],check=True,capture_output=True)
         raise
-    return {'ok':True,'message':'REALITY сохранён. Обновите подписки на устройствах.'}
+    return dict(result,message='REALITY сохранён. Обновите подписки на устройствах.')
 
 def install_happ(ns):
     """Prepare the newly allocated device identities before the user imports Happ."""
