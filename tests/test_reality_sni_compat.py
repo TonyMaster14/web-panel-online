@@ -7,7 +7,7 @@ Existing UUID, short ID and key stay identical across inbounds.
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from urllib.parse import parse_qs, urlparse
 import wpo_reality as r
 import wpo_node_vpn as vpn
@@ -21,7 +21,7 @@ class RealitySniCompatibility(unittest.TestCase):
         for chosen in ("www.nvidia.com","www.apple.com","www.yahoo.com","www.amazon.com"):
             with self.subTest(current=chosen):
                 profile=dict(PROFILE,sni=chosen,preset="custom")
-                with patch.object(r.PRIVATE,"read_text",return_value="p"*43):
+                with patch.object(r,"PRIVATE",Mock(read_text=lambda: "p"*43)):
                     items=r.inbounds(CLIENTS,profile)
                 names=[item["streamSettings"]["realitySettings"]["serverNames"][0] for item in items]
                 self.assertEqual(names[0],chosen)
@@ -59,7 +59,7 @@ class RealitySniCompatibility(unittest.TestCase):
 
     def test_node_agent_generates_matching_inbounds_without_changing_secrets(self):
         with patch.object(vpn,"REALITY_READY",True), \
-             patch.object(r.PRIVATE,"read_text",return_value="p"*43), \
+             patch.object(r,"PRIVATE",Mock(read_text=lambda: "p"*43)), \
              patch.object(r,"read_profile",return_value=dict(PROFILE)), \
              patch.object(vpn,"SUPPORTED",frozenset(("vless","hysteria","reality"))):
             state={"f"*64:{"secrets":{"reality":UUID},"name":"test"}}
