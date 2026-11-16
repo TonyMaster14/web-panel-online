@@ -383,9 +383,22 @@ if [[ -z "$RELEASE_REF" ]]; then
     RELEASE_REF="$(git ls-remote --tags --refs "$REPOSITORY" 'v[0-9]*' |
         awk -F/ '{print $3}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1)"
 fi
-[[ "$RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] ||
-    die "Could not determine a valid published release tag."
-echo "Selected release: $RELEASE_REF"
+# Stable updates still require a tag. Only explicitly requested test
+# branches may use refs/heads/*, after validating remote and syntax.
+RELEASE_KIND=tag
+if [[ -n "$REQUESTED_REF" && "$REQUESTED_REF" == test/* ]]; then
+    [[ "$REQUESTED_REF" =~ ^test/[a-zA-Z0-9][a-zA-Z0-9._-]{0,80}$ ]] ||
+        die "Invalid WPO test branch name."
+    git check-ref-format --branch "$REQUESTED_REF" >/dev/null 2>&1 ||
+        die "Invalid Git test branch."
+    git ls-remote --exit-code --heads "$REPOSITORY" "refs/heads/$REQUESTED_REF" >/dev/null ||
+        die "WPO test branch not found on GitHub: $REQUESTED_REF"
+    RELEASE_KIND=branch
+else
+    [[ "$RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] ||
+        die "Could not determine a valid published release tag."
+fi
+echo "Selected WPO $RELEASE_KIND: $RELEASE_REF"
 CURRENT_VERSION="$(cat /etc/web-proxy-panel/version 2>/dev/null || true)"
 if [[ -z "$REQUESTED_REF" && "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.+~-][A-Za-z0-9.+~-]+)?$ ]] &&
    dpkg --compare-versions "$CURRENT_VERSION" ge "${RELEASE_REF#v}"; then
@@ -513,6 +526,23 @@ fi
 if [[ -s "$TEMP_DIR/source/install-reality.sh" ]]; then
     bash "$TEMP_DIR/source/install-reality.sh"
 fi
+# Nodes Lab/Reality must not undo the registration race fix on refresh.
+if [[ -s "$TEMP_DIR/source/scripts/wpo-node-registration-race-fix.py" ]]; then
+    echo "Restoring WPO node enrollment safety after controller update..."
+    REGISTRY_STAGE="$(mktemp /opt/tproxy-panel/.wpo-registry.XXXXXXXX.py)"
+    python3 "$TEMP_DIR/source/scripts/wpo-node-registration-race-fix.py" \
+        --panel /opt/tproxy-panel/panel.py --out "$REGISTRY_STAGE"
+    python3 -m py_compile "$REGISTRY_STAGE"
+    if ! cmp -s "$REGISTRY_STAGE" /opt/tproxy-panel/panel.py; then
+        chown --reference=/opt/tproxy-panel/panel.py "$REGISTRY_STAGE"
+        chmod --reference=/opt/tproxy-panel/panel.py "$REGISTRY_STAGE"
+        mv -f "$REGISTRY_STAGE" /opt/tproxy-panel/panel.py
+        systemctl restart tproxy-panel.service
+        systemctl is-active --quiet tproxy-panel.service ||
+            die "WPO registry fix did not start after update."
+    fi
+    rm -f -- "$REGISTRY_STAGE"
+fi
 install -o root -g root -m 0755 \
     "$TEMP_DIR/source/uninstall-web-proxy.sh" \
     /usr/local/sbin/web-panel-proxy-uninstall
@@ -546,7 +576,15 @@ PANEL_EXEC_START="$(systemctl show -p ExecStart --value tproxy-panel.service 2>/
 if [[ ! -s /etc/web-proxy-panel/caddy-owned ]]; then
     printf '%s\n' 'WEB_PANEL_PROXY_V2_CADDY_SHARED' > /etc/web-proxy-panel/caddy-owned
 fi
-printf '%s\n' "${RELEASE_REF#v}" > /etc/web-proxy-panel/version
+if [[ "$RELEASE_KIND" == branch ]]; then
+    # dpkg-compatible test version sorts below a later stable release.
+    INSTALLED_REF_SHA="$(git -C "$TEMP_DIR/source" rev-parse --short=10 HEAD)"
+    printf '3.0.0~test.%s\n' "$INSTALLED_REF_SHA" > /etc/web-proxy-panel/version
+    printf '%s@%s\n' "$RELEASE_REF" "$INSTALLED_REF_SHA" > /etc/web-proxy-panel/source-ref
+    chmod 0600 /etc/web-proxy-panel/source-ref
+else
+    printf '%s\n' "${RELEASE_REF#v}" > /etc/web-proxy-panel/version
+fi
 chmod 0600 /etc/web-proxy-panel/caddy-owned /etc/web-proxy-panel/version
 UPDATE_COMMITTED=1
 # Versions up to 2.5.2 left automatic update snapshots in /root. They are not
