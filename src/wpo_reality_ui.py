@@ -72,11 +72,21 @@ def install(ns):
         path=args[3] if len(args)>3 else kwargs['path'];csrf=args[4] if len(args)>4 else kwargs['csrf']
         # Place the primary-node pencil inside the SAME bottom-right actions
         # row as the remote nodes' edit/delete buttons, not below the card.
-        anchor='<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p></div>'
-        if html.count(anchor)!=1:
+        # The label can contain an inline server icon; do not depend on its
+        # rendered SVG/HTML when locating the single primary-card meta row.
+        boundary=html.find('</article>')
+        if boundary<0:
+            raise RuntimeError("WPO: основная карточка не найдена; карандаш не добавлен.")
+        primary=html[:boundary]
+        anchor='<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">'
+        if primary.count(anchor)!=1:
             raise RuntimeError("WPO: основная карточка изменилась; карандаш не добавлен.")
+        start=primary.index(anchor)
+        end=primary.find('</p></div>',start)
+        if end<0:
+            raise RuntimeError("WPO: нижний ряд основной ноды изменился; карандаш не добавлен.")
         pencil='<button type="button" class="icon-btn wpo-node-icon" data-reality-open title="Настройки REALITY" aria-label="Настройки REALITY">'+ns['icon']('edit')+'</button>'
-        row='<div class="wpo-node-meta-row"><p class="wpo-node-template wpo-main-node-label">Основная нода</p><div class="wpo-node-actions">'+pencil+'</div></div>'
-        html=html.replace(anchor,row,1)
+        primary=primary[:end+4]+'<div class="wpo-node-actions">'+pencil+'</div>'+primary[end+4:]
+        html=primary+html[boundary:]
         return html+editor(path,csrf,args[0] if args else kwargs.get('nodes',[]))
     ns['connections_ui']=connections_ui;ns['nodes_ui']=nodes_ui
