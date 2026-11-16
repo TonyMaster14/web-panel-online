@@ -117,7 +117,7 @@ def render_xray(state, settings):
                 hysteria.append({"auth": secret, "email": "node:" + external_id, "level": 0})
     inbounds = []
     if REALITY_READY:
-        inbounds.append(wpo_reality.inbound(reality_clients))
+        inbounds.extend(wpo_reality.inbounds(reality_clients))
     if vless:
         inbounds.append({
             "tag": "wpo-vless-xhttp", "listen": "127.0.0.1", "port": 19000,
