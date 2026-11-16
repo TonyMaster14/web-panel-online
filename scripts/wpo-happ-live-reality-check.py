@@ -41,11 +41,14 @@ def read_settings():
         cfg=json.loads(xray_file.read_text())
         profile=json.loads(PROFILE.read_text())
         inbounds=[x for x in cfg.get("inbounds",[]) if x.get("streamSettings",{}).get("security")=="reality"]
-        if len(inbounds)!=1:
-            raise CheckError("Ожидается один активный REALITY inbound; найдено "+str(len(inbounds)))
-        inbound=inbounds[0]
-        reality=inbound["streamSettings"]["realitySettings"]
         sni=profile["sni"]
+        # SNI compatibility may add multiple independent REALITY backends;
+        # inspect exactly the preferred one, not merely the first found.
+        matches=[x for x in inbounds if x["streamSettings"]["realitySettings"].get("serverNames")==[sni]]
+        if len(matches)!=1:
+            raise CheckError("Не найден однозначный REALITY backend для выбранного SNI")
+        inbound=matches[0]
+        reality=inbound["streamSettings"]["realitySettings"]
         if reality.get("serverNames")!=[sni]:
             raise CheckError("SNI профиля не совпадает с serverNames работающего Xray")
         if reality.get("target",reality.get("dest"))!=sni+":443":
