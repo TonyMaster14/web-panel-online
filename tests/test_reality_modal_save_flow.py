@@ -31,6 +31,7 @@ function setup(cancelDuringSave){
  const ctx={
    running:false,cancelRequested:false,closeAfterStop:false,restoreFailed:false,
    activeAbort:null,phase:'idle',verified:null,
+   presets:{nvidia:['NVIDIA','www.nvidia.com'],apple:['Apple','www.apple.com']},
    area:{hidden:true},out:{textContent:''},d:{close(){calls.events.push('closed')}},
    f:{elements:{preset:{value:'apple'},sni:{value:'www.apple.com'},
                  fingerprint:{value:'firefox'}}},
