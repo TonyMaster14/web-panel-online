@@ -4,7 +4,9 @@ Regression covers a historical race: update invalidates caches while a
 network worker is still POSTing to a remote node. That worker must not republish
 the old SNI/keys, or erase the reservation for the new request.
 """
+import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 import wpo_happ_async_feed as feed
 
@@ -88,6 +90,17 @@ class HappRealityCacheTests(unittest.TestCase):
             feed.invalidate_all()
             self.assertEqual(feed.enqueue(None,NODE,"extid","Node",PROTOCOLS),([],True))
             self.assertEqual(worker.args[1][1][-1],1)
+
+    def test_hotfix_is_pinned_safe_and_checks_panel_after_restart(self):
+        path=Path(__file__).resolve().parents[1]/"scripts/wpo-happ-cache-fix-v1.sh"
+        result=subprocess.run(["bash","-n",str(path)],capture_output=True,text=True,timeout=5)
+        self.assertEqual(result.returncode,0,result.stderr)
+        source=path.read_text()
+        self.assertIn("REV=1245e8a6651e77e9108e09f751df6acfd3545b94",source)
+        self.assertIn('cp -a "$BACKUP/wpo_happ_async_feed.py" "$MODULE"',source)
+        self.assertIn('systemctl restart "$SERVICE"',source)
+        self.assertIn('CACHE_TTL = 300',source)
+        self.assertNotIn("systemctl restart wpo-node-xray",source)
 
     def test_no_remote_credentials_are_printed(self):
         source=__import__("pathlib").Path(feed.__file__).read_text()
