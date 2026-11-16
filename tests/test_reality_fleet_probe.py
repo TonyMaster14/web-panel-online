@@ -34,6 +34,8 @@ class FleetUI(unittest.TestCase):
         self.assertIn('type="submit" class="primary">Сохранить</button>',html)
         self.assertNotIn("Проверить и сохранить",html)
         self.assertIn("Применение прервано",html)
+        self.assertIn("const stored=await send(n.id,{read_only:'1'})",html)
+        self.assertIn("const oldPreset=(presets[old.preset]",html)
         self.assertIn("Сохранение отменено",html)
 
     def test_dedicated_node_pencil_is_not_global(self):
@@ -74,8 +76,8 @@ class FleetUI(unittest.TestCase):
         self.assertIn("editor(path,csrf,public_nodes,fleet=True)",source)
         self.assertIn("await send(n.id,{...request,check_only:'1'})",source)
         self.assertIn("await send(n.id,{...request,check_only:'0'})",source)
-        self.assertIn("for(const n of applied.reverse())",source)
-        self.assertIn("TLS доступен, но нода не поддерживает полную проверку",source)
+        self.assertIn("for(const n of attempted.reverse())",source)
+        self.assertIn("Нода не подтвердила настоящий REALITY-туннель",source)
 
 class RealTunnelVerification(unittest.TestCase):
     def test_server_requires_actual_tunnel_not_only_tls(self):
