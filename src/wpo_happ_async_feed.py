@@ -20,8 +20,13 @@ LOCK = threading.RLock()
 CACHE = {}
 PENDING = {}
 FAILURES = {}
-CACHE_TTL = 86400
+# Remote URLs contain REALITY SNI/public-key/short-ID: a day-old cached link
+# can be invalid after changing REALITY on the node. Revalidate within 5 min.
+CACHE_TTL = 300
 RETRY_DELAY = 30
+# Monotonic cache generation; obsolete concurrent POSTs must not repopulate a
+# cleared cache after an admin updates subscriptions or changes node settings.
+CACHE_EPOCH = 0
 MAX_ENTRIES = 2048
 
 
@@ -57,7 +62,7 @@ def verified_links(api, node, external_id, name, protocols, timeout=90):
     return [matches[p] for p in protocols]
 
 
-def _sync_worker(key, api, node, external_id, name, protocols):
+def _sync_worker(key, api, node, external_id, name, protocols, epoch):
     success = None
     try:
         success = verified_links(api, node, external_id, name, protocols, timeout=90)
@@ -68,14 +73,17 @@ def _sync_worker(key, api, node, external_id, name, protocols):
         print("wpo asynchronous node sync failed:", key[0], error_kind,
               file=sys.stderr, flush=True)
         with LOCK:
-            FAILURES[key] = (time.monotonic() + RETRY_DELAY, error_kind)
+            if epoch == CACHE_EPOCH:
+                FAILURES[key] = (time.monotonic() + RETRY_DELAY, error_kind)
     else:
         with LOCK:
-            CACHE[key] = (time.monotonic() + CACHE_TTL, tuple(success))
-            FAILURES.pop(key, None)
+            if epoch == CACHE_EPOCH:
+                CACHE[key] = (time.monotonic() + CACHE_TTL, tuple(success))
+                FAILURES.pop(key, None)
     finally:
         with LOCK:
-            PENDING.pop(key, None)
+            if PENDING.get(key) == epoch:
+                PENDING.pop(key, None)
     return success
 
 
@@ -106,10 +114,11 @@ def enqueue(api, node, external_id, name, protocols):
             return [], True
         # Reserve the slot before starting a worker: a fast completed task
         # must not race with setting the PENDING flag afterwards.
-        PENDING[key] = True
+        epoch = CACHE_EPOCH
+        PENDING[key] = epoch
         try:
             WORKERS.submit(_sync_worker, key, api, dict(node),
-                           external_id, name, protocols)
+                           external_id, name, protocols, epoch)
         except RuntimeError:
             PENDING.pop(key, None)
             raise
@@ -147,10 +156,13 @@ def collect(api, node_items, external_id, protocols, *, grace_seconds=4.5):
 
 
 def invalidate_all():
-    """Invalidate cached credentials after a subscription revocation/update."""
+    """Invalidate credentials and prevent in-flight stale writers resurrecting them."""
+    global CACHE_EPOCH
     with LOCK:
+        CACHE_EPOCH += 1
         CACHE.clear()
         FAILURES.clear()
+        PENDING.clear()
 
 
 
@@ -188,8 +200,11 @@ def warm(api, node, external_id, name, protocols):
     key = (str(node.get("id", "")), str(node.get("url", "")),
            hashlib.sha256(str(node.get("token", "")).encode()).hexdigest(),
            external_id, protocols)
+    with LOCK:
+        epoch = CACHE_EPOCH
     result = verified_links(api, node, external_id, name, protocols, timeout=90)
     with LOCK:
-        CACHE[key] = (time.monotonic() + CACHE_TTL, tuple(result))
-        FAILURES.pop(key, None)
+        if epoch == CACHE_EPOCH:
+            CACHE[key] = (time.monotonic() + CACHE_TTL, tuple(result))
+            FAILURES.pop(key, None)
     return result
