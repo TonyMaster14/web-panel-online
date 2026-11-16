@@ -28,6 +28,9 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
         self.assertIn("wpo_reality.py",node)
         self.assertIn("r.initialize(",main)
         self.assertIn("r.initialize(",node)
+        agent=(ROOT/"nodes/wpo-node-agent-install-v2.sh").read_text()
+        self.assertIn("REALITY_REV=19a8f4e39c34d7471ddd0b3d4841ba035b414f15",agent)
+        # This pinned revision already contains the shared NVIDIA default.
 
     def test_existing_unknown_preset_remains_custom_without_overwrite(self):
         legacy={"preset":"microsoft","sni":"www.microsoft.com"}
