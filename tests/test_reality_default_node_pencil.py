@@ -52,7 +52,7 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
                     '<article class="card wpo-node-card">'
                     '<div class="wpo-node-card-body">'
                     '<div class="wpo-node-meta-row">'
-                    '<p class="wpo-node-template wpo-main-node-label">Основная нода</p>'
+                    '<p class="wpo-node-template wpo-main-node-label"><svg class="ico"></svg> Основная нода</p>'
                     '</div></div></article>'
                     '<article class="card wpo-node-card">'
                     '<div class="wpo-node-meta-row">'
@@ -66,6 +66,7 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
         primary=html.split("</article>",1)[0]
         self.assertEqual(html.count('<button type="button" class="icon-btn wpo-node-icon" data-reality-open'),1)
         self.assertIn('<div class="wpo-node-actions"><button type="button" class="icon-btn wpo-node-icon" data-reality-open',primary)
+        self.assertIn('<svg class="ico"></svg> Основная нода</p><div class="wpo-node-actions">',primary)
         self.assertLess(primary.index("wpo-main-node-label"),primary.index("data-reality-open"))
         self.assertIn('title="Настройки REALITY"',primary)
         self.assertEqual(primary.count('class="wpo-node-meta-row"'),1)
