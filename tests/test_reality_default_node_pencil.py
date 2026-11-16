@@ -64,7 +64,7 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
         with patch.object(ui.reality,"read_profile",return_value=profile()):
             html=ns["nodes_ui"]([],{},"node.example.com","/panel","csrf")
         primary=html.split("</article>",1)[0]
-        self.assertEqual(html.count("data-reality-open"),1)
+        self.assertEqual(html.count('<button type="button" class="icon-btn wpo-node-icon" data-reality-open'),1)
         self.assertIn('<div class="wpo-node-actions"><button type="button" class="icon-btn wpo-node-icon" data-reality-open',primary)
         self.assertLess(primary.index("wpo-main-node-label"),primary.index("data-reality-open"))
         self.assertIn('title="Настройки REALITY"',primary)
