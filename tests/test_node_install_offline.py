@@ -51,6 +51,8 @@ with tempfile.TemporaryDirectory(prefix='wpo-node-offline-') as folder:
         compile((app/name).read_text(),name,'exec')
     assert '# wpo-node-country-v13' in (app/'panel.py').read_text()
     assert '__WPO_CONTROLLER_ENROLL_URL__' in (app/'wpp-node-agent-install.sh').read_text()
+    assert 'WPO_NODE_REINSTALL_GATE' in (app/'wpp-node-agent-install.sh').read_text()
+    assert 'Установить новую ноду? (yes/no):' in (app/'wpp-node-agent-install.sh').read_text()
     import wpo_reality_apply
     wpo_reality_apply.apply(app,manager,root/'src')
     wpo_reality_apply.apply(app,manager,root/'src')

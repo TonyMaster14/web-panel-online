@@ -19,10 +19,10 @@ TOKEN="$1"
 # Full install marker is written only AFTER confirmed controller enrollment.
 wpo_node_install_state() {
   python3 - "$1" <<'PY_WPO_NODE_STATE'
-import datetime
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -30,234 +30,125 @@ import sys
 mode=sys.argv[1]
 assert mode in ('check','cleanup')
 agent_cfg=Path('/etc/wpp-node-agent/config.json')
-agent_dir=Path('/opt/wpp-node-agent')
-vpn_dir=Path('/etc/wpp-node-vpn')
-marker=Path('/etc/wpp-node-agent/registered.json')
 units_dir=Path('/etc/systemd/system')
-units=(
-    'wpp-node-agent.service',
-    'wpo-node-xray.service',
-    'wpo-node-vpn.service',
-    'wpo-node-vpn-tls.service',
-    'wpo-node-vpn-tls.timer',
-    'wpo-node-relay.service',
-    'wpo-node-awg-nat.service',
-    'wpo-node-mt-firewall.service',
-    'web-panel-proxy-awg@.service',
-    'web-panel-proxy-naive.service',
-    'web-panel-proxy-mieru.service',
-)
+units={
+    'wpp-node-agent.service','wpo-node-xray.service','wpo-node-vpn.service',
+    'wpo-node-vpn-tls.service','wpo-node-vpn-tls.timer','wpo-node-relay.service',
+    'wpo-node-awg-nat.service','wpo-node-mt-firewall.service','wpo-tls-router.service',
+    'web-panel-proxy-awg@.service','web-panel-proxy-naive.service','web-panel-proxy-mieru.service',
+}
+owned=[Path(p) for p in (
+    '/etc/wpp-node-agent','/opt/wpp-node-agent','/etc/wpp-node-vpn',
+    '/var/www/wpp-node-site','/etc/tproxy-server','/etc/mtproxy',
+    '/etc/web-proxy-panel/awg','/etc/web-proxy-panel/extra-protocols',
+    '/etc/web-proxy-panel/reality','/opt/web-panel-proxy/xray','/opt/MTProxy',
+    '/usr/local/bin/tproxy-server','/usr/local/bin/amneziawg-go',
+    '/usr/local/bin/awg','/usr/local/bin/awg-quick','/usr/local/bin/caddy-naive',
+    '/usr/local/bin/mita-wpp','/usr/local/sbin/web-panel-proxy-awg-run',
+    '/usr/local/sbin/web-panel-proxy-awg-up','/usr/local/sbin/web-panel-proxy-awg-down',
+    '/usr/local/sbin/wpo-node-awg-nat','/usr/local/sbin/wpo-node-mt-firewall',
+    '/etc/sysctl.d/90-wpo-node-awg.conf',
+)]
 
-def service_active(name):
-    return subprocess.run(
-        ('systemctl','is-active','--quiet',name),
-        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
-        check=False,timeout=5,
-    ).returncode==0
+def command(*args):
+    return subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                          text=True,check=False,timeout=30)
+
+def active(name):
+    return command('systemctl','is-active','--quiet',name).returncode==0
 
 def refuse(reason):
-    print('Невозможно безопасно очистить ноду: '+reason, file=sys.stderr)
+    print('Очистка ноды остановлена: '+reason,file=sys.stderr)
     sys.exit(30)
 
-if marker.exists():
-    try:
-        state=json.loads(marker.read_text(encoding='utf-8'))
-        if not isinstance(state,dict) or not state.get('domain') or state.get('registered') is not True:
-            raise ValueError('invalid registration receipt')
-    except (OSError,ValueError,TypeError):
-        refuse('некорректная отметка регистрации. Требуется ручная проверка.')
-    print('Нода уже установлена и зарегистрирована: '+state['domain'])
-    sys.exit(20)
-
-# Active services are NOT proof of a completed installation. A failed
-# install can leave the Agent, VPN API, Xray and WEB relay running.
-# Only the receipt written after successful controller enrollment may stop
-# a new attempt with "Нода уже установлена".
-
-if Path('/opt/tproxy-panel/panel.py').exists() or service_active('tproxy-panel.service'):
-    refuse('обнаружена основная панель WPO, а не отдельный VPS ноды.')
-
-if not agent_cfg.exists() and not agent_dir.exists():
-    # A valid Node Agent always creates its config and application files
-    # before any VPN or native engine. Anything else is foreign/ambiguous.
-    if vpn_dir.exists() or any((units_dir/u).exists() for u in units):
-        refuse('обнаружены компоненты без конфигурации Node Agent.')
+# This installer is for a dedicated node; confirmation must never erase a panel.
+if Path('/opt/tproxy-panel/panel.py').exists() or active('tproxy-panel.service'):
+    refuse('на VPS установлена основная панель WPO.')
+node_paths=[Path('/etc/wpp-node-agent'),Path('/opt/wpp-node-agent'),Path('/etc/wpp-node-vpn')]
+exists=any(p.exists() or p.is_symlink() for p in node_paths)
+exists=exists or any((units_dir/u).exists() for u in units) or active('wpp-node-agent.service')
+if not exists:
     sys.exit(0)
-
-if not agent_cfg.is_file() or not (agent_dir/'agent.py').is_file():
-    refuse('неполный или неизвестный Node Agent без проверяемых файлов.')
-
-try:
-    config=json.loads(agent_cfg.read_text(encoding='utf-8'))
-    if not isinstance(config.get('domain'),str) or not config['domain']:
-        raise ValueError('bad domain')
-except (OSError,ValueError,TypeError,AttributeError):
-    refuse('невозможно прочитать прежнюю конфигурацию ноды.')
-
-# Version 0.4.0 and running services are set BEFORE registration.
-# For a fully installed legacy node which predates registered.json, protect it
-# only if its root-owned installation log proves that enrollment succeeded.
-# A previous 45%-95% failure cannot have written this success line.
-log_dir=Path('/var/log/web-panel-online')
-success_line=('Готово: Node Agent зарегистрирован на https://'+config['domain']).encode()
-if log_dir.is_dir():
-    for old_log in log_dir.glob('node-install-*.log'):
-        try:
-            stat=old_log.lstat()
-            if not old_log.is_file() or old_log.is_symlink() or stat.st_mode&0o022:
-                continue
-            # A newer failed attempt may have overwritten config.json while
-            # leaving a successful log from an older installation behind.
-            # Such a stale log does not prove the CURRENT config was enrolled.
-            if stat.st_mtime + 1 < agent_cfg.stat().st_mtime:
-                continue
-            with old_log.open('rb') as stream:
-                stream.seek(0,os.SEEK_END)
-                end=stream.tell()
-                stream.seek(max(0,end-32768),os.SEEK_SET)
-                tail=stream.read(32768)
-            if success_line in tail.splitlines():
-                print('Нода уже установлена и зарегистрирована ранее: '+config['domain'])
-                sys.exit(20)
-        except OSError:
-            continue
-
-# Without a verified receipt or successful legacy log, preserve real user
-# profiles but allow safe cleanup of unfinished WPO components.
-
-# A failed installation's VLESS/Hysteria POST self-test can leave one
-# internal "WPO install check" identity behind if its DELETE failed. Such a
-# service-only identity is not a subscriber. All other records are protected.
-# Back up the complete old node before clearing, including test credentials.
-def internal_install_check(identifier, entry):
-    import re
-    import uuid
-    if not isinstance(identifier,str) or not re.fullmatch(r'[a-f0-9]{64}',identifier):
-        return False
-    if not isinstance(entry,dict) or set(entry)!={'name','secrets','native'}:
-        return False
-    if entry['name']!='WPO install check' or entry['native']!={}:
-        return False
-    secrets=entry['secrets']
-    if not isinstance(secrets,dict) or set(secrets)!={'vless','hysteria'}:
-        return False
-    try:
-        return all(str(uuid.UUID(secret))==secret for secret in secrets.values())
-    except (ValueError,AttributeError,TypeError):
-        return False
-
-profile_state=vpn_dir/'profiles.json'
-if profile_state.exists():
-    try:
-        data=json.loads(profile_state.read_text(encoding='utf-8'))
-        entries=data['profiles']
-        if not isinstance(entries,dict) or any(
-            not internal_install_check(identifier,entry)
-            for identifier,entry in entries.items()
-        ):
-            raise ValueError('real or malformed VPN profiles')
-        if entries:
-            print('Найдены только служебные профили прерванной проверки WPO.')
-    except (OSError,ValueError,TypeError,KeyError):
-        refuse('есть пользовательские VPN-профили или повреждённый реестр.')
-
-relay_state=Path('/etc/tproxy-server/profiles.json')
-if relay_state.exists():
-    try:
-        raw=relay_state.read_text(encoding='utf-8').strip()
-        if raw.endswith(r'\n'):
-            raw=raw[:-2]
-        data=json.loads(raw)
-        entries=data['profiles']
-        if not isinstance(entries,list) or any(
-            not isinstance(entry,dict) or entry.get('name')!='node-bootstrap'
-            for entry in entries
-        ):
-            raise ValueError('non-bootstrap WEB profiles')
-    except (OSError,ValueError,TypeError,KeyError):
-        refuse('есть пользовательские WEB Proxy-профили или повреждённый реестр.')
-
-awg=Path('/etc/web-proxy-panel/awg')
-if awg.exists() and any(awg.glob('*.json')):
-    refuse('обнаружены сохранённые профили AmneziaWG.')
-
 if mode=='check':
-    print('Регистрация ноды не подтверждена: предыдущая установка незавершена.')
-    print('Перед новым запуском остатки WPO будут сохранены в резервную копию и очищены.')
-    sys.exit(0)
+    print('На VPS обнаружена установленная или незавершённая нода WPO.')
+    sys.exit(20)
+if os.environ.get('WPO_NODE_REINSTALL_APPROVED')!='1':
+    refuse('переустановка не подтверждена ответом yes.')
 
-# Do not delete global apt packages, Caddy/ACME state, shared Unix users or
-# logs. Only our explicitly owned units and files are reset.
-print('Очищаю незавершённую установку ноды WPO...')
-for unit in units:
-    unit_file=units_dir/unit
-    if unit_file.exists():
-        result=subprocess.run(
-            ('systemctl','disable','--now',unit),
-            stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,
-            text=True,check=False,timeout=20,
-        )
-        if result.returncode!=0:
-            # Stopped or never enabled units are harmless: verify state.
-            if service_active(unit):
-                refuse('не удалось остановить '+unit)
-for unit_file in sorted(units_dir.glob('wpo-node-mtproxy-*.service')):
-    unit=unit_file.name
-    subprocess.run(('systemctl','disable','--now',unit),
-                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
-                   check=False,timeout=20)
-    if service_active(unit):
-        refuse('не удалось остановить '+unit)
+# Enumerate instantiated AWG/MTProxy services, including enabled but stopped ones.
+instance=re.compile(r'(?:web-panel-proxy-awg@[A-Za-z0-9_-]+|wpo-node-mtproxy-[A-Za-z0-9_-]+)\.service')
+for verb in ('list-units','list-unit-files'):
+    result=command('systemctl',verb,'--all','--plain','--no-legend','--no-pager')
+    if result.returncode: refuse('не удалось получить список служб.')
+    for line in result.stdout.splitlines():
+        name=line.split()[0] if line.split() else ''
+        if instance.fullmatch(name): units.add(name)
+for p in units_dir.glob('wpo-node-mtproxy-*.service'):
+    if instance.fullmatch(p.name):units.add(p.name)
+# Guard all paths before stopping anything. Do not traverse unexpected parent links.
+files=[units_dir/u for u in units]
+files += [units_dir/(u+'.d') for u in units]
+for p in owned+files+[Path('/etc/caddy/Caddyfile')]:
+    if any(parent.is_symlink() for parent in p.parents):
+        refuse('неожиданная ссылка в пути '+str(p))
+    if p.is_symlink() and p in node_paths:
+        refuse('неожиданная ссылка '+str(p))
 
-# Back up the whole previous install before removing live state. This is an
-# interrupted install, not an enrolled node, but rollback files are valuable.
-backup_base=Path('/var/backups')
-backup_base.mkdir(parents=True,exist_ok=True)
-stamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-backup=backup_base/('wpo-node-incomplete-'+stamp+'-'+str(os.getpid()))
-backup.mkdir(mode=0o700)
-owned={
-    'node-config': Path('/etc/wpp-node-agent'),
-    'node-app': agent_dir,
-    'node-vpn': vpn_dir,
-    'node-site': Path('/var/www/wpp-node-site'),
-    'relay-config': Path('/etc/tproxy-server'),
-    'mtproto-config': Path('/etc/mtproxy'),
-    'awg-config': awg,
-    'extra-protocols': Path('/etc/web-proxy-panel/extra-protocols'),
-}
-for name,target in owned.items():
-    if target.is_symlink():
-        refuse('неожиданная символическая ссылка '+str(target))
-    if target.exists():
-        shutil.move(str(target),str(backup/name))
-for unit_file in [*(units_dir/u for u in units),
-                  *units_dir.glob('wpo-node-mtproxy-*.service')]:
-    if unit_file.is_symlink():
-        refuse('символическая ссылка службы '+str(unit_file))
-    if unit_file.is_file():
-        shutil.move(str(unit_file),str(backup/unit_file.name))
-# Caddy remains installed; the new Node Agent will write its own Caddyfile.
-# Never remove the only current Caddy config without replacing it first.
+print('Удаляю прежнюю ноду, пользователей, ключи и настройки...')
+# Stop instances before removing the AWG helpers/configs used by ExecStopPost.
+ordered=sorted(units,key=lambda u: (not bool(instance.fullmatch(u)),not u.endswith('.timer'),u))
+for unit in ordered:
+    if '@.service' in unit: continue
+    command('systemctl','disable','--now',unit)
+    if active(unit):refuse('не удалось остановить '+unit)
+
+# Caddy/ACME packages and certificate cache are reusable system dependencies.
+# Replace the node's serving configuration so old API/site routes disappear.
 caddy=Path('/etc/caddy/Caddyfile')
-if caddy.is_file():
-    shutil.copy2(caddy,backup/'Caddyfile')
+if caddy.is_symlink():refuse('неожиданная ссылка Caddyfile.')
+if caddy.exists():
+    command('systemctl','stop','caddy.service')
+    if active('caddy.service'):refuse('не удалось остановить Caddy.')
+    caddy.write_text('{\n    admin off\n}\n',encoding='utf-8')
 for family,table in (('inet','wpo_node_mt_guard'),('ip','wpo_node_awg_nat')):
-    subprocess.run(('nft','delete','table',family,table),
-                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
-                   check=False,timeout=5)
-subprocess.run(('systemctl','daemon-reload'),check=True,timeout=20)
-print('Прежняя незавершённая установка очищена. Резервная копия: '+str(backup))
+    command('nft','delete','table',family,table)
+for target in files+owned:
+    if target.is_symlink() or target.is_file():target.unlink()
+    elif target.is_dir():shutil.rmtree(target)
+result=command('systemctl','daemon-reload')
+if result.returncode:refuse('systemd не перечитал список служб.')
+command('systemctl','reset-failed')
+print('Прежняя нода удалена. Начинаю чистую установку.')
 PY_WPO_NODE_STATE
 }
 
+# WPO_NODE_REINSTALL_GATE: prompt once in the foreground, before all writes.
+# Only our wizard worker inherits the answer; ordinary invocations ask again.
+if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 ]]; then
+    unset WPO_NODE_REINSTALL_APPROVED
+fi
 wpo_node_previous=0
 wpo_node_install_state check || wpo_node_previous=$?
 case "$wpo_node_previous" in
   0) ;;
-  20) exit 0 ;;
+  20)
+    if [[ "${WPO_NODE_REINSTALL_APPROVED:-0}" != 1 ]]; then
+      printf 'Переустановка удалит пользователей, ключи, настройки и службы прежней ноды.\n'
+      printf 'Старую карточку ноды удалите в панели самостоятельно.\n'
+      [[ -t 0 ]] || { echo 'Для подтверждения yes/no запустите команду в SSH-терминале.' >&2; exit 30; }
+      while true; do
+        read -r -p 'Установить новую ноду? (yes/no): ' answer || exit 130
+        case "$answer" in
+          yes|YES|Yes) export WPO_NODE_REINSTALL_APPROVED=1; break ;;
+          no|NO|No|'') echo 'Отмена: прежняя нода сохранена без изменений.'; exit 0 ;;
+          *) echo 'Введите yes или no.' ;;
+        esac
+      done
+    fi
+    ;;
   *) exit "$wpo_node_previous" ;;
 esac
+# WPO_NODE_REINSTALL_GATE_END
 # WPO_NODE_WIZARD_START: TTY shell around the unchanged Node Agent installer.
 if [[ "${WPO_NODE_WIZARD_WORKER:-0}" != 1 && "${WPO_NODE_CLASSIC:-0}" != 1 && -t 0 && -t 1 ]]; then
   node_pid="" node_progress="" node_log=""
@@ -584,8 +475,7 @@ case "$ID" in
   debian) dpkg --compare-versions "$VERSION_ID" ge 12 || { echo 'Требуется Debian 12+.'; exit 2; } ;;
   *) echo 'Поддерживаются Ubuntu 22.04+ и Debian 12+.'; exit 2 ;;
 esac
-# Reset unfinished WPO node state only after a valid domain/email were given.
-# The check at startup already refused an enrolled or live node.
+# Clean the confirmed previous node only after domain/email and OS validation.
 wpo_node_install_state cleanup
 report installing 'Установка Caddy и подготовка сайта ноды.'
 # On some fresh Ubuntu images unattended upgrades have ALREADY refreshed APT.
@@ -1203,7 +1093,7 @@ else
   exit 5
 fi
 # A successful controller enrollment is the only completion condition.
-# Subsequent installer runs must refuse to replace a registered node.
+# Subsequent installer runs must ask before replacing this registered node.
 python3 - "$DOMAIN" <<'PY_WPO_NODE_REGISTERED'
 import datetime,json,os,sys,tempfile
 from pathlib import Path
