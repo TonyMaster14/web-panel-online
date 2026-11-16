@@ -957,7 +957,7 @@ bash -n "$EIGHT_SETUP"
 WPO_NODE_VPN_REF="$ENGINE_REV" bash "$EIGHT_SETUP"
 rm -f -- "$EIGHT_SETUP"
 # REALITY uses the same external TCP/443; keep sources immutable during install.
-REALITY_REV=f0d6344c76cfb3df1bd9a44f6902da61ac419d8e
+REALITY_REV=1d165774d088978a60fb2366e298a93a3e73af48
 REALITY_SETUP="$(mktemp /tmp/wpo-node-reality.XXXXXXXX.sh)"
 curl -4fsSL --retry 3 --connect-timeout 15 --max-time 90 \
     "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/${REALITY_REV}/nodes/wpo-node-reality-enable.sh" \
