@@ -64,7 +64,7 @@ class TestPanelTestBranchUpdate(unittest.TestCase):
         self.assertIn('python3 -m py_compile "$REGISTRY_STAGE"',SOURCE)
 
     def test_test_versions_do_not_get_saved_as_slash_containing_branches(self):
-        self.assertIn("3.0.0~test.%s",SOURCE)
+        self.assertIn("3.0.0+test.%s",SOURCE)
         self.assertIn("/etc/web-proxy-panel/source-ref",SOURCE)
 
 if __name__=="__main__":
