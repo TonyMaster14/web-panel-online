@@ -72,15 +72,41 @@ def initialize(xray, address):
     atomic(PUBLIC, json.dumps(profile), 0o644)
     return profile
 
+# Multiple *separate* REALITY inbound backends preserve previously exported
+# Happ links when the administrator switches between supported decoys.
+# Each domain has its OWN matching target and serverName, never mismatched
+# serverNames on a single target. The existing UUID/key/short ID are shared.
+# The broken Microsoft target is intentionally not kept as a compatibility SNI.
+def reality_routes(profile=None):
+    profile = profile or read_profile()
+    current = normalize({'preset': 'custom', 'sni': profile['sni']})['sni']
+    hosts = [current]
+    for _title, host in PRESETS.values():
+        if host != current and host not in hosts:
+            hosts.append(host)
+    return [(host, PORT + offset) for offset, host in enumerate(hosts)]
+
+
 def inbound(clients, profile=None):
     profile = profile or read_profile()
-    return {'tag': 'vless-reality', 'listen': '127.0.0.1', 'port': PORT,
+    return _inbound_for_sni(clients, profile, profile['sni'], PORT, 'vless-reality')
+
+
+def _inbound_for_sni(clients, profile, sni, port, tag):
+    return {'tag': tag, 'listen': '127.0.0.1', 'port': port,
             'protocol': 'vless', 'settings': {'decryption': 'none', 'clients': clients},
             'streamSettings': {'network': 'tcp', 'security': 'reality',
-                'realitySettings': {'show': False, 'target': profile['sni'] + ':443',
-                    'serverNames': [profile['sni']], 'privateKey': PRIVATE.read_text().strip(),
+                'realitySettings': {'show': False, 'target': sni + ':443',
+                    'serverNames': [sni], 'privateKey': PRIVATE.read_text().strip(),
                     'shortIds': [profile['short_id']]}},
             'sniffing': {'enabled': True, 'destOverride': ['http','tls','quic'], 'routeOnly': True}}
+
+
+def inbounds(clients, profile=None):
+    profile = profile or read_profile()
+    return [_inbound_for_sni(clients, profile, host, port,
+             'vless-reality' if port == PORT else 'vless-reality-' + str(port))
+            for host, port in reality_routes(profile)]
 
 def link(secret, name, profile=None):
     p = profile or read_profile()
@@ -92,7 +118,16 @@ def link(secret, name, profile=None):
     return 'vless://' + quote(secret, safe='-') + '@' + address + ':443?' + query + '#' + quote(name + ' · REALITY', safe='')
 
 def haproxy_config(sni):
-    sni = normalize({'preset':'custom', 'sni':sni})['sni']
+    routes = reality_routes({'sni': sni})
+    # Explicit SNI -> matching Xray inbound; unauthenticated handshakes go
+    # to the correct decoy instead of producing a TLS certificate mismatch.
+    rules = []
+    backends = []
+    for host, port in routes:
+        backend = 'reality' if port == PORT else 'reality_' + str(port)
+        rules.append('    use_backend ' + backend + ' if { req.ssl_sni -i ' + host + ' }')
+        backends.extend(('backend ' + backend,
+                         '    server ' + backend + ' 127.0.0.1:' + str(port)))
     return '''global
     maxconn 4096
     user haproxy
@@ -107,10 +142,9 @@ frontend wpo_tls
     bind [::]:443 v6only
     tcp-request inspect-delay 5s
     tcp-request content accept if { req.ssl_hello_type 1 }
-    use_backend reality if { req.ssl_sni -i ''' + sni + ''' }
+''' + '\n'.join(rules) + '''
     default_backend website
-backend reality
-    server reality 127.0.0.1:19444
+''' + '\n'.join(backends) + '''
 backend website
     server caddy 127.0.0.1:19443
 '''
@@ -175,7 +209,7 @@ def install_manager(ns):
                     clients.append({'id':secret,'flow':'xtls-rprx-vision','level':0,
                                     'email':'panel:'+user['id']+':'+str(index)})
         def with_reality(config, caddy_text=None, validation_inbounds=None):
-            config=copy.deepcopy(config); config['inbounds'].append(inbound(clients))
+            config=copy.deepcopy(config); config['inbounds'].extend(inbounds(clients))
             config.setdefault('api',{}).setdefault('services',[]).append('HandlerService')
             import wpo_xray_live
             old_caddy=Path(ns['CADDYFILE']).read_text()
