@@ -14,6 +14,16 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 
 class RealityModalSaveTests(unittest.TestCase):
+    def test_installer_is_syntax_checked_pinned_and_reversible(self):
+        path=ROOT/"scripts/wpo-reality-modal-save-fix-v1.sh"
+        result=subprocess.run(["bash","-n",str(path)],capture_output=True,text=True,timeout=5)
+        self.assertEqual(result.returncode,0,result.stderr)
+        source=path.read_text()
+        self.assertIn("REV=bccb93d43b6622f32ae4389b98433b15fd58cbd6",source)
+        self.assertIn('cp -a "$BACKUP/wpo_reality_ui.py" "$MODULE"',source)
+        self.assertIn('systemctl restart "$SERVICE"',source)
+        self.assertNotIn("systemctl restart wpo-node-xray",source)
+
     @unittest.skipUnless(shutil.which("node"),"node not installed")
     def test_real_browser_handler_reuses_check_then_saves_and_rolls_back_cancel(self):
         source=(ROOT/"src/wpo_reality_ui.py").read_text()
