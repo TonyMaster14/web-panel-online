@@ -1,5 +1,6 @@
 """REALITY NVIDIA default and primary node edit icon layout regression."""
 import unittest
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 import wpo_reality as reality
@@ -31,6 +32,16 @@ class RealityNvidiaNodePencilTests(unittest.TestCase):
         agent=(ROOT/"nodes/wpo-node-agent-install-v2.sh").read_text()
         self.assertIn("REALITY_REV=19a8f4e39c34d7471ddd0b3d4841ba035b414f15",agent)
         # This pinned revision already contains the shared NVIDIA default.
+
+    def test_small_controller_updater_includes_new_node_installer_and_rollback(self):
+        script=ROOT/"scripts/wpo-reality-nvidia-ui-update.sh"
+        subprocess.run(["bash","-n",str(script)],check=True,timeout=5)
+        contents=script.read_text()
+        self.assertIn("wpp-node-agent-install.sh",contents)
+        self.assertIn("nodes/wpo-node-agent-install-v2.sh",contents)
+        self.assertIn("REALITY_REV=19a8f4e39c34d7471ddd0b3d4841ba035b414f15",contents)
+        self.assertIn('systemctl restart "$SERVICE"',contents)
+        self.assertIn('cp -a "$BACKUP/$name" "$APP/$name"',contents)
 
     def test_existing_unknown_preset_remains_custom_without_overwrite(self):
         legacy={"preset":"microsoft","sni":"www.microsoft.com"}
