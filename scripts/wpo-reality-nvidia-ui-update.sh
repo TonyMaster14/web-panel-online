@@ -6,7 +6,7 @@ umask 077
 [[ $EUID -eq 0 ]] || { echo 'Запустите через sudo на VPS основной панели WPO.' >&2; exit 2; }
 APP=/opt/tproxy-panel
 SERVICE=tproxy-panel.service
-REF=cb3a516a44e7631d2d239c472de497cd14ddeb62
+REF=19a8f4e39c34d7471ddd0b3d4841ba035b414f15
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF/src"
 for name in panel.py wpo_reality.py wpo_reality_ui.py; do
   [[ -s "$APP/$name" && ! -L "$APP/$name" ]] || { echo "Не найден компонент REALITY: $APP/$name" >&2; exit 2; }
