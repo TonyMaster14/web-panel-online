@@ -212,7 +212,11 @@ displayPreset();
 #wpoRealityDialog input,#wpoRealityDialog select{box-sizing:border-box;display:block;width:100%;min-width:0;height:40px;margin:0;padding:0 12px;border:1px solid var(--line);border-radius:9px;background-color:var(--input);color:var(--text);font:inherit;font-size:12px;line-height:normal;box-shadow:none}
 #wpoRealityDialog select{-webkit-appearance:none;appearance:none;padding-right:36px;cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 50%,calc(100% - 14px) 50%;background-size:4px 4px;background-repeat:no-repeat;text-overflow:ellipsis}
 #wpoRealityDialog select option{background:var(--surface);color:var(--text)}
-#wpoRealityDialog input:focus-visible,#wpoRealityDialog select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#wpoRealityDialog input:focus,#wpoRealityDialog select:focus,
+#wpoRealityDialog input:focus-visible,#wpoRealityDialog select:focus-visible{
+ outline:1px solid var(--muted)!important;outline-offset:0!important;
+ border-color:var(--line)!important;box-shadow:none!important
+}
 #wpoRealityDialog #wpoRealityAddress{color:var(--muted);background:var(--raised,var(--input));cursor:default}
 #wpoRealityDialog .connection-pane>small{font-size:11px;line-height:1.6;color:var(--muted)}
 #wpoRealityDialog details{padding:12px;border:1px solid var(--line);border-radius:9px}
@@ -221,12 +225,29 @@ displayPreset();
 #wpoRealityDialog details input{margin-top:7px}
 #wpoRealityResult{margin:0;font-size:12px;line-height:1.5}
 #wpoRealityResult:empty{display:none}
-#wpoRealityDialog{width:min(515px,calc(100vw - 28px));padding:20px;overflow:visible}
+#wpoRealityDialog{
+ box-sizing:border-box;width:min(515px,calc(100vw - 28px));
+ height:min(700px,calc(100dvh - 30px));max-height:calc(100dvh - 30px);
+ padding:18px 20px;overflow:hidden
+}
+#wpoRealityDialog form{height:100%;min-height:0;display:flex;flex-direction:column}
+#wpoRealityDialog .dialog-head{flex:0 0 auto}
+#wpoRealityDialog .connection-pane{
+ flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+ align-content:start;scrollbar-gutter:stable
+}
+#wpoRealityDialog .actions{
+ flex:0 0 auto;display:flex;justify-content:flex-end;align-items:center;
+ min-height:62px;margin-top:auto;padding:10px 0 0;border-top:1px solid var(--line)
+}
 #wpoRealityDialog .connection-pane{gap:13px;padding:12px 2px 18px}
 #wpoRealityDialog .connection-pane>label{position:relative;min-width:0}
 #wpoRealityDialog .wpo-reality-picker{position:relative;width:100%;min-width:0}
 #wpoRealityDialog .wpo-reality-picker-toggle{display:flex;width:100%;height:41px;justify-content:space-between;text-align:left;padding:0 13px;background:var(--input);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:12px}
-#wpoRealityDialog .wpo-reality-picker-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#wpoRealityDialog .wpo-reality-picker-toggle:focus-visible{
+ outline:1px solid var(--muted)!important;outline-offset:0!important;
+ border-color:var(--line)!important;box-shadow:none!important
+}
 #wpoRealityDialog .wpo-reality-picker-menu{position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:50;max-height:210px;overflow-y:auto;display:grid;gap:3px;padding:6px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 12px 38px #0006}
 #wpoRealityDialog .wpo-reality-picker-menu[hidden]{display:none}
 #wpoRealityDialog .wpo-reality-picker-menu button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:9px 12px;border:1px solid transparent;border-radius:8px;background:transparent;text-align:left;font-size:12px}
@@ -249,7 +270,11 @@ displayPreset();
 #wpoRealityDialog .wpo-reality-chip{padding:3px 6px;border-radius:6px;background:color-mix(in srgb,var(--green) 12%,transparent);border:1px solid color-mix(in srgb,var(--green) 25%,var(--line));color:var(--green);font-size:9px}
 @keyframes wpo-real-pulse{to{opacity:.25;transform:scale(.7)}}
 #wpoRealityDialog .actions{justify-content:flex-end}
-@media(max-width:580px){#wpoRealityDialog{max-height:88dvh;overflow-y:auto}#wpoRealityDialog .wpo-reality-picker-menu{max-height:190px}}
+@media(max-width:580px){
+ #wpoRealityDialog{width:calc(100vw - 24px);height:calc(100dvh - 26px);max-height:calc(100dvh - 26px);padding:15px 16px;overflow:hidden}
+ #wpoRealityDialog .wpo-reality-picker-menu{max-height:190px}
+ #wpoRealityDialog .connection-pane{padding:12px 0 16px;scrollbar-gutter:auto}
+}
 
 </style>'''
     return style+html+script
