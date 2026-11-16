@@ -10,7 +10,7 @@ XRAY=/opt/web-panel-proxy/xray/xray
 XRAY_CONF=/etc/web-panel-proxy-xray/config.json
 REALITY=/etc/web-proxy-panel/reality
 MODULE="$APP/wpo_reality.py"
-REV=1d165774d088978a60fb2366e298a93a3e73af48
+REV=a3d7a3084cbe09b2fb7d5fe23321393930659b3a
 URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/src/wpo_reality.py"
 for file in "$APP/panel.py" "$MODULE" "$MANAGER" "$XRAY_CONF" "$REALITY/profile.json" "$REALITY/private.key" "$REALITY/haproxy.cfg"; do
     [[ -s "$file" && ! -L "$file" ]] || { echo "Не найден REALITY компонент основной панели: $file" >&2; exit 2; }
@@ -43,6 +43,9 @@ python3 -m py_compile "$WORK/wpo_reality.py"
 grep -Fq "def reality_routes(" "$WORK/wpo_reality.py" &&
 grep -Fq "config['inbounds'].extend(inbounds(clients))" "$WORK/wpo_reality.py" ||
     { echo "Получена неподходящая версия REALITY панели." >&2; exit 3; }
+curl -4fsSL --retry 3 --connect-timeout 12 --max-time 75 --proto '=https' \
+    "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/scripts/wpo-reality-compat-smoke.py" -o "$WORK/compat-smoke.py"
+python3 -m py_compile "$WORK/compat-smoke.py"
 PYTHONPATH="$WORK:$APP" python3 - "$WORK" <<'PY'
 import copy,json,sys
 from pathlib import Path
@@ -93,6 +96,9 @@ systemctl restart tproxy-panel.service
 for unit in web-panel-proxy-xray.service wpo-tls-router.service tproxy-panel.service; do
     systemctl is-active --quiet "$unit" || { echo "Служба $unit неактивна." >&2; exit 4; }
 done
+# Actual REALITY Vision HTTP 204 for each previously used SNI.
+# Any failed handshake invokes the EXIT rollback to restore the panel.
+python3 -u "$WORK/compat-smoke.py"
 PYTHONPATH="$APP" python3 - <<'PY'
 import json
 from pathlib import Path
