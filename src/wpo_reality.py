@@ -15,10 +15,11 @@ ROOT = Path('/etc/web-proxy-panel/reality')
 PUBLIC = ROOT / 'profile.json'
 PRIVATE = ROOT / 'private.key'
 PORT = 19444
-PRESETS = {'microsoft': ('Microsoft', 'www.microsoft.com'), 'apple': ('Apple', 'www.apple.com'),
-           'yahoo': ('Yahoo', 'www.yahoo.com'), 'nvidia': ('NVIDIA', 'www.nvidia.com'),
-           'amazon': ('Amazon', 'www.amazon.com')}
-DEFAULT = {'preset': 'microsoft', 'sni': 'www.microsoft.com', 'fingerprint': 'firefox', 'port': 443}
+# NVIDIA is the verified default for fresh panel and remote-node REALITY.
+# Microsoft is not offered as a target; existing profile files are preserved.
+PRESETS = {'nvidia': ('NVIDIA', 'www.nvidia.com'), 'apple': ('Apple', 'www.apple.com'),
+           'yahoo': ('Yahoo', 'www.yahoo.com'), 'amazon': ('Amazon', 'www.amazon.com')}
+DEFAULT = {'preset': 'nvidia', 'sni': 'www.nvidia.com', 'fingerprint': 'firefox', 'port': 443}
 
 def normalize(value):
     result = dict(DEFAULT, **value)
