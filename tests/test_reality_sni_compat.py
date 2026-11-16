@@ -6,6 +6,7 @@ Existing UUID, short ID and key stay identical across inbounds.
 """
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch, Mock
 from urllib.parse import parse_qs, urlparse
@@ -68,6 +69,23 @@ class RealitySniCompatibility(unittest.TestCase):
         self.assertEqual(len(realities),len(r.PRESETS))
         for item in realities:
             self.assertEqual(item["settings"]["clients"][0]["id"],UUID)
+
+    def test_safe_compat_updaters_validate_and_rollback(self):
+        root=Path(__file__).resolve().parents[1]
+        for name in ("wpo-reality-sni-compat-node.sh","wpo-reality-sni-compat-controller.sh"):
+            with self.subTest(name=name):
+                script=root/"scripts"/name
+                shell=script.read_text()
+                result=subprocess.run(["bash","-n",str(script)],capture_output=True,text=True,timeout=6)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertIn("REV=1d165774d088978a60fb2366e298a93a3e73af48",shell)
+                self.assertIn("BACKUP",shell)
+                self.assertIn("INSTALLED=1",shell)
+                self.assertIn("haproxy -c -f",shell)
+                self.assertIn("run -test -config",shell)
+                self.assertNotIn("xray x25519",shell)
+                self.assertNotIn("apt-get",shell)
+                self.assertNotIn("secrets.token",shell)
 
     def test_custom_target_also_keeps_supported_default_domains(self):
         p=dict(PROFILE,sni="custom.example.org",preset="custom")
