@@ -6,7 +6,7 @@ umask 077
 [[ $EUID -eq 0 ]] || { echo 'Запустите с sudo на VPS ноды WPO.' >&2; exit 2; }
 APP=/opt/wpp-node-agent
 UNIT=wpo-node-vpn.service
-REV=a82bc7a2f03ada39ad0ab3db407996e24862878a
+REV=7b673ffd20d256d8fb2204ea1cca9637b4707f94
 BASE="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/src"
 for file in wpo_reality.py wpo_node_vpn.py; do
     [[ -s "$APP/$file" && ! -L "$APP/$file" ]] || { echo "REALITY Node Agent не найден: $file" >&2; exit 2; }
