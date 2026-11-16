@@ -28,7 +28,7 @@ cleanup(){
  rm -rf "$TEMP";exit "$rc"
 }
 trap cleanup EXIT
-for module in wpo_reality.py wpo_xray_live.py wpo_node_vpn.py wpo_node_eight.py; do
+for module in wpo_reality.py wpo_reality_probe.py wpo_xray_live.py wpo_node_vpn.py wpo_node_eight.py; do
  curl -4fsSL --retry 3 --connect-timeout 15 --max-time 90 \
  "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REF/src/$module" -o "$TEMP/$module"
  python3 -m py_compile "$TEMP/$module"
