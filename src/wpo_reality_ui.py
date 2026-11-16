@@ -116,9 +116,9 @@ async function execute(save){
  try{
   if(!reuse){
    phase='checking';activeAbort=new AbortController();
-   // Every node has its own REALITY endpoint. Check in parallel, too:
-   // one slow node must not add its latency to all the other nodes.
-   const assessments=await Promise.allSettled(nodes.map(async n=>{
+   // Walk the visible node list in order: only one REALITY check is
+   // running at a time. This makes progress predictable on Connections/Nodes.
+   for(const n of nodes){
     ensureActive();const row=rows.get(n.id);
     try{
      update(row,'pending','TLS 1.3 → HTTP/2 → REALITY Vision → HTTPS');
@@ -130,10 +130,9 @@ async function execute(save){
      if(cancelRequested)throw err;
      operationFailed=true;update(row,'error',err.message||'Ошибка проверки REALITY');
     }
-   }));
+   }
    activeAbort=null;
    ensureActive();
-   if(assessments.some(x=>x.status==='rejected'))operationFailed=true;
    if(operationFailed){
     verified=null;
     out.textContent=save?'Сохранение отменено: не все ноды прошли проверку. Настройки не менялись.':'Не все ноды подтвердили REALITY. Настройки не менялись.';
@@ -145,31 +144,26 @@ async function execute(save){
    out.textContent='REALITY подтверждён на '+nodes.length+' нод(ах). Теперь можно нажать «Сохранить».';
    return;
   }
-  // Reuse the result of Check. Each mutating POST still tests the REALITY
-  // tunnel on its node, but does not restart the UI's full preflight loop.
-  // Remote nodes have separate agents. Read previous settings concurrently,
-  // then apply independent writes concurrently; total latency is bounded by
-  // the slowest node rather than the sum of all nodes.
+  // Reuse the successful Check; read all previous profiles in the same
+  // displayed order before modifying anything, so cancellation stays safe.
   phase='reading';activeAbort=new AbortController();
-  await Promise.all(nodes.map(async n=>{
+  for(const n of nodes){
    ensureActive();const row=rows.get(n.id);
    update(row,'pending','Получаем прежние параметры');
    const old=await send(n.id,{read_only:'1'},{signal:activeAbort.signal});
+   ensureActive();
    original.set(n.id,old.profile);
-  }));
-  ensureActive();
+  }
   phase='saving';activeAbort=null;
-  const changing=[];
+  // Apply and read back one node at a time, in the same order as Check.
+  // A mutating request is never aborted mid-flight: cancellation stops the
+  // NEXT write and triggers rollback of already attempted changes.
   for(const n of nodes){
-   const row=rows.get(n.id),before=original.get(n.id);
+   ensureActive();const row=rows.get(n.id),before=original.get(n.id);
    if(before.sni===request.sni&&before.fingerprint===request.fingerprint){
     update(row,'ok','Уже сохранено',['SNI','REALITY']);
-   }else changing.push(n);
-  }
-  // Mutating requests must NEVER be aborted halfway: Promise.allSettled
-  // waits for every in-flight node before starting a compensating rollback.
-  const statuses=await Promise.allSettled(changing.map(async n=>{
-   ensureActive();const row=rows.get(n.id);
+    continue;
+   }
    attempted.push(n);update(row,'pending','Сохраняем и проверяем ноду');
    try{
     const saved=await send(n.id,{...request,check_only:'0'});
@@ -180,9 +174,7 @@ async function execute(save){
     update(row,'ok','Сохранено и подтверждено',['SNI','REALITY','HTTP 204']);
     ensureActive();
    }catch(err){update(row,'error','Ошибка сохранения: '+err.message);throw err}
-  }));
-  const failure=statuses.find(item=>item.status==='rejected');
-  if(failure)throw failure.reason;
+  }
   ensureActive();
   verified=null;
   out.textContent='Сохранено на всех '+nodes.length+' нод(ах). Обновите подписки после смены SNI.';
