@@ -33,11 +33,11 @@ class RealityModalSaveTests(unittest.TestCase):
         js=r'''
 const assert=require('node:assert/strict');
 const handlerSource=SOURCE_JS;
-function setup(cancelDuringSave){
+function setup(cancelDuringSave,simulateSlowWrites=false){
  const entries=[{id:'local',name:'Основная нода'},{id:'node1',name:'Нидерланды'}];
  const store={local:{preset:'nvidia',sni:'www.nvidia.com',fingerprint:'firefox'},
               node1:{preset:'nvidia',sni:'www.nvidia.com',fingerprint:'firefox'}};
- const calls={preflight:0,save:0,read:0,rollback:0,events:[]};
+ const calls={preflight:0,save:0,read:0,rollback:0,events:[],inflight:0,maxInflight:0};
  const ctx={
    running:false,cancelRequested:false,closeAfterStop:false,restoreFailed:false,
    activeAbort:null,phase:'idle',verified:null,
@@ -71,6 +71,11 @@ function setup(cancelDuringSave){
   if(data.check_only==='0'){
     calls.save++;
     if(data.sni==='www.nvidia.com')calls.rollback++;
+    if(simulateSlowWrites&&data.sni==='www.apple.com'){
+      calls.inflight++;calls.maxInflight=Math.max(calls.maxInflight,calls.inflight);
+      await new Promise(resolve=>setTimeout(resolve,25));
+      calls.inflight--;
+    }
     store[id]={preset:data.preset,sni:data.sni,fingerprint:data.fingerprint};
     if(cancelDuringSave&&data.sni==='www.apple.com'&&id==='local')
        ctx.cancelRequested=true,ctx.closeAfterStop=true;
@@ -105,7 +110,15 @@ function setup(cancelDuringSave){
  assert.equal(b.store.node1.sni,'www.nvidia.com');
  assert.equal(b.calls.events.at(-1),'closed','Close after safe rollback');
  assert.equal(b.ctx.running,false);
- console.log('REALITY UI: Save and cancellation state machine passed');
+ const c=setup(false,true);
+ await c.execute(false);
+ await c.execute(true);
+ assert.equal(c.calls.maxInflight,2,'Independent remote writes must run concurrently');
+ assert.equal(c.calls.preflight,2,'Save must not repeat completed verification');
+ assert.equal(c.calls.save,2);
+ assert.equal(c.store.local.sni,'www.apple.com');
+ assert.equal(c.store.node1.sni,'www.apple.com');
+ console.log('REALITY UI: Save, parallel requests and cancellation rollback passed');
 })().catch(e=>{console.error(e);process.exit(1)});
 ''';
         # The mock uses the same network API surface but deliberately no DOM.
@@ -118,7 +131,7 @@ function setup(cancelDuringSave){
         js=js.replace("SOURCE_JS",json.dumps(body,ensure_ascii=False))
         result=subprocess.run(["node","-e",js],capture_output=True,text=True,timeout=15)
         self.assertEqual(result.returncode,0,result.stderr[:2500])
-        self.assertIn("state machine passed",result.stdout)
+        self.assertIn("parallel requests and cancellation rollback passed",result.stdout)
 
 if __name__=="__main__":
     unittest.main()
