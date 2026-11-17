@@ -252,6 +252,43 @@ def actual_reality(host,p):
     except subprocess.TimeoutExpired:process.kill();process.wait(timeout=2)
 
 
+
+def wpo_static_routing_view():
+ """WPO's client-side split routing, separate from Linux kernel IP routes."""
+ try:
+  sys.path.insert(0,str(APP))
+  import wpp_routing
+  content=wpp_routing.load('/var/lib/tproxy-panel/routing.json')
+  profiles=content.get('profiles',{})
+  if not isinstance(profiles,dict):raise ValueError('Incorrect routing format')
+ except (OSError,ValueError,ImportError,TypeError):
+  print('  Не удалось прочитать настройки маршрутизации WPO.',flush=True)
+  return
+ print('\n━━ СТАТИЧЕСКИЕ МАРШРУТЫ WPO · правила подписок Happ ━━',flush=True)
+ print('Это клиентские правила DIRECT/PROXY, отдельно от Linux-маршрутов VPS.',flush=True)
+ if not profiles:
+  print('  Дополнительных правил для подключений WPO не задано.',flush=True)
+  return
+ count=0
+ for cid,profile in sorted(profiles.items()):
+  if not isinstance(profile,dict):continue
+  if count>=16:
+   print('  ...остальные профили не показаны.',flush=True)
+   break
+  safe_id=cid if re.fullmatch('[A-Za-z0-9_-]{3,64}',str(cid)) else 'скрыто'
+  enabled=bool(profile.get('enabled',True))
+  flags=[key for key in ('ru_direct','private_direct','captive_direct',
+            'push_proxy','youtube_proxy','split_dns','block_bittorrent')
+         if profile.get(key)]
+  direct=profile.get('direct_domains',[])
+  proxy=profile.get('proxy_domains',[])
+  print('  '+str(safe_id)+': '+('включено' if enabled else 'выключено')+
+        '; flags='+(','.join(flags) if flags else 'нет')+
+        '; домены DIRECT='+str(len(direct) if isinstance(direct,list) else '?')+
+        '; PROXY='+str(len(proxy) if isinstance(proxy,list) else '?'),flush=True)
+  count+=1
+ print('Домены и другие приватные данные в отчёт не выводятся.',flush=True)
+
 def controller_route(host):
  """Kernel's chosen route from controller toward each registered node."""
  try:
@@ -335,6 +372,7 @@ def main():
   print('Не удалось прочитать реестр: '+type(exc).__name__,file=sys.stderr)
   return 2
  if warning:print('! Не удалось сверить подписки: '+warning,flush=True)
+ wpo_static_routing_view()
  inspected=[]
  for node in nodes:
   label=str(node.get('name') or node.get('country_name') or 'Нода')[:55]
