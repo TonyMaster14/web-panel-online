@@ -10,8 +10,8 @@ import json
 # The catalog is shared conceptually with the panel's native protocols. A
 # node VPN capability is not implied just because a protocol is displayed.
 CATALOG = (
-    ("vless", "VLESS XHTTP", "Happ · HTTPS 443", "happ"),
     ("reality", "VLESS REALITY", "Happ · TCP 443 · Vision", "happ"),
+    ("vless", "VLESS XHTTP", "Happ · HTTPS 443", "happ"),
     ("web", "WEB Proxy", "Telegram", "telegram"),
     ("mtproto", "MTProto", "Telegram", "telegram"),
     ("awg20", "AmneziaWG 2.0", "Amnezia · конфигурация", "amnezia"),
@@ -96,7 +96,7 @@ def form(path, csrf, connections, nodes=None, local=None):
         '<section class="create-step" id="quickFields" hidden></section>'
     )
     return (
-        '<style>@media(min-width:561px){.wpo-v28-option.wpo-reality-hysteria{grid-column:2}}</style><dialog id="createAccount" class="create-dialog wpo-v28-dialog">'
+        '<style>@media(min-width:561px){.wpo-v28-option.wpo-reality-hysteria{grid-column:1}}</style><dialog id="createAccount" class="create-dialog wpo-v28-dialog">'
         '<div class="dialog-head"><div><h2>Новый пользователь</h2>'
         '<small>Конфигурация · выбранные ноды и протоколы</small></div>'
         '<button type="button" data-close-dialog aria-label="Закрыть">×</button></div>'
@@ -670,4 +670,4 @@ def replace_legacy_create_js(source):
         raise ValueError("Old wizard boundaries are reversed")
     return source[:start] + LEGACY_CREATE_JS + "\n" + source[end:]
 
-CSS_REALITY = """@media(min-width:561px){.wpo-v28-option.wpo-reality-hysteria{grid-column:2}}"""
+CSS_REALITY = """@media(min-width:561px){.wpo-v28-option.wpo-reality-hysteria{grid-column:1}}"""
