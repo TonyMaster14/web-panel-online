@@ -23,7 +23,7 @@ XRAY=Path('/opt/web-panel-proxy/xray/xray')
 CHECK_URL='https://www.gstatic.com/generate_204'
 
 REMOTE=r"""
-import base64,json,re,sys,subprocess
+import base64,json,re,sys,subprocess,socket,ipaddress
 from pathlib import Path
 def read(path):
  try:return json.loads(Path(path).read_text())
@@ -33,6 +33,72 @@ def up(service):
   return subprocess.run(['systemctl','is-active','--quiet',service],
     stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=4).returncode==0
  except (OSError,subprocess.TimeoutExpired):return False
+
+# READ-ONLY Linux policy routes + effective kernel route decisions.
+def ip_json(*args):
+ try:
+  p=subprocess.run(['ip','-j','-4',*args],stdout=subprocess.PIPE,
+      stderr=subprocess.DEVNULL,text=True,timeout=5)
+  if p.returncode:return None
+  obj=json.loads(p.stdout)
+  return obj if isinstance(obj,list) else None
+ except (OSError,ValueError,subprocess.TimeoutExpired):return None
+def route_fields(record):
+ if not isinstance(record,dict):return {}
+ return {k:record[k] for k in ('dst','dev','gateway','table','metric','protocol','type','src','prefsrc')
+         if k in record and isinstance(record[k],(str,int))}
+def selected_route(host):
+ arr=ip_json('route','get',host)
+ return route_fields(arr[0]) if arr else {}
+def policy_fields(record):
+ if not isinstance(record,dict):return {}
+ return {k:record[k] for k in ('priority','table','src','dst','fwmark','iif','oif','action')
+         if k in record and isinstance(record[k],(str,int))}
+def routes_snapshot(config):
+ entries=ip_json('route','show','table','all')
+ rules=ip_json('rule','show')
+ defaults=[route_fields(x) for x in (entries or []) if x.get('dst')=='default'
+           and x.get('table','main') in ('main',254,'254')]
+ extra_rules=[policy_fields(x) for x in (rules or [])
+              if x.get('priority') not in (0,32766,32767)
+              and x.get('table') not in ('local','main','default')]
+ # A static route is not the automatically generated kernel connected subnet.
+ static=[route_fields(x) for x in (entries or [])
+         if x.get('protocol') not in ('kernel','local')
+         and x.get('dst') not in ('default',None)
+         and x.get('type','unicast') not in ('local','broadcast')
+         and (x.get('gateway') or x.get('table','main') not in ('main',254,'254')
+              or x.get('protocol')=='static')]
+ lookups={host:selected_route(host) for host in ('1.1.1.1','8.8.8.8')}
+ dev=lookups.get('1.1.1.1',{}).get('dev')
+ rp_filter=None
+ if isinstance(dev,str) and re.fullmatch('[A-Za-z0-9_.:-]{1,15}',dev):
+  try:rp_filter=int((Path('/proc/sys/net/ipv4/conf')/dev/'rp_filter').read_text().strip())
+  except (OSError,ValueError):pass
+ outbounds=[x.get('protocol','') for x in config.get('outbounds',[])
+            if isinstance(x,dict)]
+ mapping=config.get('routing',{}) if isinstance(config.get('routing'),dict) else {}
+ def direct():
+  try:
+   p=subprocess.run(['curl','-4','--noproxy','*','-sS','--connect-timeout','4',
+                     '--max-time','7','-o','/dev/null','-w','%{http_code} %{time_total}',
+                     'https://www.gstatic.com/generate_204'],
+      stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,timeout=10)
+   code,_,duration=p.stdout.strip().partition(' ')
+   if p.returncode==0 and code=='204':
+    return str(round(float(duration)*1000))+'ms'
+  except (OSError,ValueError,subprocess.TimeoutExpired):pass
+  return 'FAIL'
+ return {'available':entries is not None and rules is not None,
+         'default':defaults[:4],
+         'static_count':len(static),'static':static[:8],
+         'policy_count':len(extra_rules),'policy':extra_rules[:6],
+         'get':lookups,'rp_filter':rp_filter,
+         'xray_direct':'freedom' in outbounds,
+         'xray_outbound_kinds':sorted(set(str(x) for x in outbounds))[:10],
+         'xray_rules_count':len(mapping.get('rules',[])) if isinstance(mapping.get('rules'),list) else 0,
+         'direct_https204':direct()}
+
 try:
  ids=json.loads(base64.b64decode(sys.argv[1],validate=True))
  ids=list(dict.fromkeys(x for x in ids if isinstance(x,str) and re.fullmatch('[0-9a-f]{64}',x)))[:150]
@@ -77,7 +143,8 @@ try:
   'target_matches':settings_reality.get('target',settings_reality.get('dest'))==str(sni)+':443',
   # Used only by a temporary Xray client on the controller; never printed.
   'client_secret':sample,'public_key':profile.get('public_key',''),
-  'short_id':profile.get('short_id','')
+  'short_id':profile.get('short_id',''),
+  'static_routes':routes_snapshot(cfg)
  },separators=(',',':')))
 except Exception as exc:
  print(json.dumps({'ok':False,'kind':type(exc).__name__}))
@@ -184,6 +251,79 @@ def actual_reality(host,p):
     try:process.wait(timeout=2)
     except subprocess.TimeoutExpired:process.kill();process.wait(timeout=2)
 
+
+def controller_route(host):
+ """Kernel's chosen route from controller toward each registered node."""
+ try:
+  address=socket.getaddrinfo(host,443,family=socket.AF_INET,type=socket.SOCK_STREAM)[0][4][0]
+  result=subprocess.run(['ip','-j','-4','route','get',address],capture_output=True,
+                        text=True,timeout=5)
+  rows=json.loads(result.stdout) if result.returncode==0 else []
+  if isinstance(rows,list) and rows:return describe_route(rows[0])
+ except (OSError,ValueError,TypeError,IndexError,subprocess.TimeoutExpired):
+  pass
+ return 'недоступно'
+
+def describe_route(record):
+ if not isinstance(record,dict) or not record:return 'нет маршрута'
+ fields=[]
+ for key in ('dev','gateway','table','metric','src','type'):
+  if key in record and isinstance(record[key],(str,int)):
+   fields.append(key+'='+str(record[key]))
+ return ', '.join(fields) if fields else 'маршрут не определён'
+
+def static_routes_view(data):
+ """Render separate static routing section with Poland as a reference."""
+ info=data.get('static_routes',{})
+ if not isinstance(info,dict) or not info.get('available'):
+  print('  СТАТИЧЕСКИЕ МАРШРУТЫ: iproute2 не ответил на запрос таблиц/правил.',flush=True)
+  return None
+ print('  ┌─ Статические маршруты и правила ─────────────────',flush=True)
+ defaults=info.get('default',[])
+ print('  │ Основной default: '+('; '.join(describe_route(x) for x in defaults[:2])
+       if defaults else 'НЕ НАЙДЕН'),flush=True)
+ for target in ('1.1.1.1','8.8.8.8'):
+  got=info.get('get',{}).get(target,{})
+  print('  │ Ядро → '+target+': '+describe_route(got),flush=True)
+ counts=(info.get('static_count',0),info.get('policy_count',0))
+ print('  │ Статических маршрутов: '+str(counts[0])+
+       '; дополнительных policy rules: '+str(counts[1]),flush=True)
+ for x in info.get('static',[])[:6]:
+  print('  │   route: '+describe_route(x)+' dst='+str(x.get('dst','?'))[:65],flush=True)
+ for x in info.get('policy',[])[:4]:
+  print('  │   rule: '+', '.join(k+'='+str(v) for k,v in x.items())[:150],flush=True)
+ rp=info.get('rp_filter')
+ print('  │ rp_filter на исходящем интерфейсе: '+
+       ({0:'выкл',1:'строгий',2:'свободный'}.get(rp,'неизвестно')),flush=True)
+ print('  │ Xray direct/freedom: '+('OK' if info.get('xray_direct') else 'FAIL')+
+       '; правил маршрутизации Xray: '+str(info.get('xray_rules_count','?')),flush=True)
+ print('  │ Прямой HTTPS 204 с этой VPS: '+str(info.get('direct_https204','?'))[:25],flush=True)
+ print('  └─────────────────────────────────────────────────',flush=True)
+ return {'dev':info.get('get',{}).get('1.1.1.1',{}).get('dev',''),
+         'table':info.get('get',{}).get('1.1.1.1',{}).get('table','main'),
+         'policy':counts[1],'static':counts[0],
+         'rp_filter':rp,'direct':info.get('xray_direct'),
+         'https':info.get('direct_https204')}
+
+def routing_comparison(items):
+ if not items:return
+ print('\n━━ СРАВНЕНИЕ С ПОЛЬШЕЙ · СТАТИЧЕСКИЕ МАРШРУТЫ ━━',flush=True)
+ baseline=next((v for n,v in items if 'польш' in n.lower() or 'poland' in n.lower()),None)
+ if baseline is None:
+  print('Польская нода не распознана по названию; показываю сравнение без эталона.',flush=True)
+ for name,route in items:
+  issues=[]
+  if route.get('policy',0):issues.append('policy rules='+str(route['policy']))
+  if route.get('rp_filter')==1:issues.append('строгий rp_filter')
+  if route.get('direct') is False:issues.append('нет outbound freedom')
+  if str(route.get('https','')).upper().startswith('FAIL'):issues.append('прямой HTTPS не прошёл')
+  if baseline is not None and route is not baseline:
+   if route.get('policy')!=baseline.get('policy'):issues.append('число policy rules отличается от Польши')
+   if route.get('static')!=baseline.get('static'):issues.append('число static routes отличается от Польши')
+   if route.get('rp_filter')!=baseline.get('rp_filter'):issues.append('rp_filter отличается от Польши')
+  print('• '+name+': '+('; '.join(dict.fromkeys(issues)) if issues else 'явных аномалий не выявлено'),flush=True)
+ print('Разные gateway/интерфейсы VPS обычно нормальны. Этот отчёт не проверяет путь от телефона до ноды.',flush=True)
+
 def main():
  if os.geteuid()!=0 or not NODES.is_file() or not (APP/'wpp_nodes.py').is_file():
   print('Запустите команду на основной панели WPO с sudo.',file=sys.stderr)
@@ -195,6 +335,7 @@ def main():
   print('Не удалось прочитать реестр: '+type(exc).__name__,file=sys.stderr)
   return 2
  if warning:print('! Не удалось сверить подписки: '+warning,flush=True)
+ inspected=[]
  for node in nodes:
   label=str(node.get('name') or node.get('country_name') or 'Нода')[:55]
   print('\n━━ '+label+' ━━',flush=True)
@@ -207,6 +348,7 @@ def main():
    continue
   print('  Домен: '+host,flush=True)
   print('  TCP443 из основной панели: '+('/'.join(tcp(host) for _ in range(2))),flush=True)
+  print('  Маршрут основной панели → нода: '+controller_route(host),flush=True)
   data=ssh_check(host,expected.get(str(node.get('id')),[]))
   if not data.get('ok'):
    print('  SSH: '+str(data.get('kind','ошибка'))[:60],flush=True)
@@ -225,6 +367,9 @@ def main():
         +'; в Xray '+str(data.get('in_xray',0)),flush=True)
   print('  Клиентов REALITY в Xray: '+str(data.get('xray_clients',0)),flush=True)
   print('  REALITY→HTTPS204 из основной панели: '+actual_reality(host,data),flush=True)
+  summary=static_routes_view(data)
+  if summary:inspected.append((label,summary))
+ routing_comparison(inspected)
  print('\nЗавершено: ничего не изменено. Это не проверка из сети самого Happ.',flush=True)
  return 0
 
