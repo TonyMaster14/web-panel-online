@@ -2392,3 +2392,57 @@ if "WPO_SELECT_POPOVER_V2_JS" in globals():
         .replace("m6 9 6 6 6-6", "M7 9h10l-5 6z"))
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "")).encode("utf-8")).hexdigest()[:12]
 # WPO_FILLED_TRIANGLE_ICON_V1_END
+
+
+# WPO_GLOBAL_DISCLOSURE_TRIANGLE_V2_BEGIN
+# Unified 16px icon slot with an actual 10x6 gray filled triangle in all dropdowns.
+CSS += '''
+:root{
+ --wpo-disclosure-triangle:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M3 5h10L8 11z' fill='%2391aeb8'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"]{
+ --wpo-disclosure-triangle:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M3 5h10L8 11z' fill='%235d7870'/%3E%3C/svg%3E");
+}
+select:not([multiple]):not(.wpo-popup-select-source){
+ -webkit-appearance:none!important;appearance:none!important;
+ background-image:var(--wpo-disclosure-triangle)!important;
+ background-position:right 12px center!important;
+ background-repeat:no-repeat!important;
+ background-size:16px 16px!important;
+ padding-right:38px!important;
+}
+.wpo-popup-select-trigger .wpo-popup-select-chevron{
+ display:block!important;width:16px!important;height:16px!important;
+ flex:0 0 16px!important;fill:var(--muted)!important;stroke:none!important;
+}
+details>summary:not(.xray-config-summary){
+ list-style:none;
+}
+details>summary:not(.xray-config-summary)::-webkit-details-marker{display:none}
+details>summary:not(.xray-config-summary)::after{
+ content:"";display:inline-block;vertical-align:middle;
+ width:16px;height:16px;min-width:16px;
+ margin-left:9px;flex:0 0 16px;
+ background:var(--wpo-disclosure-triangle) center / 16px 16px no-repeat;
+ transition:transform .16s ease;
+}
+details[open]>summary:not(.xray-config-summary)::after{transform:rotate(180deg)}
+.xray-config-summary-side i{
+ display:block!important;width:16px!important;height:16px!important;
+ border:0!important;background:var(--wpo-disclosure-triangle) center / 16px 16px no-repeat!important;
+ transform:none!important;transition:transform .16s ease!important;
+}
+.xray-config-editor[open] .xray-config-summary-side i{transform:rotate(180deg)!important}
+@media(prefers-reduced-motion:reduce){
+ details>summary:not(.xray-config-summary)::after,
+ .xray-config-summary-side i{transition:none!important}
+}
+'''
+if "WPO_SELECT_POPOVER_V2_JS" in globals():
+    WPO_SELECT_POPOVER_V2_JS = (WPO_SELECT_POPOVER_V2_JS
+        .replace("arrow.setAttribute('viewBox','0 0 24 24')", "arrow.setAttribute('viewBox','0 0 16 16')")
+        .replace("M7 9h10l-5 6z", "M3 5h10L8 11z")
+        .replace("m7 10 5 5 5-5", "M3 5h10L8 11z")
+        .replace("m6 9 6 6 6-6", "M3 5h10L8 11z"))
+ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "")).encode("utf-8")).hexdigest()[:12]
+# WPO_GLOBAL_DISCLOSURE_TRIANGLE_V2_END
