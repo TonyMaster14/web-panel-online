@@ -2155,3 +2155,45 @@ CSS += '''
  .nodes-list>.node-card{transition:none!important;transform:none!important}
 }
 '''
+
+
+# wpo-reality-select-style-v1
+# Native select controls across modal editors, user filters and release selectors
+# follow the single-outline inactive "Сайт для REALITY" field design. Native
+# <select> remains intact, so server actions, change events and keyboard work.
+CSS += '''
+:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select){
+ -webkit-appearance:none;appearance:none;
+ box-sizing:border-box;min-width:0;min-height:40px;
+ padding:9px 36px 9px 12px;
+ border:1px solid var(--line);border-radius:9px;
+ background-color:var(--input);color:var(--text);
+ background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+ background-position:calc(100% - 18px) 50%,calc(100% - 14px) 50%;
+ background-size:4px 4px;background-repeat:no-repeat;
+ font:inherit;font-size:12px;line-height:1.4;
+ box-shadow:none;outline:none;text-overflow:ellipsis;
+ cursor:pointer;
+}
+:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select):hover:not(:disabled){
+ border-color:color-mix(in srgb,var(--accent) 30%,var(--line));
+}
+:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select):focus-visible{
+ outline:2px solid var(--accent);outline-offset:2px;
+ border-color:var(--line);box-shadow:none;
+}
+:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select):disabled{
+ opacity:.65;cursor:not-allowed;
+ border-color:var(--line);box-shadow:none;
+}
+:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select) option{
+ background:var(--surface);color:var(--text);
+}
+.clients-toolbar select{flex:0 1 auto;max-width:180px;min-width:130px;min-height:40px}
+.update-control select{width:100%;min-height:40px}
+#connectionEditor select{width:100%;max-width:100%}
+@media(max-width:700px){
+ .clients-toolbar select{flex:1 1 120px;min-width:0;max-width:none}
+}
+'''
+ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
