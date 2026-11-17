@@ -28,7 +28,7 @@ def editor(path, csrf, nodes=(), fleet=False):
 <div class="dialog-head"><div><h2>VLESS TCP REALITY Vision</h2><small>TCP · Vision · общий внешний порт 443</small></div><button type="button" data-reality-close>×</button></div>
 <input type="hidden" name="csrf" value="'''+e(csrf)+'''">
 <section class="connection-pane">'''+scope+'''<label>IP-адрес<input id="wpoRealityAddress" value="'''+e(profile.get('address',''))+'''" readonly aria-readonly="true" spellcheck="false"></label>
-<label>Сайт для REALITY<div class="wpo-reality-picker"><input type="hidden" name="preset" value="'''+e(chosen)+'''"><button type="button" class="wpo-reality-picker-toggle" data-reality-toggle aria-haspopup="listbox" aria-expanded="false"><span data-reality-label>'''+e(selected_label)+'''</span><span aria-hidden="true">⌄</span></button><div class="wpo-reality-picker-menu" role="listbox" data-reality-list hidden>'''+choices+'''</div></div></label>
+<label>Сайт для REALITY<div class="wpo-reality-picker"><input type="hidden" name="preset" value="'''+e(chosen)+'''"><button type="button" class="wpo-reality-picker-toggle" data-reality-toggle aria-haspopup="listbox" aria-expanded="false"><span data-reality-label>'''+e(selected_label)+'''</span><span class="wpo-reality-picker-triangle" aria-hidden="true"></span></button><div class="wpo-reality-picker-menu" role="listbox" data-reality-list hidden>'''+choices+'''</div></div></label>
 <label>SNI<input name="sni" value="'''+e(profile['sni'])+'''" required></label>
 <label>TLS fingerprint<select name="fingerprint"><option value="firefox">Mozilla Firefox</option><option value="edge">Edge · проверить в клиенте</option></select></label>
 <small>Шаблон сайта на вашем домене настраивается отдельно. '''+('Сохранение применяется ко всей сети после проверки каждой ноды.' if fleet else 'Изменения применяются ко всем REALITY-подключениям этой ноды.')+''' После смены SNI обновите подписки.</small>
@@ -317,6 +317,24 @@ displayPreset();
 }
 }
 
+
+/* WPO_REALITY_FILLED_TRIANGLE_V1_BEGIN */
+#wpoRealityDialog .wpo-reality-picker-toggle .wpo-reality-picker-triangle{
+  display:grid;place-items:center;box-sizing:border-box;
+  flex:0 0 16px;width:16px;height:16px;
+  transition:transform .14s ease;
+}
+#wpoRealityDialog .wpo-reality-picker-toggle .wpo-reality-picker-triangle::after{
+  content:"";display:block;width:10px;height:6px;
+  background:var(--muted);clip-path:polygon(0 0,100% 0,50% 100%);
+}
+#wpoRealityDialog .wpo-reality-picker-toggle[aria-expanded="true"] .wpo-reality-picker-triangle{
+  transform:rotate(180deg);
+}
+@media(prefers-reduced-motion:reduce){
+  #wpoRealityDialog .wpo-reality-picker-triangle{transition:none}
+}
+/* WPO_REALITY_FILLED_TRIANGLE_V1_END */
 </style>'''
     return style+html+script
 
