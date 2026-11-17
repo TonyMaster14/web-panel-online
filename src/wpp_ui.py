@@ -978,7 +978,7 @@ def routing_ui(connections, state, path, csrf):
     choices=sorted(
         (item for item in connections if selectable_connection(item)
          and item.get('enabled') and item.get('protocol') in ('vless','reality','hysteria','awg20','awg31')),
-        key=lambda item: {'vless':0,'reality':1,'hysteria':2,'awg20':3,'awg31':4}.get(item.get('protocol'),4))
+        key=lambda item: {'reality':0,'vless':1,'hysteria':2,'awg20':3,'awg31':4}.get(item.get('protocol'),4))
 
     if not choices:
         return f'''<section class="card empty"><div><h3>Нет доступных подключений</h3><p>Сначала создайте VLESS, Hysteria2 или AWG в разделе «Подключения».</p><a class="btn primary" href="{esc(path)}/connections">Перейти к подключениям</a></div></section>'''
@@ -992,9 +992,11 @@ def routing_ui(connections, state, path, csrf):
             return False
         if protocol in ('awg20','awg31'):
             return bool(saved.get('allowed_ips',[]))
-        return bool(saved.get('enabled'))
+        return bool(saved.get('enabled', True) and (
+            any(saved.get(key) for key in routing_store.ROUTING_FLAGS)
+            or saved.get('direct_domains') or saved.get('proxy_domains')))
     routing_tabs=[]
-    for protocol,title in (('vless','VLESS XHTTP'),('reality','VLESS TCP REALITY Vision'),('hysteria','Hysteria2'),
+    for protocol,title in (('reality','VLESS TCP REALITY Vision'),('vless','VLESS XHTTP'),('hysteria','Hysteria2'),
                            ('awg20','AmneziaWG 2.0'),('awg31','AmneziaWG 3.1')):
         available=[item for item in choices if item.get('protocol')==protocol]
         if not available:
@@ -1050,8 +1052,9 @@ def routing_ui(connections, state, path, csrf):
         active_mark=lambda key: '<em>Добавлено</em>' if active(key) else ''
         direct='\n'.join(str(x).removeprefix('domain:') for x in profile.get('direct_domains',[]))
         proxy='\n'.join(str(x).removeprefix('domain:') for x in profile.get('proxy_domains',[]))
-        protocol_title='Hysteria2' if item.get('protocol')=='hysteria' else 'VLESS XHTTP'
-        forms.append(f'''<form class="routing-form" data-routing-form="{esc(item['id'])}" data-routing-stored="{"1" if has_profile and profile.get('enabled') else "0"}" method="post" action="{esc(path)}/routing-action" {'hidden' if index else ''}>
+        protocol_title=('Hysteria2' if item.get('protocol')=='hysteria' else
+                         'VLESS TCP REALITY Vision' if item.get('protocol')=='reality' else 'VLESS XHTTP')
+        forms.append(f'''<form class="routing-form" data-routing-form="{esc(item['id'])}" data-routing-stored="{"1" if routing_enabled(item) else "0"}" method="post" action="{esc(path)}/routing-action" {'hidden' if index else ''}>
 <input type="hidden" name="csrf" value="{esc(csrf)}"><input type="hidden" name="connection_id" value="{esc(item['id'])}">
 <aside class="routing-client-notice"><span aria-hidden="true">!</span><div><b>Обновите подключение после изменения маршрутизации</b><small>Обновите подписку в VPN-приложении.</small></div></aside>
 <section class="routing-hero"><div><span class="connection-protocol">{esc(protocol_title)}</span><h2>{esc(item.get('name','Подключение'))}</h2><p>Отметьте только те правила, которые нужно добавить или убрать.</p></div></section>
@@ -1087,8 +1090,8 @@ def routing_ui(connections, state, path, csrf):
 .routing-protocol-card.is-unavailable{{opacity:.44;cursor:not-allowed}}
 .routing-tab-dot{{display:inline-flex;align-items:center;justify-content:center;flex:0 0 17px;width:17px;height:17px;border:1.5px solid #8394a9;border-radius:50%;background:transparent}}
 .routing-tab-dot i{{width:8px;height:8px;border-radius:50%;background:transparent}}
-.routing-protocol-card.is-selected .routing-tab-dot{{border-color:#22c55e;background:color-mix(in srgb,#22c55e 12%,transparent)}}
-.routing-protocol-card.is-selected .routing-tab-dot i{{background:#22c55e}}
+.routing-protocol-card[data-routing-enabled="1"] .routing-tab-dot{{border-color:#22c55e;background:color-mix(in srgb,#22c55e 12%,transparent)}}
+.routing-protocol-card[data-routing-enabled="1"] .routing-tab-dot i{{background:#22c55e}}
 .routing-tab-copy{{min-width:0;display:grid;gap:4px}}
 .routing-tab-copy b{{font-size:12px;line-height:1.25;font-weight:700}}
 .routing-tab-copy small{{font-size:10px;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}}
