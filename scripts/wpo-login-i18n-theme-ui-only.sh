@@ -38,6 +38,8 @@ installed = Path(sys.argv[1]).read_text(encoding='utf-8')
 source = Path(sys.argv[2]).read_text(encoding='utf-8')
 begin = '# WPO_LOGIN_LANGUAGE_THEME_V1_BEGIN'
 end = '# WPO_LOGIN_LANGUAGE_THEME_V1_END'
+safe_begin = '# WPO_LOGIN_SAFE_SUBMIT_V2_BEGIN'
+safe_end = '# WPO_LOGIN_SAFE_SUBMIT_V2_END'
 
 def section(data, start, stop):
     a = data.find(start)
@@ -105,8 +107,25 @@ if begin in installed:
 else:
     installed = installed.rstrip() + '\n\n' + new_patch + '\n'
 
-if installed.count('def login_ui(path):') != 2:
-    raise RuntimeError('Не найдена обёртка нового UI входа.')
+# Apply the extra iOS Safari safe-submit guard from the same pinned source.
+if source.count(safe_begin) != 1 or source.count(safe_end) != 1 or source.index(safe_begin) >= source.index(safe_end):
+    raise RuntimeError('Защита ручного входа iOS отсутствует в источнике.')
+safe_patch = source[source.index(safe_begin):source.index(safe_end) + len(safe_end)]
+if not all(piece in safe_patch for piece in (
+    'WPO_LOGIN_SAFE_SUBMIT_V2_JS', '_WPO_LOGIN_SAFE_SUBMIT_V2_BASE = login_ui',
+    'ASSET_REV = ')):
+    raise RuntimeError('Неполный защитный скрипт входа iOS.')
+if installed.count(safe_begin) != installed.count(safe_end) or installed.count(safe_begin) > 1:
+    raise RuntimeError('Нарушены маркеры защиты входа.')
+if safe_begin in installed:
+    a = installed.index(safe_begin)
+    b = installed.index(safe_end, a) + len(safe_end)
+    installed = installed[:a] + safe_patch + installed[b:]
+else:
+    installed = installed.rstrip() + '\n\n' + safe_patch + '\n'
+
+if installed.count('def login_ui(path):') != 3:
+    raise RuntimeError('Не найдены обе обёртки нового UI входа.')
 if 'autoTimer=' in section(installed, start_login, end_login):
     raise RuntimeError('Автоматическая отправка формы не удалена.')
 if 'data-wpo-lang="ru"' not in installed or 'wpo-theme-moon' not in installed:
