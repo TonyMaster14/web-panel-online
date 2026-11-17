@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import subprocess
+import sys
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -120,6 +121,37 @@ class FleetSshTests(unittest.TestCase):
         self.assertIn('policy rules',report)
         self.assertIn('строгий rp_filter',report)
         self.assertIn('прямой HTTPS не прошёл',report)
+
+    def test_client_split_routing_rules_are_reported_without_domains(self):
+        fake=SimpleNamespace(load=lambda path:{
+            'profiles':{
+                'reality-primary':{'enabled':True,'ru_direct':True,
+                    'private_direct':True,'captive_direct':False,'push_proxy':True,
+                    'youtube_proxy':True,'split_dns':True,'block_bittorrent':False,
+                    'direct_domains':['domain:private.example','domain:internal.example'],
+                    'proxy_domains':['domain:secret-project.example']}
+            }})
+        stream=io.StringIO()
+        with patch.dict(sys.modules,{'wpp_routing':fake}), contextlib.redirect_stdout(stream):
+            diag.wpo_static_routing_view()
+        report=stream.getvalue()
+        self.assertIn('СТАТИЧЕСКИЕ МАРШРУТЫ WPO',report)
+        self.assertIn('reality-primary',report)
+        self.assertIn('DIRECT=2',report)
+        self.assertIn('PROXY=1',report)
+        self.assertNotIn('secret-project.example',report)
+        self.assertNotIn('private.example',report)
+
+    def test_polish_reference_chosen_by_country_code_even_if_custom_named(self):
+        polish={'country_code':'PL','policy':0,'static':0,
+                'rp_filter':2,'direct':True,'https':'42ms'}
+        remote={'country_code':'SE','policy':1,'static':2,
+                'rp_filter':1,'direct':True,'https':'FAIL'}
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            diag.routing_comparison([('Fast server',polish),('Other',remote)])
+        text=output.getvalue()
+        self.assertNotIn('Польская нода не распознана',text)
+        self.assertIn('число static routes отличается от Польши',text)
 
     def test_route_diagnostics_cannot_alter_network_configuration(self):
         source=(ROOT/"scripts/wpo-happ-fleet-ssh-diagnose.py").read_text()
