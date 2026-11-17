@@ -71,7 +71,11 @@ function validElement(el){
   return el&&el.nodeType===1&&!(el.matches(skip)||el.closest(skip));
 }
 function translateText(node){
-  if(!validElement(node.parentElement))return;
+  const parent=node.parentElement;
+  if(!validElement(parent))return;
+  // An <option> without a value attribute submits its text as its value.
+  // Preserve these options so language never changes connection/protocol IDs.
+  if(parent.tagName==='OPTION'&&!parent.hasAttribute('value'))return;
   const current=node.nodeValue;
   if(!current||!/[А-ЯЁа-яё]/u.test(current)&&!textStates.has(node))return;
   const info=restoreOrTranslate(current,textStates.get(node));
