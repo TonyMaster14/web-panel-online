@@ -2197,3 +2197,57 @@ CSS += '''
 }
 '''
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode("utf-8")).hexdigest()[:12]
+
+
+# wpo-reality-picker-unified-select-v1: native select controls now visually
+# match the single-frame "Сайт для REALITY" picker (41px, one border, one arrow).
+# Keep native semantics, options, keyboard controls and submit behavior intact.
+CSS += '''
+:where(#connectionProtocol,#clientFilter,#protocolFilter,#clientSort,
+       #panelRelease,#xrayRelease,#openfluxRelease,
+       dialog select,.wpo-node-edit select,.wpo-node-editor select){
+ -webkit-appearance:none;appearance:none;box-sizing:border-box;
+ width:100%;height:41px;min-height:41px;margin:0;
+ padding:0 36px 0 13px;
+ border:1px solid var(--line);border-radius:10px;
+ background-color:var(--input);
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m5 7 5 5 5-5' fill='none' stroke='%2391aeb8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+ background-position:right 12px center;background-size:16px 16px;background-repeat:no-repeat;
+ color:var(--text);font:500 12px/1.4 "Segoe UI",system-ui,sans-serif;
+ text-overflow:ellipsis;white-space:nowrap;box-shadow:none;outline:none;
+ transition:border-color .16s ease,background-color .16s ease;
+}
+:where(#connectionProtocol,#clientFilter,#protocolFilter,#clientSort,
+       #panelRelease,#xrayRelease,#openfluxRelease,
+       dialog select,.wpo-node-edit select,.wpo-node-editor select):hover:not(:disabled){
+ border-color:color-mix(in srgb,var(--muted) 60%,var(--line));
+}
+:where(#connectionProtocol,#clientFilter,#protocolFilter,#clientSort,
+       #panelRelease,#xrayRelease,#openfluxRelease,
+       dialog select,.wpo-node-edit select,.wpo-node-editor select):focus-visible{
+ outline:2px solid var(--accent);outline-offset:2px;box-shadow:none;
+}
+:where(#connectionProtocol,#clientFilter,#protocolFilter,#clientSort,
+       #panelRelease,#xrayRelease,#openfluxRelease,
+       dialog select,.wpo-node-edit select,.wpo-node-editor select):disabled{
+ opacity:.65;cursor:not-allowed;
+}
+:where(#connectionProtocol,#clientFilter,#protocolFilter,#clientSort,
+       #panelRelease,#xrayRelease,#openfluxRelease,
+       dialog select,.wpo-node-edit select,.wpo-node-editor select) option{
+ color:var(--text);background:var(--surface);
+}
+:root[data-theme=light] :where(#connectionProtocol,#clientFilter,#protocolFilter,#clientSort,
+       #panelRelease,#xrayRelease,#openfluxRelease,
+       dialog select,.wpo-node-edit select,.wpo-node-editor select){
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m5 7 5 5 5-5' fill='none' stroke='%235d7870' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+@media(max-width:700px){
+ :where(#clientFilter,#protocolFilter,#clientSort){width:auto;min-width:0;flex:1 1 120px}
+}
+@media(prefers-reduced-motion:reduce){
+ :where(#connectionProtocol,#clientFilter,#protocolFilter,#clientSort,
+        #panelRelease,#xrayRelease,#openfluxRelease,
+        dialog select,.wpo-node-edit select,.wpo-node-editor select){transition:none}
+}
+'''
