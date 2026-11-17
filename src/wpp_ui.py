@@ -2473,3 +2473,13 @@ def page_layout(*args, **kwargs):
     return _WPO_PAGE_LANGUAGE_BASE(*args, **kwargs).replace('</body></html>', WPO_I18N_UI_JS + '</body></html>', 1)
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "") + WPO_I18N_UI_JS).encode("utf-8")).hexdigest()[:12]
 # WPO_LOGIN_LANGUAGE_THEME_V1_END
+
+# WPO_LOGIN_SAFE_SUBMIT_V2_BEGIN
+# Require a deliberate Sign in button activation; prevents iOS implicit login.
+WPO_LOGIN_SAFE_SUBMIT_V2_JS = "<script>\n(()=>{'use strict';\n const form=document.getElementById('loginForm');\n const button=document.getElementById('loginSubmit');\n const username=document.getElementById('loginName');\n const password=document.getElementById('loginPassword');\n if(!form||!button||!username||!password)return;\n let explicit=false, pointer=false;\n // Never sign in merely because Safari/password manager autofills or focuses a field.\n // Authorize only an intentional button press (pointer, keyboard, or focused assistive activation).\n button.addEventListener('pointerdown',event=>{\n   if(event.isTrusted)pointer=true;\n },true);\n button.addEventListener('pointercancel',()=>{pointer=false},true);\n button.addEventListener('keydown',event=>{\n   if(event.isTrusted&&(event.key==='Enter'||event.key===' '))explicit=true;\n },true);\n button.addEventListener('click',event=>{\n   const real=event.isTrusted&&(pointer||explicit||document.activeElement===button);\n   pointer=false;\n   if(!real){event.preventDefault();event.stopImmediatePropagation();explicit=false;return;}\n   explicit=true;\n },true);\n // Mobile keyboards sometimes dispatch implicit submits when the user\n // moves from username to password or accepts an autofill suggestion.\n form.addEventListener('keydown',event=>{\n   if(event.key!=='Enter'||event.target===button)return;\n   event.preventDefault();\n   if(event.target===username)password.focus({preventScroll:true});\n },true);\n form.addEventListener('submit',event=>{\n   if(!explicit||!username.value.trim()||!password.value){\n     event.preventDefault();event.stopImmediatePropagation();\n     explicit=false;\n     if(!username.value.trim())username.focus({preventScroll:true});\n     else if(!password.value)password.focus({preventScroll:true});\n     return;\n   }\n   explicit=false;\n },true);\n})();\n</script>"
+_WPO_LOGIN_SAFE_SUBMIT_V2_BASE = login_ui
+def login_ui(path):
+    markup = _WPO_LOGIN_SAFE_SUBMIT_V2_BASE(path)
+    return markup.replace('</body></html>', WPO_LOGIN_SAFE_SUBMIT_V2_JS + '</body></html>', 1)
+ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "") + globals().get("WPO_I18N_UI_JS", "") + WPO_LOGIN_SAFE_SUBMIT_V2_JS).encode("utf-8")).hexdigest()[:12]
+# WPO_LOGIN_SAFE_SUBMIT_V2_END
