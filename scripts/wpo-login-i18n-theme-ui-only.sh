@@ -6,7 +6,7 @@ umask 077
 APP=/opt/tproxy-panel
 TARGET="$APP/wpp_ui.py"
 SERVICE=tproxy-panel.service
-REV=d382a4a56261624cd27b1c19858cbc483ee7cf12
+REV=4086df4671e2d893ab337d71b81f3ffe997ff492
 URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/$REV/src/wpp_ui.py"
 [[ -s "$TARGET" && -s "$APP/panel.py" && ! -L "$TARGET" ]] || {
   echo 'Интерфейс WPO не найден. Изменений нет.' >&2; exit 2;
