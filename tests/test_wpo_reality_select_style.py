@@ -63,7 +63,7 @@ class RealitySelectStyleTests(unittest.TestCase):
             style_path=root/"style.txt"
             output=root/"updated.py"
             original.write_text(
-                "import hashlib\nCOMMON_JS='script'\nCSS='base'\n"
+                "import hashlib\nCOMMON_JS='script'\nCSS = 'base'\n"
                 "def nodes_ui():\n    return '<dialog id=\"wpoEditNodeDialog\"></dialog>'\n",
                 encoding="utf-8")
             style_path.write_text(style,encoding="utf-8")
