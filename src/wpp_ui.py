@@ -1308,6 +1308,54 @@ def routing_ui(connections, state, path, csrf):
 </style>{chooser}<select id="routingConnection" hidden aria-label="Текущее подключение для маршрутизации">{options}</select>{''.join(forms)}{guide}<script>(()=>{{const dialog=document.getElementById('awgRuGuide'),scenes=dialog?[...dialog.querySelectorAll('.awg-guide-scene')]:[],play=dialog?.querySelector('[data-awg-guide-play]'),progress=dialog?.querySelector('.awg-guide-progress i');let step=0,timer=null;const draw=()=>{{scenes.forEach((scene,index)=>scene.classList.toggle('is-current',index===step));if(progress)progress.style.width=((step+1)/scenes.length*100)+'%'}};const pause=()=>{{clearInterval(timer);timer=null;if(play)play.textContent='▶ Смотреть'}};const start=()=>{{pause();if(play)play.textContent='Ⅱ Пауза';timer=setInterval(()=>{{step=(step+1)%scenes.length;draw()}},2600)}};document.querySelectorAll('[data-open-awg-guide]').forEach(button=>button.addEventListener('click',()=>{{step=0;draw();dialog?.showModal();start()}}));dialog?.querySelector('[data-close-awg-guide]')?.addEventListener('click',()=>dialog.close());dialog?.addEventListener('close',pause);play?.addEventListener('click',()=>timer?pause():start());draw()}})();</script><script>(()=>{{const select=document.getElementById('routingConnection'),cards=[...document.querySelectorAll('[data-routing-choice]')],forms=[...document.querySelectorAll('[data-routing-form]')];const remembered=location.hash.startsWith('#routing-')?decodeURIComponent(location.hash.slice(9)):'';if(forms.some(form=>form.dataset.routingForm===remembered))select.value=remembered;const show=()=>{{forms.forEach(form=>form.hidden=form.dataset.routingForm!==select.value);cards.forEach(card=>{{const active=card.dataset.routingChoice===select.value;card.classList.toggle('is-selected',active);card.setAttribute('aria-pressed',String(active))}});const chosen=cards.find(card=>card.dataset.routingChoice===select.value);const enabled=chosen?.dataset.routingEnabled==='1';const status=document.getElementById('routingState');status?.classList.toggle('is-on',enabled);const title=document.getElementById('routingStateTitle');if(title)title.textContent=enabled?'Маршрутизация включена':'Маршрутизация отключена'}};show();cards.forEach(card=>card.addEventListener('click',()=>{{if(select.value===card.dataset.routingChoice)return;select.value=card.dataset.routingChoice;select.dispatchEvent(new Event('change',{{bubbles:true}}))}}));select.addEventListener('change',()=>{{show();history.replaceState(null,'',location.pathname+location.search+'#routing-'+encodeURIComponent(select.value))}});forms.forEach(form=>{{const buttons=[...form.querySelectorAll('.routing-actions button')],fields=[...form.querySelectorAll('.routing-toggle input,textarea')];const update=()=>{{const chosen=fields.some(field=>field.type==='checkbox'?field.checked:Boolean(field.value.trim()));const saved=form.dataset.routingStored==='1';buttons.forEach(button=>button.disabled=!(chosen||(button.value==='remove-selected'&&saved)))}};fields.forEach(field=>field.addEventListener(field.type==='checkbox'?'change':'input',update));form.addEventListener('submit',event=>{{const button=event.submitter;if(button?.value!=='remove-selected')return;const specific=fields.some(field=>field.type==='checkbox'?field.checked:Boolean(field.value.trim()));if(!specific&&form.dataset.routingStored==='1'){{if(!confirm('Удалить всю маршрутизацию выбранного подключения, включая сохранённые исключения?')){{event.preventDefault();return}}button.value='remove-all'}}else if(!confirm('Убрать только выбранные правила маршрутизации? Остальные настройки останутся без изменений.'))event.preventDefault()}});update()}})}})();</script>'''
 
 
+# wpo-visual-mobile-pass-v1: compact connection cards on phones, without
+# changing connection actions, drag ordering, IDs, forms or the desktop table.
+CONNECTIONS_MOBILE_POLISH = '''
+@media(max-width:760px){
+ .connections-shell .connection-table-scroll{overflow-x:visible;overscroll-behavior:auto}
+ .connections-shell .connection-list-head{display:none}
+ .connections-shell .connection-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:10px}
+ .connections-shell .connection-card.connection-row{
+  display:grid;min-width:0;min-height:0;grid-template-columns:32px 46px minmax(0,1fr);
+  grid-template-rows:auto auto auto auto;gap:9px 10px;align-items:center;
+  padding:13px 12px;border:1px solid var(--line);border-radius:12px;
+  background:color-mix(in srgb,var(--surface) 96%,var(--accent));
+ }
+ .connections-shell .connection-card.connection-row:last-child{border-bottom:1px solid var(--line)}
+ .connections-shell .connection-index{grid-column:1;grid-row:1;justify-content:flex-start}
+ .connections-shell .connection-state-form{grid-column:2;grid-row:1;justify-content:center}
+ .connections-shell .connection-identity{grid-column:3;grid-row:1;min-width:0}
+ .connections-shell .connection-identity h2{font-size:13px;white-space:normal;overflow-wrap:anywhere}
+ .connections-shell .connection-identity p{font-size:10px}
+ .connections-shell .connection-route{grid-column:1/-1;grid-row:2;padding-top:9px;border-top:1px solid var(--line)}
+ .connections-shell .connection-route b{font-size:11px}
+ .connections-shell .connection-route small{display:none}
+ .connections-shell .connection-port{grid-column:1/2;grid-row:3;justify-content:flex-start;font-size:11px}
+ .connections-shell .connection-tags{grid-column:2/-1;grid-row:3;justify-content:flex-start;flex-wrap:wrap}
+ .connections-shell .connection-users{grid-column:1/2;grid-row:4;justify-content:flex-start}
+ .connections-shell .connection-card.connection-row>.connection-table-actions{
+  grid-column:2/-1;grid-row:4;justify-content:flex-end;justify-self:end;
+  width:auto;min-width:0;padding:0;gap:6px;border:0;overflow:visible;
+ }
+ .connections-shell .connection-table-actions .icon-btn{width:40px;height:38px;min-height:38px;padding:9px}
+ .connections-shell .connection-table-actions .icon-btn .ico{width:17px;height:17px}
+ .connections-shell .connection-port-empty small{font-size:9px!important}
+ .connection-editor{width:min(560px,calc(100vw - 16px));max-height:calc(100dvh - 20px)}
+ .connection-editor form{max-height:calc(100dvh - 20px)}
+ .connection-editor .dialog-head{padding:16px 16px 13px}
+ .connection-editor .connection-pane{padding:14px 16px}
+ .connection-editor .actions{padding:12px 16px max(12px,env(safe-area-inset-bottom))}
+}
+@media(max-width:390px){
+ .connections-shell .connection-card.connection-row{gap:8px}
+ .connections-shell .connection-tags span,.connections-shell .connection-tags i{padding:4px 6px;font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+ .connections-shell .connection-card.connection-row{transition:none!important}
+}
+'''
+
+
 def connections_ui(connections, profiles, path, csrf, subscriptions=None, openflux_profiles=None):
     usage={}
     for profile in profiles:
@@ -1375,6 +1423,8 @@ def connections_ui(connections, profiles, path, csrf, subscriptions=None, openfl
     state_script='''<script>(()=>{document.querySelectorAll('.connection-state-form').forEach(form=>form.addEventListener('submit',async event=>{event.preventDefault();event.stopImmediatePropagation();const button=form.querySelector('.connection-switch'),row=form.closest('[data-connection-id]'),name=row?.querySelector('.connection-identity h2')?.textContent?.trim()||'Подключение',wasEnabled=button?.getAttribute('aria-checked')==='true';if(!button||button.disabled)return;button.disabled=true;try{const response=await fetch(form.action,{method:'POST',headers:{'X-WPP-Async':'1','Accept':'application/json'},body:new URLSearchParams(new FormData(form))});if(response.redirected)throw new Error('Сессия завершена. Войдите заново.');let result;try{result=await response.json()}catch(error){throw new Error('Панель вернула некорректный ответ.')}if(!response.ok||!result.ok)throw new Error(result.message||'Не удалось изменить подключение.');const enabled=typeof result.enabled==='boolean'?result.enabled:!wasEnabled;button.classList.toggle('on',enabled);button.setAttribute('aria-checked',String(enabled));button.title=enabled?'Отключить подключение':'Включить подключение';window.showPanelToast?.('Подключение «'+name+'» '+(enabled?'включено.':'выключено.'),enabled?'success':'disabled')}catch(error){window.showPanelToast?.(error.message||'Не удалось изменить подключение.','error')}finally{button.disabled=false}},true))})();</script>'''
     reorder_script='''<script>(()=>{const grid=document.querySelector('.connections-shell .connection-grid');if(!grid)return;const rows=()=>Array.from(grid.querySelectorAll('.connection-card.connection-row[data-connection-id]'));let savedOrder=rows().map(row=>row.dataset.connectionId),drag=null,saving=false;function updateNumbers(){rows().forEach((row,index)=>{const number=row.querySelector('[data-connection-number]');if(number)number.textContent=String(index+1)})}function arrange(order){const byId=new Map(rows().map(row=>[row.dataset.connectionId,row]));order.forEach(id=>{const row=byId.get(id);if(row)grid.appendChild(row)});updateNumbers()}async function persistOrder(){if(saving)return;const order=rows().map(row=>row.dataset.connectionId);if(order.length===savedOrder.length&&order.every((id,index)=>id===savedOrder[index]))return;saving=true;grid.classList.add('is-saving-order');try{const source=grid.querySelector('.connection-state-form');if(!source)throw new Error('Не удалось определить форму сохранения порядка.');const response=await fetch(source.action,{method:'POST',headers:{'X-WPP-Async':'1','Accept':'application/json'},body:new URLSearchParams({csrf:source.querySelector('input[name="csrf"]')?.value||'',operation:'reorder',order:JSON.stringify(order)})});if(response.redirected)throw new Error('Сессия завершена. Войдите заново.');let result;try{result=await response.json()}catch(error){throw new Error('Панель вернула некорректный ответ.')};if(!response.ok||!result.ok)throw new Error(result.message||'Не удалось сохранить порядок подключений.');savedOrder=order.slice();window.showPanelToast?.('Порядок подключений сохранён.','success')}catch(error){arrange(savedOrder);window.showPanelToast?.(error.message||'Не удалось сохранить порядок подключений.','error')}finally{saving=false;grid.classList.remove('is-saving-order')}}function clearDrag(){if(!drag)return;drag.row.classList.remove('is-dragging');rows().forEach(row=>row.classList.remove('drop-target'));grid.classList.remove('is-reordering');drag=null}function moveRow(event){if(!drag||event.pointerId!==drag.pointerId)return;const distance=Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY);if(!drag.moved&&distance<5)return;drag.moved=true;event.preventDefault();drag.row.classList.add('is-dragging');grid.classList.add('is-reordering');const target=document.elementFromPoint(event.clientX,event.clientY)?.closest('.connection-card.connection-row[data-connection-id]');rows().forEach(row=>row.classList.toggle('drop-target',row===target&&row!==drag.row));if(!target||target===drag.row)return;const rect=target.getBoundingClientRect(),after=event.clientY>rect.top+rect.height/2;grid.insertBefore(drag.row,after?target.nextElementSibling:target);updateNumbers()}async function finishDrag(event,cancelled=false){if(!drag||event.pointerId!==drag.pointerId)return;const moved=drag.moved;clearDrag();if(cancelled){arrange(savedOrder);return}if(moved)await persistOrder()}grid.addEventListener('pointerdown',event=>{const handle=event.target.closest('[data-connection-drag-handle]');if(!handle||saving||rows().length<2)return;if(event.pointerType==='mouse'&&event.button!==0)return;const row=handle.closest('.connection-card.connection-row');if(!row)return;drag={row,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,moved:false};try{handle.setPointerCapture(event.pointerId)}catch(error){}event.preventDefault()});grid.addEventListener('pointermove',moveRow);grid.addEventListener('pointerup',event=>finishDrag(event,false));grid.addEventListener('pointercancel',event=>finishDrag(event,true));grid.addEventListener('keydown',async event=>{const handle=event.target.closest('[data-connection-drag-handle]');if(!handle||saving||!['ArrowUp','ArrowDown'].includes(event.key))return;const row=handle.closest('.connection-card.connection-row'),list=rows(),index=list.indexOf(row);if(index<0)return;event.preventDefault();if(event.key==='ArrowUp'&&index>0)grid.insertBefore(row,list[index-1]);else if(event.key==='ArrowDown'&&index<list.length-1)grid.insertBefore(row,list[index+1].nextElementSibling);else return;updateNumbers();await persistOrder();handle.focus()})})();</script>'''
     extra_script=f'''<script>(()=>{{const form=document.getElementById('connectionForm'),protocol=document.getElementById('connectionProtocol'),box=form?.querySelector('[data-extra-protocol]'),transport=form?.elements.extra_transport,transportLabel=box?.querySelector('[data-mieru-transport]'),items={dataset},byId=Object.fromEntries(items.map(item=>[item.id,item]));if(!form||!protocol||!box)return;function sync(){{const active=['naive','mieru'].includes(protocol.value);box.hidden=!active;box.querySelectorAll('input,select').forEach(control=>control.disabled=!active);transportLabel.hidden=protocol.value!=='mieru'}}function fill(item){{const config=item?.config||{{}};form.elements.port.value=config.port||'';transport.value=config.transport||'TCP';sync()}}document.getElementById('newConnection')?.addEventListener('click',()=>fill(null));document.querySelectorAll('[data-edit-connection]').forEach(button=>button.addEventListener('click',()=>fill(byId[button.dataset.editConnection])));protocol.addEventListener('change',sync);form.addEventListener('reset',()=>setTimeout(()=>fill(null),0));sync()}})();</script>'''
+    page=page.replace('</style><section class="connections-shell">',
+                      CONNECTIONS_MOBILE_POLISH+'</style><section class="connections-shell">',1)
     return page+openflux_script+extra_script+advanced_script+routing_preview_script+state_script+reorder_script
 
 
@@ -2068,3 +2118,40 @@ CSS += '\n.client-deleting{display:none!important}\n'
 
 # wpo-quiet-client-pending-v2
 CSS += '\n.clients-table tr.client-pending .client-name:after{content:none!important}\n'
+
+# wpo-visual-mobile-pass-v1: a consistent rhythm for existing node cards and
+# usable dashboard status controls on phones. No status/data/refresh changes.
+CSS += '''
+.nodes-list>.node-card{min-width:0;min-height:0;padding:15px;border-radius:14px;transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.nodes-list>.node-card .node-card-head{min-width:0;gap:10px;align-items:center}
+.nodes-list>.node-card .node-card-name{min-width:0;flex:1}
+.nodes-list>.node-card .node-card-name h2{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+.nodes-list>.node-card .node-card-head>.badge{margin-left:auto;flex:0 0 auto}
+.nodes-list>.node-card .node-endpoint{min-width:0;margin:11px 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:9px}
+.nodes-list>.node-card .node-card-meta{gap:7px}
+.nodes-list>.node-card .node-card-meta>div{min-width:0;padding:9px}
+.nodes-list>.node-card .node-card-meta strong{overflow-wrap:anywhere}
+.nodes-list>.node-card .node-remove{padding-top:10px}
+.nodes-list>.node-card .node-remove button{min-height:36px}
+@media(hover:hover) and (pointer:fine){
+ .nodes-list>.node-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--accent) 36%,var(--line));box-shadow:0 12px 30px #0002}
+}
+@media(max-width:760px){
+ #dashboardContent .overview-stat-total{padding-bottom:56px}
+ #dashboardContent .overview-stat-total .dashboard-inline-tools{
+  left:14px;right:14px;top:auto;bottom:11px;transform:none;
+  justify-content:flex-start;max-width:calc(100% - 28px)
+ }
+ #dashboardContent .overview-stat-total .dashboard-inline-tools .live-indicator{min-width:0;max-width:100%}
+ .nodes-list>.node-card{padding:14px}
+ .nodes-list>.node-card .node-endpoint{margin:10px 0}
+}
+@media(max-width:400px){
+ .nodes-list>.node-card .node-card-head{gap:8px}
+ .nodes-list>.node-card .node-flag{width:36px;height:36px}
+ .nodes-list>.node-card .node-card-head>.badge{font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){
+ .nodes-list>.node-card{transition:none!important;transform:none!important}
+}
+'''
