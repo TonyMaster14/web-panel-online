@@ -2328,3 +2328,37 @@ def page_layout(*args, **kwargs):
     return markup.replace('</body></html>', WPO_SELECT_POPOVER_V2_JS + '</body></html>', 1)
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS + WPO_SELECT_POPOVER_V2_JS).encode("utf-8")).hexdigest()[:12]
 # WPO_SELECT_POPOVER_V2_END
+
+# WPO_UNIFIED_SELECT_CHEVRON_V1_BEGIN
+# Match all native selects and WPO custom dropdowns to the TLS fingerprint example.
+CSS += r'''
+/* All WPO single-choice controls use the same compact 10x5 chevron. */
+:root {
+  --wpo-chevron-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2391aeb8' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"] {
+  --wpo-chevron-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235d7870' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+}
+select:not([multiple]):not([size]):not(.wpo-popup-select-source),
+select[size="1"]:not(.wpo-popup-select-source) {
+  -webkit-appearance:none!important;
+  appearance:none!important;
+  background-image:var(--wpo-chevron-image)!important;
+  background-repeat:no-repeat!important;
+  background-position:right 12px center!important;
+  background-size:16px 16px!important;
+  padding-right:38px!important;
+}
+.wpo-popup-select-trigger .wpo-popup-select-chevron{
+  display:block;
+  width:16px!important;height:16px!important;min-width:16px;min-height:16px;
+  flex:0 0 16px;
+  stroke:var(--muted)!important;
+  stroke-width:1.9px!important;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+'''
+if "WPO_SELECT_POPOVER_V2_JS" in globals():
+    WPO_SELECT_POPOVER_V2_JS = WPO_SELECT_POPOVER_V2_JS.replace("m6 9 6 6 6-6", "m7 10 5 5 5-5")
+ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "")).encode("utf-8")).hexdigest()[:12]
+# WPO_UNIFIED_SELECT_CHEVRON_V1_END
