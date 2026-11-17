@@ -7,7 +7,6 @@ Install in two steps:
 
 Only /opt/tproxy-panel/wpp_ui.py is ever replaced; backups and rollback enabled.
 """
-import argparse
 import ast
 import hashlib
 import json
@@ -65,7 +64,7 @@ LANGUAGE_JS = r"""<script>
 'use strict';
 const dictionary=__DICTIONARY__;
 const savedText=new WeakMap(),savedAttrs=new WeakMap();
-const skip='script,style,noscript,textarea,code,pre,svg,button,select,option,form,dialog,[contenteditable],[data-wpo-no-translate],.wpo-utility-switches';
+const skip='script,style,noscript,textarea,code,pre,svg,button:not(#loginSubmit),select,option,form:not(#loginForm),dialog,[contenteditable],[data-wpo-no-translate],.wpo-utility-switches';
 let language='ru';
 try{language=localStorage.getItem('wpo-language')==='en'?'en':'ru'}catch(_){}
 const originalTitle=document.title;
@@ -282,9 +281,6 @@ def service_ok():
 
 
 def main():
-    cli=argparse.ArgumentParser()
-    cli.add_argument("mode",choices=["--check-login","--apply-login","--check-buttons","--apply-buttons"])
-    # Argparse does not treat --prefixed strings as positional; parse directly below.
     mode=sys.argv[1] if len(sys.argv)==2 else ""
     if mode not in {"--check-login","--apply-login","--check-buttons","--apply-buttons"}:
         raise SystemExit("Использование: --check-login | --apply-login | --check-buttons | --apply-buttons")
