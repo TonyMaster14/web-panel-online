@@ -2162,7 +2162,7 @@ CSS += '''
 # follow the single-outline inactive "Сайт для REALITY" field design. Native
 # <select> remains intact, so server actions, change events and keyboard work.
 CSS += '''
-:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select){
+:is(dialog select:not([multiple]),.clients-toolbar select,.update-control select){
  -webkit-appearance:none;appearance:none;
  box-sizing:border-box;min-width:0;min-height:40px;
  padding:9px 36px 9px 12px;
@@ -2175,18 +2175,18 @@ CSS += '''
  box-shadow:none;outline:none;text-overflow:ellipsis;
  cursor:pointer;
 }
-:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select):hover:not(:disabled){
+:is(dialog select:not([multiple]),.clients-toolbar select,.update-control select):hover:not(:disabled){
  border-color:color-mix(in srgb,var(--accent) 30%,var(--line));
 }
-:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select):focus-visible{
+:is(dialog select:not([multiple]),.clients-toolbar select,.update-control select):focus-visible{
  outline:2px solid var(--accent);outline-offset:2px;
  border-color:var(--line);box-shadow:none;
 }
-:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select):disabled{
+:is(dialog select:not([multiple]),.clients-toolbar select,.update-control select):disabled{
  opacity:.65;cursor:not-allowed;
  border-color:var(--line);box-shadow:none;
 }
-:where(dialog select:not([multiple]),.clients-toolbar select,.update-control select) option{
+:is(dialog select:not([multiple]),.clients-toolbar select,.update-control select) option{
  background:var(--surface);color:var(--text);
 }
 .clients-toolbar select{flex:0 1 auto;max-width:180px;min-width:130px;min-height:40px}
