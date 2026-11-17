@@ -2362,3 +2362,33 @@ if "WPO_SELECT_POPOVER_V2_JS" in globals():
     WPO_SELECT_POPOVER_V2_JS = WPO_SELECT_POPOVER_V2_JS.replace("m6 9 6 6 6-6", "m7 10 5 5 5-5")
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "")).encode("utf-8")).hexdigest()[:12]
 # WPO_UNIFIED_SELECT_CHEVRON_V1_END
+
+
+# WPO_FILLED_TRIANGLE_ICON_V1_BEGIN
+# All single-choice native and custom dropdown arrows share one gray filled triangle.
+CSS += '''
+:root{
+  --wpo-filled-triangle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16'%3E%3Cpath d='M7 9h10l-5 6z' fill='%2391aeb8'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"]{
+  --wpo-filled-triangle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16'%3E%3Cpath d='M7 9h10l-5 6z' fill='%235d7870'/%3E%3C/svg%3E");
+}
+select:not([multiple]):not(.wpo-popup-select-source){
+  -webkit-appearance:none!important;appearance:none!important;
+  background-image:var(--wpo-filled-triangle)!important;
+  background-position:right 12px center!important;
+  background-size:16px 16px!important;
+  background-repeat:no-repeat!important;
+  padding-right:38px!important;
+}
+.wpo-popup-select-trigger .wpo-popup-select-chevron {
+  width:16px!important;height:16px!important;flex:0 0 16px!important;
+  fill:var(--muted)!important;stroke:none!important;
+}
+'''
+if "WPO_SELECT_POPOVER_V2_JS" in globals():
+    WPO_SELECT_POPOVER_V2_JS = (WPO_SELECT_POPOVER_V2_JS
+        .replace("m7 10 5 5 5-5", "M7 9h10l-5 6z")
+        .replace("m6 9 6 6 6-6", "M7 9h10l-5 6z"))
+ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "")).encode("utf-8")).hexdigest()[:12]
+# WPO_FILLED_TRIANGLE_ICON_V1_END
