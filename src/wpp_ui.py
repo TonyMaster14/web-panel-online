@@ -2251,3 +2251,69 @@ CSS += '''
         dialog select,.wpo-node-edit select,.wpo-node-editor select){transition:none}
 }
 '''
+
+# WPO_REALITY_SELECT_STYLE_BEGIN
+# Use the same single-border, 41px control as "Сайт для REALITY".
+# Native selects remain native and keep their existing enabled/disabled behavior.
+CSS += '''
+#connectionProtocol,
+#clientFilter,
+#protocolFilter,
+#clientSort,
+#wpoEditNodeDialog select[name="site_template"],
+#panelRelease,
+#xrayRelease,
+#openfluxRelease {
+  box-sizing:border-box;
+  width:100%;
+  height:41px;
+  min-height:41px;
+  min-width:0;
+  padding:0 38px 0 13px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background-color:var(--input);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2391aeb8' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 12px center;
+  background-size:16px 16px;
+  color:var(--text);
+  font:500 12px/1.4 "Segoe UI",system-ui,sans-serif;
+  box-shadow:none;
+  appearance:none;
+  -webkit-appearance:none;
+}
+#clientFilter,
+#protocolFilter,
+#clientSort {width:auto;min-width:128px;max-width:175px}
+#clientSort {min-width:118px}
+#connectionProtocol:disabled,
+#panelRelease:disabled,
+#xrayRelease:disabled,
+#openfluxRelease:disabled {
+  opacity:1;
+  color:var(--muted);
+  cursor:not-allowed;
+}
+#connectionProtocol:focus-visible,
+#clientFilter:focus-visible,
+#protocolFilter:focus-visible,
+#clientSort:focus-visible,
+#wpoEditNodeDialog select[name="site_template"]:focus-visible,
+#panelRelease:focus-visible,
+#xrayRelease:focus-visible,
+#openfluxRelease:focus-visible {
+  outline:1px solid var(--muted);
+  outline-offset:0;
+  border-color:var(--line);
+  box-shadow:none;
+}
+@media(max-width:700px) {
+  #clientFilter,
+  #protocolFilter,
+  #clientSort {max-width:100%;min-width:0}
+}
+'''
+# WPO_REALITY_SELECT_STYLE_END
+
+ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode('utf-8')).hexdigest()[:12]
