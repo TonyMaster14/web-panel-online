@@ -384,9 +384,48 @@ def page_layout(title, body, path, active, domain):
 
 
 def login_ui(path):
-    return f'''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Вход · WPO</title>{THEME_INIT}<style>{CSS}</style></head><body class="login-page"><div class="login-ambient" aria-hidden="true"><i></i><i></i><i></i></div><div class="login-theme">{theme_button()}</div><main class="login-card"><header class="login-card-head"><div class="signin-emblem"><img class="signin-logo" src="{esc(path)}/__logo?v=20261110b" alt=""><div><span>WEB PANEL ONLINE</span></div></div><span class="login-secure"><i></i>Защищённый вход</span></header><form id="loginForm" method="post" action="{esc(path)}/login"><div class="login-field"><label for="loginName">Логин</label><input id="loginName" name="user" autocomplete="username" required autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Введите логин"></div><div class="login-field"><label for="loginPassword">Пароль</label><div class="login-password-wrap"><input id="loginPassword" type="password" name="password" autocomplete="current-password" required placeholder="Введите пароль"><button class="login-password-toggle" id="loginPasswordToggle" type="button" aria-controls="loginPassword" aria-pressed="false">Показать</button></div></div><button type="submit" class="primary login-submit" id="loginSubmit"><b>Вход</b><span aria-hidden="true">→</span></button></form><footer class="login-card-foot"><span class="login-foot-status"><i></i>HTTPS · защищённая сессия</span><small class="login-version">WPP {VERSION}</small></footer></main>{COMMON_JS}<script>(()=>{{const form=document.getElementById('loginForm'),username=document.getElementById('loginName'),password=document.getElementById('loginPassword'),toggle=document.getElementById('loginPasswordToggle'),submit=document.getElementById('loginSubmit');let submitted=false;toggle.addEventListener('click',()=>{{const visible=password.type==='text';password.type=visible?'password':'text';toggle.textContent=visible?'Показать':'Скрыть';toggle.setAttribute('aria-pressed',String(!visible));password.focus({{preventScroll:true}})}});form.addEventListener('submit',event=>{{if(submitted){{event.preventDefault();return}}if(!username.value.trim()||!password.value){{event.preventDefault();return}}submitted=true;submit.setAttribute('aria-busy','true');submit.classList.add('is-busy');submit.querySelector('b').textContent='Вход…'}})}})();</script></body></html>'''
+    return f'''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Вход · WPO</title>{THEME_INIT}<style>{CSS}</style></head><body class="login-page"><div class="login-ambient" aria-hidden="true"><i></i><i></i><i></i></div><div class="login-theme">{theme_button()}</div><main class="login-card"><header class="login-card-head"><div class="signin-emblem"><img class="signin-logo" src="{esc(path)}/__logo?v=20261110b" alt=""><div><span>WEB PANEL ONLINE</span></div></div><span class="login-secure"><i></i>Защищённый вход</span></header><form id="loginForm" method="post" action="{esc(path)}/login"><div class="login-field"><label for="loginName">Логин</label><input id="loginName" name="user" autocomplete="username" required autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Введите логин"></div><div class="login-field"><label for="loginPassword">Пароль</label><div class="login-password-wrap"><input id="loginPassword" type="password" name="password" autocomplete="current-password" required placeholder="Введите пароль"><button class="login-password-toggle" id="loginPasswordToggle" type="button" aria-controls="loginPassword" aria-pressed="false">Показать</button></div></div><button type="button" class="primary login-submit" id="loginSubmit"><b>Вход</b><span aria-hidden="true">→</span></button></form><footer class="login-card-foot"><span class="login-foot-status"><i></i>HTTPS · защищённая сессия</span><small class="login-version">WPP {VERSION}</small></footer></main>{COMMON_JS}<script>
+(()=>{{
+'use strict';
+const form=document.getElementById('loginForm');
+const username=document.getElementById('loginName');
+const password=document.getElementById('loginPassword');
+const toggle=document.getElementById('loginPasswordToggle');
+const button=document.getElementById('loginSubmit');
+if(!form||!username||!password||!toggle||!button)return;
+toggle.addEventListener('click',()=>{{
+ const visible=password.type==='text';
+ password.type=visible?'password':'text';
+ toggle.textContent=visible?'Показать':'Скрыть';
+ toggle.setAttribute('aria-pressed',String(!visible));
+ password.focus({{preventScroll:true}});
+}});
+let sent=false;
+function signIn(){{
+ if(sent)return;
+ if(!form.checkValidity()){{form.reportValidity();return}}
+ if(!username.value.trim()){{username.focus();return}}
+ if(!password.value){{password.focus();return}}
+ sent=true;
+ button.setAttribute('aria-busy','true');
+ // Browser-native POST: do not fire the old submit handlers, and never submit from autofill/focus.
+ HTMLFormElement.prototype.submit.call(form);
+}}
+button.addEventListener('click',event=>{{
+ event.preventDefault();
+ signIn();
+}});
+form.addEventListener('keydown',event=>{{
+ if(event.key!=='Enter'||event.isComposing)return;
+ if(event.target!==username&&event.target!==password)return;
+ event.preventDefault();
+ if(event.target===username){{password.focus();return}}
+ signIn();
+}});
+}})();
+</script>
 
-
+</body></html>'''
 
 def hidden(csrf, **values):
     return ''.join(f'<input type="hidden" name="{esc(k)}" value="{esc(v)}">' for k,v in {'csrf':csrf, **values}.items())
@@ -2489,3 +2528,9 @@ ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_
 CSS += "\n/* WPO: center sign-in copy independently of the right-hand arrow. */\n.login-card .login-submit{\n position:relative!important;\n display:flex!important;\n align-items:center!important;\n justify-content:center!important;\n width:min(184px,100%)!important;\n min-height:43px!important;\n height:43px!important;\n padding:0 34px!important;\n gap:0!important;\n text-align:center!important;\n touch-action:manipulation;\n}\n.login-card .login-submit b{\n display:block!important;\n flex:0 0 auto!important;\n min-width:0!important;\n font-size:17px!important;\n font-weight:750!important;\n line-height:1.2!important;\n text-align:center!important;\n}\n.login-card .login-submit span{\n position:absolute!important;\n right:14px!important;\n top:50%!important;\n transform:translateY(-50%)!important;\n font-size:18px!important;\n line-height:1!important;\n pointer-events:none!important;\n}\n.login-card .login-submit:hover span{\n transform:translate(2px,-50%)!important;\n}\n"
 ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "") + globals().get("WPO_I18N_UI_JS", "") + globals().get("WPO_HEADER_LOGOUT_JS", "")).encode("utf-8")).hexdigest()[:12]
 # WPO_LOGIN_BUTTON_SAFE_V3_END
+
+# WPO_LOGIN_DIRECT_POST_SPACING_V4_BEGIN
+# Explicit user click/Enter sends native POST; styling does not alter auth route.
+CSS += "\n/* WPO login: touch-safe button and a readable gap between language and theme. */\n.login-card #loginSubmit{\n pointer-events:auto!important;\n cursor:pointer!important;\n position:relative!important;\n z-index:3!important;\n -webkit-tap-highlight-color:transparent;\n}\n.wpo-utility-switches{\n column-gap:12px!important;\n gap:12px!important;\n}\n.login-theme{\n right:34px!important;\n}\n.appbar-tools{\n padding-right:8px!important;\n}\n@media(max-width:700px){\n .login-theme{right:22px!important}\n .wpo-utility-switches{gap:10px!important}\n .appbar-tools{padding-right:6px!important}\n}\n@media(max-width:355px){\n .wpo-utility-switches{gap:8px!important}\n}\n"
+ASSET_REV = hashlib.sha256((CSS + COMMON_JS + globals().get("WPO_SELECT_POPOVER_V2_JS", "") + globals().get("WPO_I18N_UI_JS", "") + globals().get("WPO_HEADER_LOGOUT_JS", "")).encode("utf-8")).hexdigest()[:12]
+# WPO_LOGIN_DIRECT_POST_SPACING_V4_END
