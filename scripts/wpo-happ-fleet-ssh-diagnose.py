@@ -345,7 +345,7 @@ def static_routes_view(data):
 def routing_comparison(items):
  if not items:return
  print('\n━━ СРАВНЕНИЕ С ПОЛЬШЕЙ · СТАТИЧЕСКИЕ МАРШРУТЫ ━━',flush=True)
- baseline=next((v for n,v in items if 'польш' in n.lower() or 'poland' in n.lower()),None)
+ baseline=next((v for n,v in items if v.get('country_code')=='PL' or 'польш' in n.lower() or 'poland' in n.lower()),None)
  if baseline is None:
   print('Польская нода не распознана по названию; показываю сравнение без эталона.',flush=True)
  for name,route in items:
@@ -406,7 +406,9 @@ def main():
   print('  Клиентов REALITY в Xray: '+str(data.get('xray_clients',0)),flush=True)
   print('  REALITY→HTTPS204 из основной панели: '+actual_reality(host,data),flush=True)
   summary=static_routes_view(data)
-  if summary:inspected.append((label,summary))
+  if summary:
+   summary['country_code']=str(node.get('country_code','')).upper()
+   inspected.append((label,summary))
  routing_comparison(inspected)
  print('\nЗавершено: ничего не изменено. Это не проверка из сети самого Happ.',flush=True)
  return 0
