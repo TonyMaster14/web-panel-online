@@ -631,7 +631,9 @@ _WPO_C333_AUDITED_TRANSLATIONS = _wpo_i18n_json.loads(r"""{
   "или": "or",
   "напрямую": "direct",
   "основной": "main",
-  "Сохранить": "Save"
+  "Сохранить": "Save",
+  "https://disk.yandex.ru/i/… или https://cloud.mail.ru/public/…": "https://disk.yandex.ru/i/… or https://cloud.mail.ru/public/…",
+  "https://disk.yandex.ru/i/…, https://telemost.yandex.ru/j/… или Mail.ru": "https://disk.yandex.ru/i/…, https://telemost.yandex.ru/j/… or Mail.ru"
 }""")
 
 def _wpo_c333_extend_english(original_js):
@@ -725,7 +727,7 @@ def main():
         print("✓ Additional audited WPO English translations already installed.")
         return
 
-    print("✓ Compatible WPO version detected. Extra UI translations:", 603)
+    print("✓ Compatible WPO version detected. Extra UI translations:", 605)
     if mode == "--check":
         print("✓ Check complete. No files or services were modified.")
         return
