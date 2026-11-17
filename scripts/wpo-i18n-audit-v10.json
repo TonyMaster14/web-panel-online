@@ -601,5 +601,7 @@
   "или": "or",
   "напрямую": "direct",
   "основной": "main",
-  "Сохранить": "Save"
+  "Сохранить": "Save",
+  "https://disk.yandex.ru/i/… или https://cloud.mail.ru/public/…": "https://disk.yandex.ru/i/… or https://cloud.mail.ru/public/…",
+  "https://disk.yandex.ru/i/…, https://telemost.yandex.ru/j/… или Mail.ru": "https://disk.yandex.ru/i/…, https://telemost.yandex.ru/j/… or Mail.ru"
 }
