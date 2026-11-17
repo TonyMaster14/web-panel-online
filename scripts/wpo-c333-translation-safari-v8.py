@@ -59,7 +59,7 @@ function translateOriginal(original){
  // Dynamic CPU and uptime values preserve their numbers.
  const cpu=key.match(/^Ядер:\s*(.+?)\s*·\s*гипервизор:\s*(.+)$/u);
  if(cpu)return m[1]+'Cores: '+cpu[1]+' · hypervisor: '+cpu[2]+m[3];
- const elapsed=key.replace(/(\d+)\s*д\\./gu,'$1 d.').replace(/(\d+)\s*ч\\./gu,'$1 h.').replace(/(\d+)\s*мин\\./gu,'$1 min.').replace(/(\d+)\s*с\s+назад/gu,'$1 s ago').replace(/(\d+)\s*мин\s+назад/gu,'$1 min ago');
+ const elapsed=key.replace(/(\d+)\s*д\./gu,'$1 d.').replace(/(\d+)\s*ч\./gu,'$1 h.').replace(/(\d+)\s*мин\./gu,'$1 min.').replace(/(\d+)\s*с\s+назад/gu,'$1 s ago').replace(/(\d+)\s*мин\s+назад/gu,'$1 min ago');
  if(elapsed!==key)return m[1]+elapsed+m[3];
  if(has(key))return m[1]+ruToEn[key]+m[3];
  const arrow=key.match(/^([↑↓])\s*(.+)$/);
