@@ -35,28 +35,39 @@ curl -4fsSL --retry 3 --connect-timeout 12 --max-time 75 --proto '=https' \
 python3 - "$TARGET" "$TMP/source.py" "$TMP/patched.py" <<'PY'
 from pathlib import Path
 import sys
-target=Path(sys.argv[1]).read_text(encoding="utf-8")
-source=Path(sys.argv[2]).read_text(encoding="utf-8")
-start="# wpo-reality-picker-unified-select-v1:"
-if source.count(start)!=1:
-    raise RuntimeError("Source version mismatch: style marker is missing or duplicate.")
-css=source[source.index(start):]
-if not css.strip().endswith("'''"):
-    raise RuntimeError("Invalid source CSS footer.")
-if ("CSS +=" not in css or "background-image:" not in css or
-        "#clientFilter" not in css or "#panelRelease" not in css or
-        "#connectionProtocol" not in css or "dialog select" not in css):
+
+target = Path(sys.argv[1]).read_text(encoding="utf-8")
+source = Path(sys.argv[2]).read_text(encoding="utf-8")
+start = "# WPO_REALITY_SELECT_STYLE_BEGIN"
+end = "# WPO_REALITY_SELECT_STYLE_END"
+asset_rev = "ASSET_REV = hashlib.sha256((CSS + COMMON_JS).encode('utf-8')).hexdigest()[:12]"
+
+if source.count(start) != 1 or source.count(end) != 1 or source.index(end) < source.index(start):
+    raise RuntimeError("Source CSS markers are missing, repeated or out of order.")
+css = source[source.index(start):source.index(end) + len(end)]
+if (css.count("CSS += '''") != 1 or css.count("'''") != 2 or
+        "background-image:" not in css or "#clientFilter" not in css or
+        "#panelRelease" not in css or "#connectionProtocol" not in css or
+        '#wpoEditNodeDialog select[name="site_template"]' not in css):
     raise RuntimeError("Incomplete select style patch.")
-if target.count(start)>1:
-    raise RuntimeError("Existing repeated CSS marker; aborting safely.")
-if "CSS = " not in target or "def connections_ui(" not in target:
+if "CSS = " not in target or "COMMON_JS = " not in target or "def connections_ui(" not in target:
     raise RuntimeError("Installed WPO UI is not compatible.")
+if target.count(start) != target.count(end) or target.count(start) > 1:
+    raise RuntimeError("Installed CSS markers are inconsistent; aborting safely.")
+
 if start in target:
-    target=target[:target.index(start)].rstrip()+"\n\n"+css
+    a = target.index(start)
+    b = target.index(end, a) + len(end)
+    target = target[:a] + css + target[b:]
+    # Some older builds calculate ASSET_REV before their final CSS addition.
+    if "ASSET_REV =" not in target[target.index(end, a) + len(end):]:
+        target = target.rstrip() + "\n\n" + asset_rev + "\n"
 else:
-    target=target.rstrip()+"\n\n"+css
-compile(target,sys.argv[3],"exec")
-Path(sys.argv[3]).write_text(target,encoding="utf-8")
+    # Only add the bounded CSS block. Never copy unrelated source Python code.
+    target = target.rstrip() + "\n\n" + css + "\n\n" + asset_rev + "\n"
+
+compile(target, sys.argv[3], "exec")
+Path(sys.argv[3]).write_text(target, encoding="utf-8")
 PY
 python3 -m py_compile "$TMP/patched.py"
 if cmp -s "$TMP/patched.py" "$TARGET"; then
