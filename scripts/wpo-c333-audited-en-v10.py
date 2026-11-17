@@ -1,0 +1,674 @@
+#!/usr/bin/env python3
+"""WPO c333 safe UI: audited additional English translations (v10).
+
+Only updates /opt/tproxy-panel/wpp_ui.py on --apply.
+Keeps the original RU content and existing English text unchanged.
+No changes to routes, client values, protocol settings, nodes or VPN services.
+"""
+import ast
+from datetime import datetime, timezone
+import os
+from pathlib import Path
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.error import HTTPError
+from urllib.request import urlopen
+
+APP = Path("/opt/tproxy-panel")
+TARGET = APP / "wpp_ui.py"
+SERVICE = "tproxy-panel.service"
+MARK = "# WPO_C333_AUDITED_EN_V10"
+
+ADDON = r'''
+# WPO_C333_AUDITED_EN_V10
+# UI-only dictionary extension. Values are English labels, keys are original Russian.
+import json as _wpo_i18n_json
+
+_WPO_C333_AUDITED_TRANSLATIONS = _wpo_i18n_json.loads(r"""{
+  "Копирование ссылки": "Copying link",
+  "✓ Скопировано": "✓ Copied",
+  "Не удалось скопировать": "Could not copy",
+  "Импорт профиля": "Import profile",
+  "Не удалось создать QR. Обновите список и попробуйте ещё раз.": "Could not generate the QR code. Refresh the list and try again.",
+  "JSON с маршрутизацией · Happ": "Routing JSON · Happ",
+  "Профиль Happ": "Happ profile",
+  "Отсканируйте QR в Happ или скопируйте ссылку.": "Scan the QR code in Happ or copy the link.",
+  "Отсканируйте QR в приложении OpenFlux": "Scan the QR code in OpenFlux",
+  "Сканируйте камерой другого устройства.": "Scan with the camera of another device.",
+  "Отсканируйте в совместимом приложении": "Scan in a compatible app",
+  "Happ загрузит JSON одного подключения с DNS и правилами.": "Happ will import a single-connection JSON with DNS and routing rules.",
+  "Happ загрузит профиль и данные о лимите трафика.": "Happ will import the profile and traffic limit information.",
+  "Профиль добавится автоматически.": "The profile will be added automatically.",
+  "Откройте ссылку в Telegram.": "Open the link in Telegram.",
+  "или скопируйте ссылку.": "or copy the link.",
+  "Передаёт трафик": "Transferring traffic",
+  "Остановлен": "Stopped",
+  "Отозвано": "Revoked",
+  "Разрешено": "Allowed",
+  "· обновление": "· updated",
+  "Разрешить": "Allow",
+  "Сменить ссылку": "Change link",
+  "Сменить ссылку и отозвать ключи всех устройств?": "Change the link and revoke all device keys?",
+  "Удалить подписку и отозвать все её ключи?": "Delete the subscription and revoke all of its keys?",
+  "Удалить это подключение?": "Delete this connection?",
+  "Скопировать ссылку подписки": "Copy subscription link",
+  "Обновляет все выбранные подключения": "Updates all selected connections",
+  "Работает отдельно от общей ссылки": "Works independently of the shared link",
+  "Сейчас отключён": "Currently disabled",
+  "Ссылка и QR для импорта сервера в Shadowrocket": "Link and QR code for importing the server into Shadowrocket",
+  "Mieru · официальный клиент": "Mieru · official client",
+  "Полный профиль для mieru CLI на Windows, Linux и macOS": "Complete profile for mieru CLI on Windows, Linux and macOS",
+  "· JSON с маршрутизацией": "· routing JSON",
+  "Профиль Happ с DNS и правилами маршрутизации.": "Happ profile with DNS and routing rules.",
+  "· с маршрутизацией": "· with routing",
+  "Профиль Happ с отображением использованного и доступного трафика.": "Happ profile showing used and available traffic.",
+  "Обычная ссылка без правил маршрутизации": "Regular link without routing rules",
+  "Персональный ключ подключения": "Personal connection key",
+  "· ключ": "· key",
+  "без AES · System VPN": "without AES · System VPN",
+  "Документы, Телемост или MAX": "Documents, Telemost or MAX",
+  "Сессия завершена. Войдите в панель заново.": "Session expired. Sign in to the panel again.",
+  "Панель вернула некорректный ответ. Обновите страницу и повторите попытку.": "The panel returned an invalid response. Refresh the page and try again.",
+  "Не удалось создать профиль OpenFlux.": "Could not create the OpenFlux profile.",
+  "Профиль сохранён, но служба пока не запустилась:": "Profile saved, but the service has not started yet:",
+  "Доля отправки и получения, не лимит": "Upload/download proportion, not a limit",
+  "Яндекс": "Yandex",
+  "Остановить": "Stop",
+  "Запустить": "Start",
+  "Одна ссылка для VLESS и Hysteria2 с общим лимитом устройств.": "One link for VLESS and Hysteria2 with a shared device limit.",
+  "Лимит работает по X-HWID и распространяется на все выбранные протоколы, включая WEB Proxy.": "The limit uses X-HWID and applies to all selected protocols, including WEB Proxy.",
+  "Лимит работает по X-HWID для VLESS и Hysteria2.": "The limit uses X-HWID for VLESS and Hysteria2.",
+  "Для ограничения WEB Proxy выберите «Одна подписка» и отметьте WEB Proxy.": "To limit WEB Proxy, choose “One subscription” and select WEB Proxy.",
+  "Сессия завершена. Войдите заново.": "Session expired. Sign in again.",
+  "Панель вернула некорректный ответ.": "The panel returned an invalid response.",
+  "Не удалось сохранить профиль OpenFlux.": "Could not save the OpenFlux profile.",
+  "Профиль OpenFlux сохранён.": "OpenFlux profile saved.",
+  "Не указано": "Not specified",
+  "Германия": "Germany",
+  "Финляндия": "Finland",
+  "Франция": "France",
+  "Великобритания": "United Kingdom",
+  "США": "USA",
+  "Канада": "Canada",
+  "Норвегия": "Norway",
+  "Дания": "Denmark",
+  "Чехия": "Czechia",
+  "Австрия": "Austria",
+  "Швейцария": "Switzerland",
+  "Испания": "Spain",
+  "Италия": "Italy",
+  "Литва": "Lithuania",
+  "Латвия": "Latvia",
+  "Эстония": "Estonia",
+  "Румыния": "Romania",
+  "Болгария": "Bulgaria",
+  "Турция": "Türkiye",
+  "Казахстан": "Kazakhstan",
+  "Россия": "Russia",
+  "Украина": "Ukraine",
+  "Япония": "Japan",
+  "Сингапур": "Singapore",
+  "Гонконг": "Hong Kong",
+  "ОАЭ": "UAE",
+  "Исландия": "Iceland",
+  "Ирландия": "Ireland",
+  "Бельгия": "Belgium",
+  "Протоколы маршрутизации": "Routing protocols",
+  "Выбор подключения": "Select connection",
+  "Текущее подключение для маршрутизации": "Current connection for routing",
+  "Будут удалены связанные ключи и связь с подписками.": "Associated keys and subscription links will be removed.",
+  "Будет создан после сохранения": "Will be created after saving",
+  ". Изменение JSON затронет эти подключения.": ". Editing the JSON will affect these connections.",
+  "Настройка подключения": "Connection settings",
+  "Измените маршрут без замены ключей клиентов": "Change the route without replacing client keys",
+  "Ошибка JSON:": "JSON error:",
+  "Ошибка в конфигурации Xray:": "Error in Xray configuration:",
+  "Не удалось изменить подключение.": "Could not modify the connection.",
+  "Включить подключение": "Enable connection",
+  "выключено.": "disabled.",
+  "Не удалось определить форму сохранения порядка.": "Could not identify the sort-order form.",
+  "Не удалось сохранить порядок подключений.": "Could not save connection order.",
+  "Найдены ошибки:": "Errors found:",
+  "Проверяем DNS, HTTPS, CDN и Xray…": "Checking DNS, HTTPS, CDN and Xray…",
+  "Восстановить локальные настройки Xray и Caddy? Внешние настройки CDN не изменятся.": "Restore local Xray and Caddy settings? External CDN settings will not change.",
+  "Создаём резервную копию и восстанавливаем локальную часть WPP…": "Creating a backup and restoring local WPO components…",
+  "Подключена": "Connected",
+  "Применяем…": "Applying…",
+  "подписка": "subscription",
+  "отдельная ссылка": "separate link",
+  "Selectel: совместимый XHTTP packet-up через POST короткими порциями. Разрешите POST, отключите кэширование, Gzip и буферизацию запросов.": "Selectel: compatible XHTTP packet-up using short POST chunks. Allow POST and disable caching, Gzip and request buffering.",
+  "VK Cloud: совместимый GET packet-up с блоками 100–300 КБ. Отключите кэширование; длительные загрузки всё равно могут ограничиваться edge-сервером.": "VK Cloud: compatible GET packet-up with 100–300 KB blocks. Disable caching; long uploads may still be restricted by the edge server.",
+  "Yandex Cloud: GET packet-up с передачей данных в заголовках. Пакет ограничен 8 КБ, чтобы укладываться в лимиты CDN; отключите кэширование и игнорирование параметров запроса.": "Yandex Cloud: GET packet-up with data in headers. Packets are limited to 8 KB to fit CDN limits; disable caching and ignored query parameters.",
+  "Timeweb: отдельный GET packet-up маршрут с блоками 400–800 КБ и Session ID в query. Отключите кэширование и проверьте маршрут в CDN Doctor.": "Timeweb: separate GET packet-up route with 400–800 KB blocks and Session ID in the query. Disable caching and check the route in CDN Doctor.",
+  "Beget и CDN только с GET: оптимизированный packet-up. Для максимального upload используйте Selectel с POST или прямое подключение.": "Beget and GET-only CDNs: optimized packet-up. For maximum upload speed, use Selectel with POST or a direct connection.",
+  "устр.": "devices",
+  "ГБ": "GB",
+  "· без лимита трафика": "· unlimited traffic",
+  "Клиент ·": "Client ·",
+  "выберите подключение": "select connection",
+  "без лимита": "unlimited",
+  "Укажите отдельный TCP-порт Telegram.": "Enter a separate Telegram TCP port.",
+  "Будет создана отдельная HTTPS-ссылка для Telegram.": "A separate HTTPS link will be created for Telegram.",
+  "Отдельное подключение ·": "Separate connection ·",
+  "· порт": "· port",
+  "· через CDN": "· via CDN",
+  "· напрямую": "· direct",
+  "Выберите хотя бы один протокол": "Select at least one protocol",
+  "Не удалось создать подключение.": "Could not create the connection.",
+  "Выберите хотя бы один протокол.": "Select at least one protocol.",
+  "доступ для": "access for",
+  "клиент(а/ов)? Соединения могут кратковременно прерваться.": "client(s)? Connections may be briefly interrupted.",
+  "выключен.": "disabled.",
+  "Пользователи включены:": "Users enabled:",
+  "Пользователи выключены:": "Users disabled:",
+  "Секрет сохранён.": "Secret saved.",
+  "Изменение сохранено.": "Change saved.",
+  "Пользователь «": "User “",
+  "» удалён.": "” deleted.",
+  "Ссылки выбранных клиентов скопированы.": "Selected client links copied.",
+  "Браузер не разрешил копирование. Используйте кнопки в строках.": "The browser blocked copying. Use the buttons in each row.",
+  "Без привязки": "Not bound",
+  "Персональные ключи": "Personal keys",
+  "Предпросмотр ·": "Preview ·",
+  "Загружаем предпросмотр…": "Loading preview…",
+  "Сервер вернул неверный ответ предпросмотра.": "The server returned an invalid preview response.",
+  "Ошибка загрузки шаблона.": "Could not load the template.",
+  "Предпросмотр без публикации · рабочий сайт не изменён": "Preview only · live site unchanged",
+  "Истекло время загрузки предпросмотра. Попробуйте снова.": "Preview timed out. Try again.",
+  "Шаблон не был опубликован.": "The template was not published.",
+  "этот шаблон": "this template",
+  "Сайт ответил HTTP": "Website returned HTTP",
+  "Сервер долго не отвечает. Проверьте сайт на домене перед повторной публикацией.": "The server is taking too long. Check the site at its domain before publishing again.",
+  "Применить настройки": "Apply settings",
+  "Настроить OpenFlux": "Configure OpenFlux",
+  "· установлена": "· installed",
+  "Опубликованные стабильные релизы GitHub": "Published stable GitHub releases",
+  "Установить выбранную": "Install selected",
+  "Изменение версии выполняется. Панель может временно отключиться; не запускайте повторную установку.": "Version change in progress. The panel may disconnect temporarily; do not start another installation.",
+  "Нет связи с панелью. Данные на экране могут быть устаревшими.": "The panel is unreachable. Displayed data may be outdated.",
+  "Установить версию": "Install version",
+  "? Для отката будет создана временная копия, которая удалится автоматически. Панель и подключения могут кратковременно прерваться.": "? A temporary rollback copy will be created and removed automatically. The panel and connections may be briefly interrupted.",
+  "Ошибка обновления": "Update error",
+  "Установлено:": "Installed:",
+  "неизвестно": "unknown",
+  "Подождите…": "Please wait…",
+  "Выберите опубликованную версию GitHub.": "Choose a published GitHub version.",
+  "Ошибка загрузки версий": "Could not load versions",
+  "Изменение версии выполняется. Откройте раздел «Обновления», чтобы увидеть статус.": "Version change in progress. Open Updates to view its status.",
+  "Версия панели": "Panel version",
+  "Ход установки компонента": "Component installation progress",
+  "Версии панели загружены.": "Panel versions loaded.",
+  "Нажмите «Обновить списки».": "Click “Refresh lists”.",
+  "Автообновление включено.": "Auto-update enabled.",
+  "Автообновление выключено.": "Auto-update is disabled.",
+  "Автообновление компонентов включено.": "Component auto-update enabled.",
+  "Автообновление компонентов выключено.": "Component auto-update disabled.",
+  "Текущая рабочая версия сохранена.": "The current working version has been preserved.",
+  "Версии компонентов загружены.": "Component versions loaded.",
+  "Операция завершилась ошибкой.": "The operation failed.",
+  "Панель не ответила на запрос состояния.": "The panel did not respond to the status request.",
+  "Установить панель": "Install panel",
+  "? Панель и подключения могут кратковременно прерваться.": "? The panel and connections may be briefly interrupted.",
+  "Включить автоматическую установку стабильных версий? Временный откат будет удаляться после каждой проверки.": "Enable automatic installation of stable versions? The temporary rollback copy will be removed after each check.",
+  "Выберите значение": "Select a value",
+  "Выбор": "Selection",
+  "Вся сеть · основная и": "Entire network · main and",
+  "дополнительных нод": "additional nodes",
+  "Нода": "Node",
+  "Применение": "Scope",
+  "Основная нода": "Main node",
+  "Свой домен": "Custom domain",
+  "Укажите SNI вручную": "Enter SNI manually",
+  "TCP · Vision · общий внешний порт 443": "TCP · Vision · shared external port 443",
+  "Шаблон сайта на вашем домене настраивается отдельно.": "The website template on your domain is configured separately.",
+  "Сохранение применяется ко всей сети после проверки каждой ноды.": "Changes are applied across the network after each node is verified.",
+  "Изменения применяются ко всем REALITY-подключениям этой ноды.": "Changes apply to all REALITY connections on this node.",
+  "После смены SNI обновите подписки.": "Update subscriptions after changing SNI.",
+  "Параметры доступа": "Access parameters",
+  "Проверка REALITY": "REALITY check",
+  "Реальный туннель · HTTP 204": "Real tunnel · HTTP 204",
+  "Проверить цель": "Check target",
+  "Цель уже проверена": "Target already verified",
+  "Ожидание проверки": "Waiting for check",
+  "Проверка пройдена": "Check passed",
+  "Не все ноды подтвердили REALITY. Настройки не менялись.": "Not every node confirmed REALITY. Settings were not changed.",
+  "REALITY подтверждён на": "REALITY confirmed on",
+  "нод(ах). Теперь можно нажать «Сохранить».": "node(s). You can now click “Save”.",
+  "Получаем прежние параметры": "Retrieving previous settings",
+  "Уже сохранено": "Already saved",
+  "Сохраняем и проверяем ноду": "Saving and checking node",
+  "Сохранено и подтверждено": "Saved and verified",
+  "Ошибка сохранения:": "Save error:",
+  "Сохранено на всех": "Saved on all",
+  "нод(ах). Обновите подписки после смены SNI.": "node(s). Update subscriptions after changing SNI.",
+  "Возвращаем прежние настройки затронутых нод…": "Restoring previous settings on affected nodes…",
+  "Нет прежних параметров для отката": "No previous settings available for rollback",
+  "Восстанавливаем прежний SNI": "Restoring previous SNI",
+  "Прежние настройки восстановлены": "Previous settings restored",
+  "Откат не удался:": "Rollback failed:",
+  "Часть изменений не удалось откатить. Проверьте красные статусы перед закрытием.": "Some changes could not be rolled back. Check the red statuses before closing.",
+  "Сохранение отменено. Прежние настройки восстановлены.": "Save cancelled. Previous settings restored.",
+  "Сохранение прервано. Прежние настройки восстановлены.": "Save interrupted. Previous settings restored.",
+  "Сохранение не выполнено:": "Save unsuccessful:",
+  "Ошибка соединения": "Connection error",
+  ". Настройки не изменены.": ". Settings were not changed.",
+  "Операция отменена пользователем": "Operation cancelled by user",
+  "Отмена запрошена. Завершаем текущий запрос и возвращаем прежние настройки. Не закрывайте вкладку.": "Cancellation requested. Finishing the current request and restoring previous settings. Do not close this tab.",
+  "Проверка остановлена. Настройки не изменены.": "Check stopped. Settings were not changed.",
+  "Расширенные настройки": "Advanced settings",
+  "Сайт для REALITY": "REALITY target site",
+  "Все подключения": "All connections",
+  "Выбрать ноду": "Select node",
+  "Подключение REALITY": "REALITY connection",
+  "Настройка ноды": "Node settings",
+  "Amnezia · конфигурация": "Amnezia · configuration",
+  "Naive · отдельный профиль": "Naive · separate profile",
+  "Mieru · отдельный профиль": "Mieru · separate profile",
+  "· одна выбранная нода": "· one selected node",
+  "· выбранные ноды": "· selected nodes",
+  "Например, Home VPN": "For example, Home VPN",
+  "Быстрый выбор срока": "Quick expiry selection",
+  "Быстрый срок": "Quick duration",
+  "Месяц календаря": "Calendar month",
+  "Выбрать день": "Select day",
+  "Текущие дата и время": "Current date and time",
+  "До 2099": "Until 2099",
+  "Трафик, ГБ": "Traffic, GB",
+  "0 — без лимита · общий учёт нод пока не подключён": "0 = unlimited · combined node accounting is not available yet",
+  "0 — без ограничения HWID": "0 = unlimited HWIDs",
+  "1 отдельный профиль · выбранная нода ·": "1 separate profile · selected node ·",
+  "Отдельные протоколы создаются по одному на выбранной ноде": "Separate protocols are created individually on the selected node",
+  "нод ×": "nodes ×",
+  "протокола =": "protocols =",
+  "подключений Happ": "Happ connections",
+  "Отдельная конфигурация": "Separate configuration",
+  "Выберите хотя бы один доступный протокол.": "Select at least one available protocol.",
+  "Выберите хотя бы одну ноду.": "Select at least one node.",
+  "Укажите будущую дату окончания.": "Choose a future expiry date.",
+  "Общий лимит трафика пока не готов: укажите 0 ГБ.": "Shared traffic limit is not ready yet; enter 0 GB.",
+  "Выберите хотя бы один доступный протокол": "Select at least one available protocol",
+  "Happ объединяет выбранные ноды. Telegram, Amnezia, Naive и Mieru создаются отдельными профилями на одной выбранной ноде. Лимит срока для отдельных профилей пока нужно проверять отдельно.": "Happ combines selected nodes. Telegram, Amnezia, Naive and Mieru are created as separate profiles on one selected node. Expiry limits for individual profiles still need separate verification.",
+  "Happ объединяет выбранные ноды.": "Happ combines selected nodes.",
+  "Telegram, Amnezia, Naive и Mieru создаются отдельными профилями на одной выбранной ноде.": "Telegram, Amnezia, Naive and Mieru are created as separate profiles on one selected node.",
+  "Лимит срока для отдельных профилей пока нужно проверять отдельно.": "Expiry limits for individual profiles still need separate verification.",
+  "Сначала добавьте подключение в разделе «Подключения»": "Add the connection under Connections first",
+  "Имя конфигурации": "Configuration name",
+  "Срок действия": "Expiry date",
+  "Выбрать дату окончания": "Choose expiry date",
+  "Протоколы": "Protocols",
+  "Пользователи": "Users",
+  "Будет создано": "To be created",
+  "Подписка для Happ": "Happ subscription",
+  "Создать пользователя": "Create user",
+  "Отмена": "Cancel",
+  "Например": "For example",
+  "Разрешить регистрацию": "Allow registration",
+  "Отозвать устройство": "Revoke device",
+  "Включена": "Enabled",
+  "Без лимита HWID · общий ключ": "Unlimited HWIDs · shared key",
+  "Отключить подписку": "Disable subscription",
+  "Включить подписку": "Enable subscription",
+  "черновик": "draft",
+  "опубликованный исходник": "published source",
+  "Удалить черновик и вернуться к опубликованному исходнику?": "Delete the draft and return to the published source?",
+  "Сохранить черновик": "Save draft",
+  "Опубликовать на сайте": "Publish to website",
+  "Удалить черновик": "Delete draft",
+  "Компьютер": "Desktop",
+  "Телефон": "Phone",
+  "Нажмите «Предпросмотр», чтобы увидеть текущий код без публикации.": "Click Preview to view the current code without publishing.",
+  "Изолированный предпросмотр заглушки": "Isolated placeholder preview",
+  "Подготовка…": "Preparing…",
+  "Ошибка предпросмотра": "Preview error",
+  "Предпросмотр обновлён. Рабочий сайт не изменён.": "Preview updated. Live site unchanged.",
+  "Опубликовать текущий HTML на основном домене?": "Publish the current HTML to the main domain?",
+  "UDP · прямое подключение": "UDP · direct connection",
+  "Прямое подключение": "Direct connection",
+  "Доступ отозван": "Access revoked",
+  "Подключено": "Connected",
+  "Без срока": "No expiry",
+  "Без лимита": "Unlimited",
+  "Конфиг": "Configuration",
+  "сервер подписки": "subscription server",
+  "Ещё не использовалась": "Never used",
+  "Доступна": "Available",
+  "Устройства появятся после добавления подписки в Happ.": "Devices will appear after importing the subscription into Happ.",
+  "В подписке пока нет доступных подключений.": "The subscription has no available connections yet.",
+  "В подписке пока нет доступных конфигов.": "The subscription has no available configurations yet.",
+  "Конфиги в подписке": "Subscription configurations",
+  "Как подключиться": "How to connect",
+  "Скопируйте ссылку и добавьте её в приложение как подписку. Эта страница не регистрирует новое устройство и не расходует доступный лимит.": "Copy the link and add it in your app as a subscription. This page does not register a new device or use the available device limit.",
+  "HWID устройств не отображаются. Переименование и отзыв устройства не меняют ссылку подписки.": "Device HWIDs are not displayed. Renaming or revoking a device does not change the subscription link.",
+  "QR конфигурации": "Configuration QR code",
+  "Отсканируйте код в VPN-приложении.": "Scan the code in your VPN app.",
+  "Скачать приложение": "Download app",
+  "Открыть в Happ": "Open in Happ",
+  "Одна ссылка: VLESS XHTTP + Hysteria2": "One link: VLESS XHTTP + Hysteria2",
+  "Клиент": "Client",
+  "Устройства": "Devices",
+  "Устройство": "Device",
+  "Срок истёк": "Expired",
+  "Установлена": "Installed",
+  "Файл подключений повреждён:": "Connection file is corrupted:",
+  "Некорректный формат файла подключений.": "Invalid connection file format.",
+  "Редактор inbound доступен для VLESS и Hysteria2.": "The inbound editor is available for VLESS and Hysteria2.",
+  "Протокол JSON должен совпадать с протоколом подключения.": "The JSON protocol must match the connection protocol.",
+  "settings должен быть JSON-объектом.": "settings must be a JSON object.",
+  "UUID и пароли клиентов изменяются во вкладке «Пользователи».": "Client UUIDs and passwords are changed under Users.",
+  "port: укажите целый порт от 1 до 65535.": "port: enter an integer from 1 to 65535.",
+  "settings и streamSettings должны быть JSON-объектами.": "settings and streamSettings must be JSON objects.",
+  "Это подключение XHTTP за Caddy: listen должен быть 127.0.0.1, network — xhttp, security — none. TLS работает на Caddy.": "This XHTTP connection is behind Caddy: listen must be 127.0.0.1, network must be xhttp and security must be none. Caddy handles TLS.",
+  "xhttpSettings должен быть JSON-объектом.": "xhttpSettings must be a JSON object.",
+  "network и security управляются панелью.": "network and security are managed by the panel.",
+  "server.streamSettings.xhttpSettings доступен только для VLESS.": "server.streamSettings.xhttpSettings is only available for VLESS.",
+  "Путь XHTTP управляется панелью и не может быть переопределён.": "The XHTTP path is managed by the panel and cannot be overridden.",
+  "Раздел client пока доступен только для VLESS XHTTP.": "The client section is currently available only for VLESS XHTTP.",
+  "client.mode: допустимы auto, packet-up или stream-up.": "client.mode: allowed values are auto, packet-up or stream-up.",
+  "client.extra должен быть JSON-объектом.": "client.extra must be a JSON object.",
+  "client.fingerprint: неизвестный TLS fingerprint.": "client.fingerprint: unknown TLS fingerprint.",
+  "client.alpn: используйте список из h2, h3 или http/1.1.": "client.alpn: use a list containing h2, h3 or http/1.1.",
+  "Неизвестный маршрут VLESS.": "Unknown VLESS route.",
+  "Неизвестный CDN-провайдер.": "Unknown CDN provider.",
+  "публичный домен CDN": "public CDN domain",
+  "Неизвестный TLS fingerprint.": "Unknown TLS fingerprint.",
+  "Неизвестный режим XHTTP.": "Unknown XHTTP mode.",
+  "Метод XHTTP должен быть GET, POST или DELETE.": "The XHTTP method must be GET, POST or DELETE.",
+  "Настройки REALITY изменяются в настройках ноды.": "REALITY settings are changed in node settings.",
+  "Порт Naive/Mieru должен быть от 1025 до 65535.": "The Naive/Mieru port must be between 1025 and 65535.",
+  "Mieru поддерживает TCP или UDP.": "Mieru supports TCP or UDP.",
+  "Для подключения ещё не назначен порт.": "No port has been assigned to this connection yet.",
+  "Нет свободных UDP-портов для AWG.": "No free UDP ports are available for AWG.",
+  "DNS домена CDN": "CDN domain DNS",
+  "Домен не разрешается:": "Domain does not resolve:",
+  "Проверьте домен CDN и дождитесь завершения его активации.": "Check the CDN domain and wait for its activation.",
+  "HTTPS-сертификат CDN": "CDN HTTPS certificate",
+  "Сертификат истёк.": "The certificate has expired.",
+  "Выпустите или привяжите сертификат в CDN.": "Issue or attach a certificate in the CDN.",
+  "Проверьте автоматическое продление сертификата.": "Check automatic certificate renewal.",
+  "Проверьте сертификат и HTTPS в настройках CDN.": "Check the certificate and HTTPS settings in the CDN.",
+  "Источник WPP": "WPO origin",
+  "Обновите WPP и проверьте основной домен на порту 443.": "Update WPO and check the main domain on port 443.",
+  "Проверьте DNS основного домена, порт 443 и службу Caddy.": "Check the main domain DNS, port 443 and the Caddy service.",
+  "Маршрут через CDN": "CDN route",
+  "не указан": "not specified",
+  "Для Selectel это допустимо при ограничении путей ресурса и не означает, что XHTTP не работает.": "For Selectel this is acceptable when resource paths are restricted and does not mean XHTTP is broken.",
+  "Дождитесь ACTIVE; проверьте баланс, ограничения и Hostname источника.": "Wait for ACTIVE; check the balance, limits and origin Hostname.",
+  "Укажите источник HTTPS, порт 443 и Hostname основного домена WPP.": "Set an HTTPS origin on port 443 and use the main WPO domain as its Hostname.",
+  "Проверьте источник и передачу заголовка Host в CDN.": "Check the origin and Host header forwarding in the CDN.",
+  "Проверьте статус CDN и доступность публичного домена.": "Check the CDN status and public domain availability.",
+  "Проверьте разрешённые HTTP-методы CDN.": "Check the allowed CDN HTTP methods.",
+  "Режим исходящего трафика": "Outgoing traffic mode",
+  "packet-up · POST короткими порциями без зависания потокового запроса": "packet-up · POST in short chunks without hanging streaming requests",
+  "packet-up · CDN принимает только GET, поэтому скорость upload зависит от лимитов edge-сервера.": "packet-up · CDN only accepts GET, so upload speed depends on edge server limits.",
+  "Кеширование CDN": "CDN caching",
+  "Уникальный диагностический запрос получен из кеша:": "Unique diagnostic request was served from cache:",
+  "Отключите кеширование и очистите кеш CDN-ресурса.": "Disable caching and clear the CDN resource cache.",
+  "Признаков кеширования диагностического запроса нет.": "No evidence that the diagnostic request was cached.",
+  "Локальный Xray inbound": "Local Xray inbound",
+  "Перезапустите Xray через обновление WPP и проверьте журнал службы.": "Restart Xray through a WPO update and check the service logs.",
+  "Путь XHTTP": "XHTTP path",
+  "Не удалось скачать файлы релиза: GitHub недоступен или соединение прервано.": "Could not download release files: GitHub is unreachable or the connection was interrupted.",
+  "Пакет OpenFlux отсутствует или повреждён.": "OpenFlux package is missing or corrupted.",
+  "Архив Xray не прошёл проверку целостности.": "Xray archive failed the integrity check.",
+  "Один из обязательных портов занят другой программой.": "One of the required ports is in use by another program.",
+  "Не удалось применить конфигурацию HTTPS/Caddy.": "Could not apply the HTTPS/Caddy configuration.",
+  "Установленная версия панели не распознана безопасным обновлением.": "The installed panel version was not recognized by the safe updater.",
+  "Обновление завершилось ошибкой. Откройте журнал через WPP или SSH.": "The update failed. Open the log through WPO or SSH.",
+  "Обновление прервано. Проверьте журнал через WPP/SSH.": "Update interrupted. Check logs through WPO/SSH.",
+  "GitHub недоступен. Повторите позже.": "GitHub is unreachable. Try again later.",
+  "Опубликованные стабильные теги не найдены.": "No published stable tags were found.",
+  "Не удалось проверить GitHub. Повторите позже.": "Could not check GitHub. Try again later.",
+  "Обновление уже выполняется.": "An update is already in progress.",
+  "Не удалось запустить службу обновления.": "Could not start the update service.",
+  "Проверьте доступ VPS к GitHub и повторите установку. Текущая версия сохранена.": "Check VPS access to GitHub and retry the installation. The current version has been preserved.",
+  "Архив не удалось распаковать": "Could not extract the archive",
+  "Обновите список версий и повторите. Текущая версия сохранена.": "Refresh the version list and try again. The current version has been preserved.",
+  "Версия несовместима с настройками": "Version is incompatible with the settings",
+  "Выберите другую версию. Работающее подключение не было заменено.": "Choose another version. The working connection was not replaced.",
+  "Версия не поддерживает MAX": "The version does not support MAX",
+  "OpenFlux не обновлён: выбранный релиз несовместим с существующими MAX-профилями.": "OpenFlux was not updated: the selected release is incompatible with existing MAX profiles.",
+  "Выберите более новую версию OpenFlux. Текущая версия сохранена.": "Choose a newer OpenFlux version. The current version has been preserved.",
+  "Компонент не запустился": "The component did not start",
+  "Панель восстановила предыдущий файл. Повторите или выберите другую версию.": "The panel restored the previous file. Retry or choose another version.",
+  "Неверный файл релиза": "Invalid release file",
+  "Выберите другую опубликованную версию. Текущая версия сохранена.": "Choose another published version. The current version has been preserved.",
+  "Установка не завершена": "Installation incomplete",
+  "Повторите установку. Если ошибка повторится, передайте администратору техническую причину ниже.": "Retry the installation. If the error repeats, provide the administrator with the technical reason below.",
+  "Установка была прервана": "Installation was interrupted",
+  "Компонент не обновлён: служба установки неожиданно остановилась.": "The component was not updated: the installation service stopped unexpectedly.",
+  "Повторите установку. Текущая версия компонента сохранена.": "Retry the installation. The current component version has been preserved.",
+  "Служба web-panel-proxy-component-update завершилась до окончания операции.": "The web-panel-proxy-component-update service exited before the operation completed.",
+  "Трафик": "Traffic",
+  "Версии": "Versions",
+  "Ноды": "Nodes",
+  "Всё хорошо": "All good",
+  "Назначение": "Destination",
+  "Конфигурация": "Configuration",
+  "Соединение": "Connection",
+  "Настроить": "Configure",
+  "Проверить": "Check",
+  "Управление": "Management",
+  "Список": "List",
+  "Ожидание": "Waiting",
+  "Применено": "Applied",
+  "Сохранено": "Saved",
+  "Всё готово": "All set",
+  "Проверка": "Check",
+  "Ошибка": "Error",
+  "Неизвестная ошибка": "Unknown error",
+  "Оформление сайта, резервная копия и доступ к панели": "Site design, backup and panel access",
+  "Клиенты, подписки, ключи, подключения, ноды, OpenFlux, сайт и учётная запись панели": "Clients, subscriptions, keys, connections, nodes, OpenFlux, website and panel account",
+  "Архив содержит пароль и секретные ключи.": "The archive contains the password and secret keys.",
+  "Храните его в безопасном месте.": "Keep it in a safe place.",
+  "После восстановления действуют логин и пароль из архива.": "After restoration, the username and password from the archive apply.",
+  "На VPS постоянные копии не создаются.": "No permanent copies are created on the VPS.",
+  "Заменить текущие настройки данными из резервной копии? Подключения кратковременно перезапустятся.": "Replace current settings with the backup? Connections will briefly restart.",
+  "Проверяем и устанавливаем резервную копию…": "Verifying and installing the backup…",
+  "Не удалось установить резервную копию.": "Could not restore the backup.",
+  "Готово. Восстановлено файлов:": "Done. Files restored:",
+  ". Перезагружаем страницу…": ". Reloading the page…",
+  "Минимум 3 символа · смена пароля завершит все сессии панели": "Minimum 3 characters · changing the password will end all panel sessions",
+  "Выбран:": "Selected:",
+  "Создание подключения": "Create connection",
+  "Выберите протокол и способ подключения клиентов": "Choose a protocol and client connection method",
+  "Основная нода REALITY": "Main node REALITY",
+  "Проверка применена ко всем нодам.": "Check applied to all nodes.",
+  "Порт будет назначен при создании клиента": "The port will be assigned when a client is created",
+  "Будет назначен": "Will be assigned",
+  "при создании клиента": "when a client is created",
+  "Укажите домены для добавления или удаления": "Enter domains to add or remove",
+  "Укажите домены для добавления или удаления.": "Enter domains to add or remove.",
+  "Прямые домены": "Direct domains",
+  "Домены через VPN": "Domains via VPN",
+  "Пока нет добавленных доменов": "No domains added yet",
+  "Сейчас домены не добавлены": "No domains currently added",
+  "Выберите правила, затем добавьте или удалите только эти элементы.": "Select rules, then add or remove only those items.",
+  "Выберите только те правила, которые нужно добавить или убрать.": "Select only the rules you want to add or remove.",
+  "Обновите подписку в VPN-приложении.": "Update the subscription in your VPN app.",
+  "Обновите подключение после изменения маршрутизации": "Update the connection after changing routing",
+  "Маршрутизация отключена": "Routing disabled",
+  "Маршрутизация включена": "Routing enabled",
+  "Правила маршрутизации": "Routing rules",
+  "Маршрутизация": "Routing",
+  "Выбранное подключение": "Selected connection",
+  "Нагрузка · 1 / 5 / 15 мин.": "Load · 1 / 5 / 15 min.",
+  "Время работы сервера": "Server uptime",
+  "Время работы Xray": "Xray uptime",
+  "Задачи Xray": "Xray tasks",
+  "Память Xray": "Xray memory",
+  "Всего трафика": "Total traffic",
+  "Передают трафик": "Transferring traffic",
+  "Подписок": "Subscriptions",
+  "Ядер:": "Cores:",
+  "гипервизор:": "hypervisor:",
+  "Сохранить подключение": "Save connection",
+  "Выберите одну или несколько VPN-нод": "Choose one or more VPN nodes",
+  "Happ и другие поддерживаемые приложения": "Happ and other supported apps",
+  "Конфигурации": "Configurations",
+  "Версия Xray": "Xray version",
+  "Версия OpenFlux": "OpenFlux version",
+  "Xray: актуальная версия": "Xray: current version",
+  "OpenFlux: актуальная версия": "OpenFlux: current version",
+  "По умолчанию": "Default",
+  "В сети": "Online",
+  "Установка": "Installing",
+  "Регистрация": "Registration",
+  "Не в сети": "Offline",
+  "Управление нодами": "Node management",
+  "Список подключений": "Connection list",
+  "Сертификат": "Certificate",
+  "Сервер": "Server",
+  "Проверка завершена.": "Check complete.",
+  "Проверка выполняется…": "Checking…",
+  "Версия доступна": "Version available",
+  "Обновление доступно": "Update available",
+  "Показано": "Showing",
+  "Статус": "Status",
+  "Клиенты": "Clients",
+  "Подписка": "Subscription",
+  "Главная": "Dashboard",
+  "Настройки": "Settings",
+  "Подключения": "Connections",
+  "Обновления": "Updates",
+  "Выйти": "Log out",
+  "Вход": "Sign in",
+  "Поиск": "Search",
+  "Нет данных": "No data"
+}""")
+
+def _wpo_c333_extend_english(original_js):
+    prefix = "const extraPairs="
+    if original_js.count(prefix) != 1:
+        raise RuntimeError("WPO language dictionary has an unexpected format")
+    pos = original_js.index(prefix) + len(prefix)
+    pairs, size = _wpo_i18n_json.JSONDecoder().raw_decode(original_js[pos:])
+    if not isinstance(pairs, list) or len(pairs) < 150:
+        raise RuntimeError("Existing WPO translations could not be verified")
+
+    # The existing dictionary and its original Russian/English behavior stay intact.
+    # Merge exact Russian phrases so only user-facing text gets translated.
+    by_ru = {}
+    for pair in pairs:
+        if (not isinstance(pair, list) or len(pair) != 2 or
+                not all(isinstance(value, str) for value in pair)):
+            raise RuntimeError("WPO translation data is malformed")
+        en, ru = pair
+        by_ru[ru] = en
+    for ru, en in _WPO_C333_AUDITED_TRANSLATIONS.items():
+        if not isinstance(ru, str) or not isinstance(en, str):
+            raise RuntimeError("WPO translation value is not text")
+        by_ru[ru] = en
+    rebuilt = [[en, ru] for ru, en in by_ru.items()]
+    json_text = _wpo_i18n_json.dumps(
+        rebuilt, ensure_ascii=False, separators=(",", ":")
+    ).replace("<", "\\u003c")
+    return original_js[:pos] + json_text + original_js[pos+size:]
+
+WPO_C333_I18N_JS = _wpo_c333_extend_english(WPO_C333_I18N_JS)
+'''
+
+
+def check_source(original):
+    if "# WPO_C333_MANUAL_LOGIN_V1" not in original:
+        raise RuntimeError("WPO manual-login patch is missing")
+    if "# WPO_C333_LANGUAGE_THEME_V1" not in original:
+        raise RuntimeError("WPO language/theme patch is missing")
+    if "# WPO_C333_I18N_V8_PRELOAD" not in original:
+        raise RuntimeError("WPO v8 translation is missing; restore it first")
+    if "WPO_SELECT_POPOVER_V2_BEGIN" not in original:
+        raise RuntimeError("WPO working selects were not detected")
+    if "WPO_NAV_NATIVE_RECOVERY_V2_BEGIN" in original:
+        raise RuntimeError("Obsolete incompatible navigation recovery detected")
+    if original.count("WPO_C333_I18N_JS = ") < 1:
+        raise RuntimeError("WPO i18n script definition missing")
+
+
+def transform(original):
+    check_source(original)
+    if MARK in original:
+        return original, True
+    updated = original + "\n" + ADDON
+    ast.parse(updated, filename=str(TARGET))
+    compile(updated, str(TARGET), "exec")
+    for key in ("def routing_ui(", "def theme_button():",
+                "# WPO_SELECT_POPOVER_V2_BEGIN", "wppNavigationTimer"):
+        if original.count(key) != updated.count(key):
+            raise RuntimeError("A working WPO component unexpectedly changed: " + key)
+    return updated, False
+
+
+def healthy():
+    if subprocess.run(["systemctl", "is-active", "--quiet", SERVICE]).returncode:
+        return False
+    try:
+        try:
+            response = urlopen("http://127.0.0.1:8090/", timeout=2)
+            code = response.status
+            response.close()
+        except HTTPError as exc:
+            code = exc.code
+        return 200 <= code < 500
+    except Exception:
+        return False
+
+
+def main():
+    mode = sys.argv[1] if len(sys.argv) == 2 else ""
+    if mode not in ("--check", "--apply"):
+        raise SystemExit("Usage: --check | --apply")
+    if mode == "--apply" and os.geteuid() != 0:
+        raise SystemExit("Run with sudo.")
+    if not TARGET.is_file() or TARGET.is_symlink() or not (APP / "panel.py").is_file():
+        raise SystemExit("Installed WPO was not found; nothing changed.")
+
+    current = TARGET.read_text(encoding="utf-8")
+    updated, already = transform(current)
+    if already:
+        print("✓ Additional audited WPO English translations already installed.")
+        return
+
+    print("✓ Compatible WPO version detected. Extra UI translations:",
+          509)
+    if mode == "--check":
+        print("✓ Check complete. No files or services were modified.")
+        return
+    if not healthy():
+        raise RuntimeError("WPO does not respond before the update. No changes made.")
+
+    backup = (Path("/var/backups/web-panel-online") /
+              ("wpo-audited-en-v10-" +
+               datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") +
+               "-" + str(os.getpid())))
+    backup.mkdir(parents=True, mode=0o700, exist_ok=False)
+    shutil.copy2(TARGET, backup / "wpp_ui.py")
+    fd, temp = tempfile.mkstemp(prefix=".wpo-audited-en-v10-", suffix=".py", dir=APP)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            out.write(updated)
+        previous = TARGET.stat()
+        os.chmod(temp, stat.S_IMODE(previous.st_mode))
+        os.chown(temp, previous.st_uid, previous.st_gid)
+        os.replace(temp, TARGET)
+        subprocess.run(["systemctl", "restart", SERVICE], check=True)
+        for _ in range(20):
+            if healthy():
+                print("✓ Audited UI translations installed. Backup:", backup / "wpp_ui.py")
+                return
+            time.sleep(1)
+        raise RuntimeError("WPO did not respond after the update")
+    except Exception:
+        shutil.copy2(backup / "wpp_ui.py", TARGET)
+        subprocess.run(["systemctl", "restart", SERVICE], check=False)
+        print("✖ Previous WPO interface restored from backup", file=sys.stderr)
+        raise
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+if __name__ == "__main__":
+    main()
