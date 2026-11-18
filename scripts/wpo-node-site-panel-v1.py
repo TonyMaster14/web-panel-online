@@ -21,8 +21,10 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import socket
 import stat
+import sys
 import subprocess
 import tempfile
 import time
@@ -202,7 +204,9 @@ def restore(allow_missing=False):
         old=path/file.name
         plain(old)
         expected=MARK_UI if file==UI else MARK_LIB
-        if expected not in file.read_text(encoding="utf-8"):
+        present=hashlib.sha256(file.read_bytes()).hexdigest()
+        original=data.get("original_sha256",{}).get(file.name)
+        if expected not in file.read_text(encoding="utf-8") and present!=original:
             raise RuntimeError("Исходный файл изменён после обновления: "+str(file))
     for file in (UI,LIB):
         old=path/file.name
@@ -224,7 +228,8 @@ def apply():
     for file in (UI,LIB):
         shutil.copy2(file,backup/file.name)
         os.chmod(backup/file.name,0o600)
-    info={"backup":str(backup),"timestamp":datetime.now(timezone.utc).isoformat()}
+    info={"backup":str(backup),"timestamp":datetime.now(timezone.utc).isoformat(),
+          "original_sha256":{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (UI,LIB)}}
     atomic(STATE,json.dumps(info).encode("utf-8"),mode=0o600)
     try:
         atomic(UI_ADD,sources[NAMES[0]].encode("utf-8"))
