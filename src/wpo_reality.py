@@ -72,11 +72,10 @@ def initialize(xray, address):
     atomic(PUBLIC, json.dumps(profile), 0o644)
     return profile
 
-# Multiple *separate* REALITY inbound backends preserve previously exported
-# Happ links when the administrator switches between supported decoys.
-# Each domain has its OWN matching target and serverName, never mismatched
-# serverNames on a single target. The existing UUID/key/short ID are shared.
-# The broken Microsoft target is intentionally not kept as a compatibility SNI.
+# One REALITY inbound for the currently selected SNI. Other preset choices
+# remain available when changing the profile, but are not simultaneously
+# provisioned as redundant backends. Refresh previously exported HAPP links
+# after changing the SNI. UUID, private key and short ID are preserved.
 def reality_routes(profile=None):
     profile = profile or read_profile()
     current = normalize({'preset': 'custom', 'sni': profile['sni']})['sni']
