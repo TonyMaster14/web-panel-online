@@ -46,7 +46,7 @@ class SiteTransportTests(unittest.TestCase):
         self.assertIn("@wpo_node_xhttp path",vpn)
         self.assertIn("reverse_proxy 127.0.0.1:19000",vpn)
         self.assertLess(vpn.index("handle @wpo_node_xhttp"),
-                        vpn.index("s=s.replace(anchor,addon,1)"))
+                        vpn.index("s=s.replace(anchor,addon+anchor,1)"))
 
     def test_sweden_real443_nginx_forwards_non_reality_tls_to_caddy(self):
         source=(ROOT/"scripts/wpo-sweden-real443-switch-v1.py").read_text()
