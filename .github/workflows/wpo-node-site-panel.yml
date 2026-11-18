@@ -5,10 +5,13 @@ on:
     paths:
       - 'src/wpo_node_site_pack_v1.py'
       - 'src/wpo_node_site_view_v1.py'
+      - 'src/wpo_user_v28.py'
       - 'src/wpo_real443_status_advertise_v1.py'
       - 'scripts/wpo-node-site-panel-v1.py'
       - 'scripts/wpo-sweden-real443-managed-v1.py'
       - 'tests/test_wpo_node_site_panel_v1.py'
+      - 'tests/test_wpo_node_country_picker_ru_v1.py'
+      - 'scripts/wpo-subscription-readonly-diagnose-v1.py'
       - 'tests/test_wpo_real443_status_advertise_v1.py'
       - 'tests/test_wpo_node_site_transport_v1.py'
       - '.github/workflows/wpo-node-site-panel.yml'
@@ -25,10 +28,11 @@ jobs:
         run: bash scripts/prepare-source-layout.sh
       - name: Syntax check and unit tests
         run: |
-          python3 -m py_compile src/wpo_node_site_pack_v1.py src/wpo_node_site_view_v1.py src/wpo_real443_status_advertise_v1.py scripts/wpo-node-site-panel-v1.py scripts/wpo-sweden-real443-managed-v1.py
+          python3 -m py_compile src/wpo_node_site_pack_v1.py src/wpo_node_site_view_v1.py src/wpo_real443_status_advertise_v1.py src/wpo_user_v28.py scripts/wpo-node-site-panel-v1.py scripts/wpo-sweden-real443-managed-v1.py scripts/wpo-subscription-readonly-diagnose-v1.py
           python3 -m unittest discover -s tests -p 'test_wpo_node_site_panel_v1.py' -v
           python3 -m unittest discover -s tests -p 'test_wpo_real443_status_advertise_v1.py' -v
           python3 -m unittest discover -s tests -p 'test_wpo_node_site_transport_v1.py' -v
+          python3 -m unittest discover -s tests -p 'test_wpo_node_country_picker_ru_v1.py' -v
       - name: Existing automatic node template tests
         run: |
           python3 -m unittest discover -s tests -p 'test_node_*.py'
