@@ -58,7 +58,7 @@ class NodeViewTests(unittest.TestCase):
         remote='<div class="wpo-xray-mode-card"><button type="button" data-wpo-xray-mode-open="0123456789abcdef">Конфигурация Xray</button></div>'
         with patch.object(ui,"routing_flags",return_value={"reality":True,"hysteria":False}):
             html=ui.attach(local+remote,[{"id":"0123456789abcdef","name":"Poland",
-                         "xray_mode":"both"}],"/panel-abc","csrf123")
+                         "xray_mode":"reality"}],"/panel-abc","csrf123")
         self.assertEqual(html.count("data-wpo-xray-code-open="),2)
         self.assertIn("JSON · Маршрутизация включена",html)
         self.assertIn("JSON · Частично включена",html)
