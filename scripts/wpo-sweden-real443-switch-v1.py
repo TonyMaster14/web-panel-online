@@ -283,8 +283,8 @@ def restore():
     if not (folder/"canary-xray.json").is_file() or not (folder/"canary-nginx.conf").is_file():
         raise RuntimeError("Резервные копии тестовых конфигураций не найдены")
     print("Возвращаю маршрутизацию WPO на порт 443 ...")
-    # Stop direct 443 before starting HAProxy.
-    cmd("systemctl","stop",CX,timeout=20)
+    # Stop direct 443 before starting HAProxy; never continue if it still holds 443.
+    need("systemctl","stop",CX,timeout=20)
     # Restore only isolated canary config; production configs were never edited.
     oldx=(folder/"canary-xray.json").read_bytes()
     oldn=(folder/"canary-nginx.conf").read_bytes()
