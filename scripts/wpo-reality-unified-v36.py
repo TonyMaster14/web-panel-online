@@ -350,6 +350,7 @@ def main():
     if count>1: print("! Старые ссылки с другими SNI после обновления перестанут работать.")
 
     before=source.read_text(encoding="utf-8")
+    router_snapshot=ROUTER.read_bytes()
     updated_reality=patch_reality(before,panel,count)
     original_agent=agent.read_text(encoding="utf-8") if node else None
     if (node and count==1 and candidate==current
@@ -390,6 +391,8 @@ def main():
             raise RuntimeError("REALITY generator changed; retry safely.")
         if node and agent.read_text(encoding="utf-8") != original_agent:
             raise RuntimeError("Node Agent changed during inspection; retry safely.")
+        if ROUTER.read_bytes() != router_snapshot:
+            raise RuntimeError("HAProxy changed during inspection; retry safely.")
         with tempfile.TemporaryDirectory(prefix=".wpo-unified-v36-",dir=str(base)) as ws:
             tmp=Path(ws)
             source_preview=tmp/"wpo_reality_preview.py"
@@ -451,6 +454,12 @@ def main():
                 raise RuntimeError("Live Xray changed after candidate validation; nothing overwritten")
             if json.loads(PROFILE.read_text(encoding="utf-8")) != profile:
                 raise RuntimeError("REALITY profile changed after validation; nothing overwritten")
+            if ROUTER.read_bytes() != router_snapshot:
+                raise RuntimeError("HAProxy changed after validation; nothing overwritten")
+            if source.read_text(encoding="utf-8") != before:
+                raise RuntimeError("REALITY source changed after validation; nothing overwritten")
+            if node and agent.read_text(encoding="utf-8") != original_agent:
+                raise RuntimeError("Node Agent changed after validation; nothing overwritten")
             written=[]
             units=["web-panel-proxy-xray.service","wpo-tls-router.service",
                    "tproxy-panel.service"] if panel else [
