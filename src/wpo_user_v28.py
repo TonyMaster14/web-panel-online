@@ -22,6 +22,44 @@ CATALOG = (
 )
 VPN_SUPPORTED = ("vless", "reality", "hysteria")
 
+# UI-only country localization. It never renames nodes in the registry,
+# edits subscription IDs, or overwrites a custom administrator name.
+_RU_COUNTRIES = {
+    "SE":"Швеция", "PL":"Польша", "NL":"Нидерланды", "FI":"Финляндия",
+    "DE":"Германия", "FR":"Франция", "GB":"Великобритания",
+    "US":"США", "NO":"Норвегия", "DK":"Дания", "CA":"Канада",
+    "CH":"Швейцария", "AT":"Австрия", "CZ":"Чехия", "ES":"Испания",
+    "IT":"Италия", "TR":"Турция", "KZ":"Казахстан", "RU":"Россия",
+    "JP":"Япония", "SG":"Сингапур", "RO":"Румыния", "BG":"Болгария",
+    "BE":"Бельгия", "LT":"Литва", "LV":"Латвия", "EE":"Эстония",
+    "IE":"Ирландия", "IS":"Исландия", "UA":"Украина", "HK":"Гонконг",
+    "AE":"ОАЭ",
+}
+_EN_COUNTRIES = {
+    "SE":"sweden", "PL":"poland", "NL":"netherlands", "FI":"finland",
+    "DE":"germany", "FR":"france", "GB":"united kingdom",
+    "US":"united states", "NO":"norway", "DK":"denmark",
+    "CA":"canada", "CH":"switzerland", "AT":"austria",
+    "CZ":"czechia", "ES":"spain", "IT":"italy", "TR":"turkey",
+    "KZ":"kazakhstan", "RU":"russia", "JP":"japan", "SG":"singapore",
+    "RO":"romania", "BG":"bulgaria", "BE":"belgium", "LT":"lithuania",
+    "LV":"latvia", "EE":"estonia", "IE":"ireland", "IS":"iceland",
+    "UA":"ukraine", "HK":"hong kong", "AE":"united arab emirates",
+}
+
+
+def display_node_name(node, default="Нода"):
+    if not isinstance(node, dict):
+        return default
+    name = str(node.get("name") or node.get("country_name") or default).strip()
+    code = str(node.get("country_code") or "").upper()
+    native = _RU_COUNTRIES.get(code)
+    english = _EN_COUNTRIES.get(code)
+    if native and (node.get("name_auto") is True or
+                   name.casefold() in (english, native.casefold())):
+        return native
+    return name
+
 
 def flag(code):
     code = str(code or "").upper()
@@ -61,7 +99,7 @@ def form(path, csrf, connections, nodes=None, local=None):
                 '<small>Сначала добавьте подключение в разделе «Подключения»</small></span></label>'
             )
     location = local if isinstance(local, dict) else {}
-    local_label = str(location.get("name") or location.get("country_name") or "Основная нода")
+    local_label = display_node_name(location, "Основная нода")
     local_card = (
         '<label class="wpo-v28-node"><input type="checkbox" name="node_local" value="1" checked>'
         '<span class="wpo-v28-radio" aria-hidden="true"><i></i></span>'
@@ -79,7 +117,7 @@ def form(path, csrf, connections, nodes=None, local=None):
         caps = set(str(s) for s in node.get("capabilities", []) if isinstance(s, str))
         ready = (node.get("enabled", True) and node.get("status", "offline") == "online" and
                  all(p in caps for p in ("vless", "hysteria")) and "federation" in caps)
-        name = str(node.get("name") or node.get("country_name") or "Нода")
+        name = display_node_name(node)
         node_cards.append(
             f'<label class="wpo-v28-node{" unavailable" if not ready else ""}">'
             f'<input type="checkbox" name="node_{node_id}" value="1" {" " if ready else "disabled"}>'
