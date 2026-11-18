@@ -13,6 +13,7 @@ rollback timer also re-arms on boot; avoid rebooting while testing.
 from __future__ import annotations
 import argparse
 import datetime
+import fcntl
 import hashlib
 import json
 import os
@@ -45,6 +46,7 @@ API="wpo-node-vpn.service"
 PROD="wpo-node-xray.service"
 TIMEOUT="wpo-sweden-443-auto-rollback"
 UNITDIR=Path("/etc/systemd/system")
+LOCK=Path("/run/wpo-sweden-443-switch.lock")
 UNIX="/run/wpo-reality-remna-test/decoy.sock"
 MARK="WPO_REMNA_CANARY_V1"
 ROLLBACK_MINUTES=12
@@ -392,6 +394,9 @@ def confirm():
         raise RuntimeError("Новые службы 443 не в ожидаемом состоянии; подтверждение запрещено")
     if not active(TIMEOUT+".timer"):
         raise RuntimeError("Таймер отката не активен; проверь --status и --rollback")
+    code=tls_probe("127.0.0.1",443)
+    if code>=500:
+        raise RuntimeError("HTTPS после REALITY вернул HTTP "+str(code))
     cancel_timer()
     print("✓ Автоматический откат отменён. Это ВРЕМЕННЫЙ тестовый режим Швеции.")
     print("! Новые клиенты WPO пока НЕ синхронизируются автоматически с тестовым Xray.")
@@ -404,11 +409,13 @@ def main():
         opt.add_argument("--"+a,action="store_true")
     a=p.parse_args()
     if os.geteuid()!=0:raise RuntimeError("Требуется sudo")
-    if a.check:check()
-    elif a.apply:switch()
-    elif a.status:status()
-    elif a.confirm:confirm()
-    else:restore()
+    with open(LOCK,"a+") as handle:
+        fcntl.flock(handle.fileno(),fcntl.LOCK_EX)
+        if a.check:check()
+        elif a.apply:switch()
+        elif a.status:status()
+        elif a.confirm:confirm()
+        else:restore()
 
 if __name__=="__main__":
     try:main()
