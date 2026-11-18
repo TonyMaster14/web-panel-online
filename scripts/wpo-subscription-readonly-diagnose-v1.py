@@ -166,25 +166,93 @@ def node():
         print("Recent categories:",json.dumps(kept[-25:],ensure_ascii=False))
     print("=== END READ ONLY ===")
 
+def traceback_summary(text):
+    """Retain exception classes, HTTP codes and stack *function names* only.
+
+    Never emit traceback source lines, URLs, input values, credential strings,
+    UUIDs, subscription IDs, domains or raw exception messages.
+    """
+    blocks=[]
+    lines=text.splitlines()
+    i=0
+    while i<len(lines):
+        if "Traceback (most recent call last)" not in lines[i]:
+            i+=1;continue
+        frames=[]
+        classes=[]
+        i+=1
+        while i<len(lines):
+            line=lines[i]
+            frame=re.search(r'File "[^"]+", line \d+, in ([a-zA-Z_][a-zA-Z0-9_]{0,80})',line)
+            exc=re.match(r'^([a-zA-Z_][a-zA-Z0-9_.]{0,100}(?:Error|Exception|Interrupt))\s*:',line)
+            if frame:frames.append(frame.group(1))
+            if exc:
+                classes.append(exc.group(1))
+                i+=1
+                break
+            if "Traceback (most recent call last)" in line:
+                break
+            i+=1
+        blocks.append({"functions":frames[-8:],"exception":classes[-1] if classes else "not-shown"})
+    return blocks[-6:]
+
+
 def panel():
     print("=== PANEL ===")
     unit_status(UNITS_PANEL)
     path=Path("/opt/tproxy-panel/wpo_happ_async_feed.py")
     print("ASYNC FEED present",present(path))
+    p=run("journalctl","-u","tproxy-panel.service","--since","-120min",
+          "-o","cat","--no-pager",timeout=14)
+    if p:
+        classes=[]
+        for line in p.stdout.splitlines():
+            if "wpo asynchronous node sync failed" in line:
+                # The writer logs only safe exception type and opaque node ID,
+                # suppress all other fields including the opaque ID.
+                m=re.search(r'\s(NodeError|RuntimeError|OSError|ValueError|TypeError|TimeoutError|HTTPError)\b',line)
+                classes.append(m.group(1) if m else "sync-failed")
+            if "Подписка готовится" in line:classes.append("subscription-preparing")
+        print("Recent subscription events",json.dumps(classes[-45:],ensure_ascii=False))
+        print("SANITIZED_TRACEBACKS",json.dumps(traceback_summary(p.stdout),ensure_ascii=False))
+        status_codes=re.findall(r'(?i)\b(?:HTTP Error|HTTP status|HTTP)\s*[:]?\s*(40[0-9]|50[0-9])\b',p.stdout)
+        print("Recent HTTP error codes",",".join(status_codes[-24:]) or "none")
+    print("=== NODE READINESS FROM PANEL (GET ONLY) ===")
     try:
-        p=run("journalctl","-u","tproxy-panel.service","--since","-120min",
-              "-o","cat","--no-pager",timeout=14)
-        if p:
-            classes=[]
-            for line in p.stdout.splitlines():
-                if "wpo asynchronous node sync failed" in line:
-                    m=re.search(r" (NodeError|RuntimeError|OSError|ValueError|TypeError|TimeoutError|HTTPError|[A-Za-z]+Error)\b",line)
-                    classes.append(m.group(1) if m else "sync-failed")
-                if "Подписка готовится" in line:classes.append("subscription-preparing")
-                if "Traceback" in line:classes.append("traceback")
-            print("Recent subscription events",json.dumps(classes[-50:],ensure_ascii=False))
+        import sys
+        sys.path.insert(0,"/opt/tproxy-panel")
+        import wpp_nodes as api
+        nodes=api.load_nodes(Path("/var/lib/tproxy-panel/nodes.json"))
+        print("Registered nodes",len(nodes))
+        for index,node in enumerate(nodes,1):
+            if not isinstance(node,dict):continue
+            cc=str(node.get("country_code","UN"))
+            cc=cc if re.fullmatch(r"[A-Z]{2}",cc) else "UN"
+            enabled=bool(node.get("enabled",True))
+            print("NODE",index,"country",cc,"enabled",enabled)
+            if not enabled:continue
+            for suffix in ("/status","/federation/status"):
+                try:
+                    reply=api.request(node,"GET",api.API_PREFIX+suffix,timeout=7)
+                    caps=reply.get("capabilities",[])
+                    caps=([v for v in caps if v in
+                       ("federation","reality","vless","hysteria","reality-direct-443")]
+                       if isinstance(caps,list) else [])
+                    print(" ",suffix,"HTTP 200","ok",reply.get("ok"),"vpn_caps",",".join(caps))
+                except Exception as exc:
+                    cause=getattr(exc,"__cause__",None)
+                    code=getattr(cause,"code",None)
+                    print(" ",suffix,"FAILED",type(exc).__name__,
+                          "http_code",code if isinstance(code,int) else "unknown")
     except Exception as exc:
-        print("LOG",type(exc).__name__)
+        print("Node discovery failed:",type(exc).__name__)
+    print("=== PREPARER SERVICE ===")
+    p=run("systemctl","list-units","--all","--no-legend","--plain","wpo*happ*","*preparer*",timeout=7)
+    if p:
+        for line in p.stdout.splitlines()[:12]:
+            unit=line.split()[0] if line.split() else ""
+            if re.fullmatch(r"[a-zA-Z0-9_.@-]{3,80}\.(service|timer)",unit):
+                print("PREPARER UNIT",unit)
     print("=== END READ ONLY ===")
 
 if __name__=="__main__":
