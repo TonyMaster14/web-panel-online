@@ -31,7 +31,7 @@ FEED=APP/"wpo_happ_async_feed.py"
 STATE=DATA/"wpo-happ-rescue-v1.json"
 SERVICE="tproxy-panel.service"
 LOCK=Path("/run/wpo-happ-rescue-v1.lock")
-REF="6a1173a08268cd0c0b319217ab88422c64c85f2c"
+REF="02a5411d502f3aa043161a5da49128db07941009"
 URL=("https://raw.githubusercontent.com/TonyMaster14/web-panel-online/"+REF+
      "/src/wpo_happ_resilient_feed_v1.py")
 MAX_BYTES=50000
