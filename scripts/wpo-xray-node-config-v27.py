@@ -71,14 +71,14 @@ def patch_panel(source):
                         nodes=node_api.load_nodes(NODES_FILE)
                         target=next((n for n in nodes if n.get("id")==uid),None)
                         if target is None: raise node_api.NodeError("Нода не найдена.")
+                        previous=node_api.request(target,"GET",
+                            node_api.API_PREFIX+"/federation/xray-mode",timeout=20)
+                        previous_mode=wpo_xray_modes.normalize(previous.get("mode","both"))
                         response=node_api.request(target,"POST",
                             node_api.API_PREFIX+"/federation/xray-mode",
                             {"mode":mode},timeout=95)
                         if not response.get("ok") or response.get("mode")!=mode:
                             raise node_api.NodeError("Нода не подтвердила конфигурацию Xray.")
-                        previous=node_api.request(target,"GET",
-                            node_api.API_PREFIX+"/federation/xray-mode",timeout=20)
-                        previous_mode=wpo_xray_modes.normalize(previous.get("mode","both"))
                         # The authenticated agent applied the change, but registry
                         # persistence may still fail; roll the agent back.
                         target["xray_mode"]=mode
