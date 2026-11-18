@@ -1,0 +1,28 @@
+name: WPO Happ Resilient Subscription Feed
+on:
+  push:
+    branches: [test/wpo-smooth-progress-v1]
+    paths:
+      - 'src/wpo_happ_resilient_feed_v1.py'
+      - 'scripts/wpo-happ-rescue-v1.py'
+      - 'tests/test_wpo_happ_resilient_feed_v1.py'
+      - '.github/workflows/wpo-happ-rescue.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  happ-rescue:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore source module paths
+        run: bash scripts/prepare-source-layout.sh
+      - name: Compile and test live handler behavior
+        run: |
+          python3 -m py_compile src/wpo_happ_resilient_feed_v1.py scripts/wpo-happ-rescue-v1.py
+          python3 -m unittest discover -s tests -p 'test_wpo_happ_resilient_feed_v1.py' -v
+      - name: Verify compatibility with existing WPO REALITY and federation tests
+        run: |
+          python3 -m unittest discover -s tests -p 'test_wpo_real443_bridge.py' -v
+          python3 -m unittest discover -s tests -p 'test_node_vpn_federation.py' -v
