@@ -93,6 +93,10 @@ def patch(source):
     if source.count(old)!=1:
         raise ValueError("REALITY modal style section changed; stopping")
     source=source.replace(old,old+"\n"+CSS,1)
+    if ("managedNodeReadonly" not in source or
+        "const actions=Array.from(f.querySelectorAll('.actions button'))" not in source or
+        "if(running||(typeof managedNodeReadonly!=='undefined'&&managedNodeReadonly))return;" not in source):
+        raise ValueError("Установленный REALITY UI не поддерживает защищённый режим; ничего не меняю")
     source=source.rstrip()+"\n"+MARK+"\n"
     ast.parse(source)
     return source
