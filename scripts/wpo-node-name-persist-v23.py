@@ -122,10 +122,6 @@ def patch_panel(source):
     if 'with wpo_node_auto.registry_lock:' not in block or 'selected.pop("auto_site_template_id",None)' not in block:
         raise RuntimeError('Неизвестная версия обработчика Save (ожидалась V25)')
     name_anchor = '                        selected["name"]=new_name\n                        node_api.save_nodes(NODES_FILE,nodes)'
-    name_fixed = '''                        selected["name"]=new_name
-                        if new_name!=str(selected.get("_wpo_previous_name","")):
-                            pass
-                        node_api.save_nodes(NODES_FILE,nodes)'''
     # Compare before assigning: only an explicit rename disables automatic country naming.
     name_fixed = '''                        if new_name!=str(selected.get("name") or ""):
                             selected["name_auto"]=False
@@ -207,7 +203,7 @@ def main():
         os.chmod(backup_dir/path.name,0o600)
     print('✓ Резервные копии:', backup_dir)
     staged = []
-    replaced = False
+    replaced = []
     try:
         for path, data in ((PANEL,panel),(UI,ui)):
             with tempfile.NamedTemporaryFile('w', encoding='utf-8',
@@ -221,7 +217,7 @@ def main():
             os.chmod(temporary, stat.S_IMODE(old.st_mode))
         for path, temporary in zip((PANEL,UI),staged):
             os.replace(temporary,path)
-        replaced = True
+            replaced.append(path)
         subprocess.run(['systemctl','restart',SERVICE],check=True,timeout=45)
         for _ in range(20):
             if service_active():
@@ -233,7 +229,7 @@ def main():
         raise RuntimeError('WPO не запустилась после установки')
     except Exception:
         if replaced:
-            for path in (PANEL,UI):
+            for path in replaced:
                 shutil.copy2(backup_dir/path.name,path)
             subprocess.run(['systemctl','restart',SERVICE],check=False)
             print('! Восстановлены оба файла прежней версии')
