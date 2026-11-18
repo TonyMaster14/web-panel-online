@@ -28,10 +28,10 @@ def editor(path, csrf, nodes=(), fleet=False):
 <div class="dialog-head"><div><h2>VLESS TCP REALITY Vision</h2><small>TCP · Vision · общий внешний порт 443</small></div><button type="button" data-reality-close>×</button></div>
 <input type="hidden" name="csrf" value="'''+e(csrf)+'''">
 <section class="connection-pane">'''+scope+'''<label>IP-адрес<input id="wpoRealityAddress" value="'''+e(profile.get('address',''))+'''" readonly aria-readonly="true" spellcheck="false"></label>
-<label>Сайт для REALITY<div class="wpo-reality-picker"><input type="hidden" name="preset" value="'''+e(chosen)+'''"><button type="button" class="wpo-reality-picker-toggle" data-reality-toggle aria-haspopup="listbox" aria-expanded="false"><span data-reality-label>'''+e(selected_label)+'''</span><span class="wpo-reality-picker-triangle" aria-hidden="true"></span></button><div class="wpo-reality-picker-menu" role="listbox" data-reality-list hidden>'''+choices+'''</div></div></label>
-<label>SNI<input name="sni" value="'''+e(profile['sni'])+'''" required></label>
+<label data-reality-legacy-target>Сайт для REALITY<div class="wpo-reality-picker"><input type="hidden" name="preset" value="'''+e(chosen)+'''"><button type="button" class="wpo-reality-picker-toggle" data-reality-toggle aria-haspopup="listbox" aria-expanded="false"><span data-reality-label>'''+e(selected_label)+'''</span><span class="wpo-reality-picker-triangle" aria-hidden="true"></span></button><div class="wpo-reality-picker-menu" role="listbox" data-reality-list hidden>'''+choices+'''</div></div></label>
+<label data-reality-sni-label>SNI<input name="sni" value="'''+e(profile['sni'])+'''" required></label>
 <label>TLS fingerprint<select name="fingerprint"><option value="firefox">Mozilla Firefox</option><option value="edge">Edge · проверить в клиенте</option></select></label>
-<small>Шаблон сайта на вашем домене настраивается отдельно. '''+('Сохранение применяется ко всей сети после проверки каждой ноды.' if fleet else 'Изменения применяются ко всем REALITY-подключениям этой ноды.')+''' После смены SNI обновите подписки.</small>
+<small data-reality-help>Шаблон сайта на вашем домене настраивается отдельно. '''+('Сохранение применяется ко всей сети после проверки каждой ноды.' if fleet else 'Изменения применяются ко всем REALITY-подключениям этой ноды.')+''' После смены SNI обновите подписки.</small>
 <details><summary>Параметры доступа</summary><label>Public key<input name="public_key" readonly value="'''+e(profile['public_key'])+'''"></label><label>Short ID<input name="short_id" readonly value="'''+e(profile['short_id'])+'''"></label></details>
 <section id="wpoRealityChecks" class="wpo-reality-checks" aria-live="polite" hidden><div class="wpo-reality-checks-head"><strong>Проверка REALITY</strong><span>Реальный туннель · HTTP 204</span></div><div id="wpoRealityChecksList" class="wpo-reality-checks-list"></div></section><p id="wpoRealityResult" role="status"></p></section><div class="actions"><button type="button" data-reality-check>Проверить цель</button><button type="submit" class="primary">Сохранить</button></div></form></dialog>'''
     script='''<script>(()=>{'use strict';
@@ -57,6 +57,20 @@ function requestStop(){
 }
 function selected(){return presets[f.elements.preset.value]||null}
 function displayPreset(){const p=selected();f.querySelector('[data-reality-label]').textContent=p?p[0]:'Свой домен';f.elements.sni.readOnly=!!p;if(p)f.elements.sni.value=p[1];selector.querySelectorAll('[data-reality-choice]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.realityChoice===f.elements.preset.value)))}
+const defaultHelp=f.querySelector('[data-reality-help]').textContent;
+function presentMode(p){
+ const direct=managedNodeReadonly;
+ f.dataset.realityMode=direct?'direct443':'legacy';
+ f.querySelector('[data-reality-legacy-target]').hidden=direct;
+ f.querySelector('[data-reality-sni-label]').firstChild.nodeValue=direct?'Домен ноды · SNI':'SNI';
+ f.querySelector('[data-reality-help]').textContent=direct
+  ?'REALITY: Xray напрямую на TCP 443. SNI совпадает с доменом ноды и управляется автоматически. Шаблон сайта настраивается отдельно в карточке ноды.'
+  :defaultHelp;
+ f.elements.fingerprint.disabled=direct;
+ f.elements.sni.readOnly=direct||f.elements.preset.value!=='custom';
+ if(direct)f.elements.sni.value=p.sni||'';
+}
+
 function togglePicker(open){selector.hidden=!open;f.querySelector('[data-reality-toggle]').setAttribute('aria-expanded',String(open))}
 f.querySelector('[data-reality-toggle]').addEventListener('click',()=>togglePicker(selector.hidden));
 selector.querySelectorAll('[data-reality-choice]').forEach(b=>b.addEventListener('click',()=>{f.elements.preset.value=b.dataset.realityChoice;displayPreset();togglePicker(false);verified=null}));
@@ -82,7 +96,7 @@ function isFullCheck(j){return Array.isArray(j.checks)&&j.checks.some(x=>x.statu
 async function load(){
  if(running)return;
  resetChecks();togglePicker(false);verified=null;cancelRequested=false;closeAfterStop=false;restoreFailed=false;managedNodeReadonly=false;
- f.elements.fingerprint.readOnly=false;
+ f.elements.fingerprint.disabled=false;
  const id=fleet?'local':f.elements.node_id.value;
  setRunning(true);phase='reading';activeAbort=new AbortController();
  try{
@@ -95,12 +109,11 @@ async function load(){
   f.elements.public_key.value=p.public_key;f.elements.short_id.value=p.short_id;
   document.getElementById('wpoRealityAddress').value=p.address||'';
   displayPreset();if(f.elements.preset.value==='custom')f.elements.sni.value=p.sni;
+  presentMode(p);
   if(managedNodeReadonly){
-    f.elements.sni.readOnly=true;
-    f.elements.fingerprint.readOnly=true;
-    out.textContent='Швеция: REALITY работает напрямую на TCP 443. Изменение SNI временно заблокировано; пользователи и подписки управляются через WPO.';
+    out.textContent='Прямой REALITY 443 активен. Настройки SNI защищены; клиенты и подписки управляются через WPO.';
   }
- }catch(err){if(!cancelRequested)out.textContent=err.message}
+ }catch(err){if(!cancelRequested){managedNodeReadonly=true;f.querySelector('[data-reality-legacy-target]').hidden=true;out.textContent='Не удалось определить режим ноды: '+err.message+'. Изменения REALITY заблокированы.'}}
  finally{setRunning(false)}
 }
 if(!fleet)f.elements.node_id.addEventListener('change',load);
@@ -233,6 +246,8 @@ displayPreset();
 }
 #wpoRealityDialog #wpoRealityAddress{color:var(--muted);background:var(--raised,var(--input));cursor:default}
 #wpoRealityDialog .connection-pane>small{font-size:11px;line-height:1.6;color:var(--muted)}
+#wpoRealityDialog [data-reality-legacy-target][hidden]{display:none!important}
+#wpoRealityDialog [data-reality-mode="direct443"] [data-reality-sni-label] input{cursor:default;background:var(--raised,var(--input));color:var(--muted)}
 #wpoRealityDialog details{padding:12px;border:1px solid var(--line);border-radius:9px}
 #wpoRealityDialog details summary{cursor:pointer;font-size:11px;color:var(--muted)}
 #wpoRealityDialog details label{display:block;margin-top:12px}
