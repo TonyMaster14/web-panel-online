@@ -100,8 +100,28 @@ def main():
               "link_count",len(links),"protocols_match",set(types)==set(choices),
               "domain_matches",domains_match)
     except urllib.error.HTTPError as exc:
-        # Never emit body (could contain internal paths or secrets).
-        print("POST /federation/sync HTTP",exc.code,"failure (body redacted)")
+        # Read the response but emit only an allowlisted category (not body,
+        # paths, UUIDs or user input). The server may return a detailed error.
+        try:
+            answer=json.loads(exc.read(2048))
+            msg=str(answer.get("message","")) if isinstance(answer,dict) else ""
+        except (ValueError,UnicodeError,OSError):
+            msg=""
+        category="other"
+        for label,needle in (
+            ("runtime_xray","Xray did not become ready"),
+            ("xray_validation","Xray configuration validation failed"),
+            ("vpn_provision","VPN provisioning failed"),
+            ("node_not_ready","VPN service is not ready"),
+            ("protocol_not_ready","Node protocols not ready"),
+            ("invalid_id","Invalid federation ID"),
+            ("invalid_protocol","Invalid node protocol selection"),
+            ("unknown","Unauthorized"),
+        ):
+            if needle.lower() in msg.lower():
+                category=label;break
+        print("POST /federation/sync HTTP",exc.code,"category",category,
+              "(response redacted)")
     except (OSError,ValueError) as exc:
         print("POST error",type(exc).__name__)
     finally:
