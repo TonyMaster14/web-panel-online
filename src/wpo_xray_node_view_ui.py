@@ -18,10 +18,15 @@ STYLES = r'''<style id="wpo-xray-view-v28-style">
  background:var(--muted);box-shadow:0 0 0 3px color-mix(in srgb,var(--muted) 13%,transparent)}
 .wpo-xray-route-dot.on{background:var(--green,#36d399);box-shadow:0 0 0 3px color-mix(in srgb,var(--green,#36d399) 16%,transparent)}
 .wpo-xray-route-dot.partial{background:#dca640;box-shadow:0 0 0 3px #dca64020}
+.wpo-xray-route-dot.off{background:var(--red,#f76a73);box-shadow:0 0 0 3px color-mix(in srgb,var(--red,#f76a73) 14%,transparent)}
+.wpo-xray-route-dot.unknown{background:var(--muted);box-shadow:none}
 .wpo-xray-route-text{flex:1;min-width:0;color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wpo-xray-code-open{flex:0 0 auto;border:1px solid var(--line);background:var(--input);color:var(--text);
- border-radius:7px;min-height:28px;padding:3px 9px;font-size:10px;cursor:pointer}
-.wpo-xray-code-open:hover{border-color:var(--accent);color:var(--accent)}
+.wpo-xray-config-preview{display:flex;box-sizing:border-box;align-items:center;justify-content:space-between;
+ width:100%;height:40px;min-height:40px;padding:0 12px;border:1px solid var(--line);
+ border-radius:9px;background:var(--input);color:var(--text);font-size:12px;cursor:pointer}
+.wpo-xray-config-preview:hover{border-color:var(--accent)}
+.wpo-xray-config-preview svg{width:15px;height:15px;color:var(--muted);flex:0 0 auto}
+#wpoXrayModeDialog .wpo-xray-preview-label{display:grid;gap:7px;font-size:11px;color:var(--muted)}
 #wpoXrayCodeDialog{width:min(820px,calc(100vw - 26px));height:min(700px,calc(100dvh - 32px));
  max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--line);
  border-radius:15px;background:var(--surface);color:var(--text);overflow:hidden}
@@ -96,15 +101,17 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
      note.textContent='Не удалось получить рабочую конфигурацию ноды.';
    }
  }
- document.querySelectorAll('[data-wpo-xray-code-open]').forEach(button=>{
-   button.addEventListener('click',()=>{
-     selected=button.dataset.wpoXrayCodeOpen;
-     metadata.textContent='';
-     title.textContent=button.dataset.wpoXrayCodeName||'Нода';
-     revealed=false;
-     dialog.showModal();
-     fetchConfig(false);
-   });
+ const configChooser=document.getElementById('wpoXrayModeDialog');
+ const configButton=configChooser?.querySelector('[data-wpo-xray-config-preview]');
+ configButton?.addEventListener('click',()=>{
+   const selector=configChooser.querySelector('form');
+   selected=selector?.elements?.id?.value||'';
+   metadata.textContent='';
+   title.textContent=configChooser.querySelector('[data-xray-node-name]')?.textContent||'Нода';
+   revealed=false;
+   if(!selected){return;}
+   dialog.showModal();
+   fetchConfig(false);
  });
  revealButton.addEventListener('click',()=>{
    if(!revealed && !window.confirm('Показать приватные ключи, UUID и другие секреты Xray? Не передавайте этот JSON другим людям.'))return;
@@ -123,35 +130,56 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
 
 
 def routing_flags():
-    """Fresh persisted connection-routing state, not a synthetic green status."""
+    """Count enabled routing switches in each connection's saved profile.
+
+    Each protocol has seven independent controls. Full green = 7/7;
+    orange = 1..6/7; red = 0/7. Hysteria being disabled must not turn an
+    otherwise completely configured REALITY profile orange.
+    """
     connections = wpp_connections.load(CONNECTIONS_PATH).get("connections", [])
     profiles = wpp_routing.load(ROUTING_PATH).get("profiles", {})
-    found = {"reality": False, "hysteria": False}
+    result = {
+        "reality": {"count": 0, "total": len(wpp_routing.ROUTING_FLAGS),
+                    "custom": False, "found": False},
+        "hysteria": {"count": 0, "total": len(wpp_routing.ROUTING_FLAGS),
+                     "custom": False, "found": False},
+    }
     for connection in connections:
         if not isinstance(connection, dict) or not connection.get("enabled", True):
             continue
-        proto = connection.get("protocol")
-        if proto not in found:
+        protocol = connection.get("protocol")
+        if protocol not in result:
             continue
-        value = profiles.get(str(connection.get("id","")))
-        if not isinstance(value, dict):
+        stored = profiles.get(str(connection.get("id", "")))
+        if not isinstance(stored, dict):
             continue
-        profile = wpp_routing.validate(value)
-        if profile.get("enabled", True) and (any(profile.get(key, False) for key in wpp_routing.ROUTING_FLAGS)
-                or profile.get("direct_domains") or profile.get("proxy_domains")):
-            found[proto] = True
-    return found
+        profile = wpp_routing.validate(stored)
+        if not profile.get("enabled", True):
+            continue
+        count = sum(bool(profile.get(flag)) for flag in wpp_routing.ROUTING_FLAGS)
+        custom = bool(profile.get("direct_domains") or profile.get("proxy_domains"))
+        previous = result[protocol]
+        # If several connection profiles share the protocol, present the
+        # most completely configured one; never sum unrelated switches.
+        if not previous["found"] or (count, custom) > (previous["count"], previous["custom"]):
+            previous.update(count=count, custom=custom, found=True)
+    return result
 
 
 def display(mode, status):
     active = modes.allowed(mode)
-    parts = [p for p in ("reality", "hysteria") if p in active]
-    enabled = sum(bool(status.get(p)) for p in parts)
-    if enabled == len(parts):
+    candidates = [status[p] for p in ("reality", "hysteria") if p in active]
+    if not candidates:
+        return "off", "JSON · Маршрутизация отключена"
+    # Selection of REALITY + Hysteria2 must not require two independently
+    # configured routing profiles to mark the chosen rules as complete.
+    effective = max(candidates, key=lambda x: (x["count"], x["custom"]))
+    count, total = effective["count"], effective["total"]
+    if total and count == total:
         return "on", "JSON · Маршрутизация включена"
-    if enabled:
+    if count or effective["custom"]:
         return "partial", "JSON · Частично включена"
-    return "off", "JSON · Не подключён"
+    return "off", "JSON · Маршрутизация отключена"
 
 
 def attach(html, nodes, path, csrf):
@@ -176,22 +204,32 @@ def attach(html, nodes, path, csrf):
         found.add(uid)
         mode=modes.get(modes.PANEL_STATE) if uid=="local" else modes.normalize(node.get("xray_mode","both"))
         name="Основная нода" if uid=="local" else str(node.get("name") or node.get("country_name") or "Нода")[:80]
-        variant,label=display(mode,state) if state is not None else ("off", "JSON · Ошибка проверки")
-        detail=('REALITY: '+('вкл.' if state["reality"] else 'выкл.')+' · Hysteria2: '+('вкл.' if state["hysteria"] else 'выкл.')) if state is not None else "Не удалось проверить маршрутизацию"
+        variant,label=display(mode,state) if state is not None else ("unknown", "JSON · Ошибка проверки")
+        detail=('REALITY: '+str(state['reality']['count'])+'/'+str(state['reality']['total'])+' · Hysteria2: '+str(state['hysteria']['count'])+'/'+str(state['hysteria']['total'])) if state is not None else 'Не удалось проверить маршрутизацию'
         ui=(
             '<div class="wpo-xray-route" title="'+escape(detail,quote=True)+'">'
             '<span class="wpo-xray-route-dot '+variant+'" aria-hidden="true"></span>'
-            '<span class="wpo-xray-route-text">'+escape(label)+'</span>'
-            '<button type="button" class="wpo-xray-code-open" '
-            'data-wpo-xray-code-open="'+escape(uid,quote=True)+'" '
-            'data-wpo-xray-code-name="'+escape(name,quote=True)+'" '
-            'aria-label="Просмотр Xray JSON ноды '+escape(name,quote=True)+'">JSON</button></div>'
+            '<span class="wpo-xray-route-text">'+escape(label)+'</span></div>'
         )
         return content+ui+match.group(2)
     result=marker.sub(add,html)
     expected={"local"}|set(node_map)
     if found!=expected:
         raise RuntimeError("WPO: не удалось добавить JSON и маршрутизацию во все карточки нод.")
+    config_open=(
+        '<div class="wpo-xray-preview-label"><span>Конфигурация</span>'
+        '<button type="button" class="wpo-xray-config-preview" data-wpo-xray-config-preview>'
+        '<span>Просмотр конфигурации Xray</span>'
+        '<svg aria-hidden="true" viewBox="0 0 16 16"><path fill="currentColor" '
+        'd="M6 3l5 5-5 5-1.2-1.2L8.6 8 4.8 4.2z"/></svg></button></div>'
+    )
+    head, sep, tail=result.partition('<dialog id="wpoXrayModeDialog">')
+    if not sep:
+        raise RuntimeError("WPO: окно выбора Xray не найдено.")
+    inside, sep2, after=tail.partition('</select></label>')
+    if not sep2 or inside.count('<select name="mode"')!=1:
+        raise RuntimeError("WPO: выбор REALITY/Hysteria2 изменился.")
+    result=head+'<dialog id="wpoXrayModeDialog">'+inside+sep2+config_open+after
     modal=(
         '<dialog id="wpoXrayCodeDialog" data-endpoint="'+escape(path+'/node-xray-view',quote=True)+'"'
         ' data-csrf="'+escape(csrf,quote=True)+'">'
