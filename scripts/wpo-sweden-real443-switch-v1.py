@@ -46,6 +46,9 @@ API="wpo-node-vpn.service"
 PROD="wpo-node-xray.service"
 TIMEOUT="wpo-sweden-443-auto-rollback"
 UNITDIR=Path("/etc/systemd/system")
+CAPDIR=UNITDIR/("wpo-reality-remna-xray-test.service.d")
+CAPFILE=CAPDIR/"91-wpo-sweden-443-bind.conf"
+CAP_MARK="# WPO_SWEDEN_REAL443_CAPABILITY_V2"
 LOCK=Path("/run/wpo-sweden-443-switch.lock")
 UNIX="/run/wpo-reality-remna-test/decoy.sock"
 MARK="WPO_REMNA_CANARY_V1"
@@ -201,6 +204,8 @@ def check():
         raise RuntimeError("Сохрани скрипт на сервер: "+str(SCRIPT))
     if STATE.exists():
         raise RuntimeError("Швеция уже в тестовом режиме 443; используй --status, --confirm или --rollback")
+    if CAPFILE.exists():
+        raise RuntimeError("Неожиданный drop-in от прошлого теста: "+str(CAPFILE))
     old,nginx=require_canary()
     if old["inbounds"][0]["port"]!=24443:
         raise RuntimeError("Исходный тестовый Xray должен слушать 24443")
@@ -272,6 +277,46 @@ def cancel_timer():
     (UNITDIR/(TIMEOUT+".service")).unlink(missing_ok=True)
     cmd("systemctl","daemon-reload",timeout=12)
 
+def install_bind_capability():
+    # The canary service runs as User=xray. Without this *unit-specific*
+    # capability it can bind 24443 but typically cannot bind privileged 443.
+    # Do not modify sysctl, the executable file capabilities, or production units.
+    if CAPFILE.exists():
+        raise RuntimeError("Изолированный drop-in для CAP_NET_BIND_SERVICE уже существует")
+    if CAPDIR.exists() and not CAPDIR.is_dir():
+        raise RuntimeError("Конфликт пути systemd drop-in")
+    CAPDIR.mkdir(mode=0o755,parents=False,exist_ok=True)
+    save(CAPFILE, (CAP_MARK+"""
+[Service]
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+""").encode(),0o644)
+    need("systemctl","daemon-reload",timeout=15)
+    show=need("systemctl","show",CX,"-p","AmbientCapabilities",timeout=10).stdout
+    if "CAP_NET_BIND_SERVICE" not in show and "cap_net_bind_service" not in show:
+        # Some versions format the capabilities as a numeric bitmask,
+        # therefore expose it for diagnostics rather than assuming success.
+        print("! Systemd capability view:",show.strip())
+    print("✓ Только тестовый Xray получил CAP_NET_BIND_SERVICE для TCP 443")
+
+def remove_bind_capability():
+    if not CAPFILE.exists():return
+    content=CAPFILE.read_text(encoding="utf-8")
+    if CAP_MARK not in content:
+        raise RuntimeError("Неизвестный systemd drop-in — не удаляю")
+    CAPFILE.unlink()
+    try:CAPDIR.rmdir()
+    except OSError:pass
+    need("systemctl","daemon-reload",timeout=15)
+
+def recent_canary_logs():
+    result=cmd("journalctl","-u",CX,"--no-pager","-n","22","-o","cat",timeout=8)
+    if result.returncode:return "журнал недоступен"
+    text=result.stdout
+    # Avoid printing UUIDs and other client identifiers in user terminal.
+    text=re.sub(r"(?i)\\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\\b","[UUID]",text)
+    return text[-2000:]
+
 def restore():
     if not STATE.exists():
         print("Нет активного переключения 443. Нечего откатывать.")
@@ -302,6 +347,8 @@ def restore():
     if not active(ROUTER):raise RuntimeError("HAProxy не восстановился")
     if not active(PROD) or not active(API):
         raise RuntimeError("Одна из рабочих служб WPO неактивна")
+    # Restore exactly the pre-trial privilege state after port 443 is back.
+    remove_bind_capability()
     STATE.unlink(missing_ok=True)
     Path("/root/wpo-sweden-real443-happ-link.txt").unlink(missing_ok=True)
     cancel_timer()
@@ -328,6 +375,7 @@ def switch():
     try:
         need("systemctl","disable","--now",ROUTER,timeout=20)
         need("systemctl","stop",CX,timeout=20)
+        install_bind_capability()
         save(CANARY_N,nginx2.encode(),0o640)
         os.chown(CANARY_N,0,__import__("grp").getgrnam("xray").gr_gid)
         save(CANARY_X,(json.dumps(xray2,indent=2)+"\n").encode(),0o640)
@@ -349,7 +397,9 @@ def switch():
                         break
                 except OSError:pass
             time.sleep(.25)
-        else:raise RuntimeError("Новый Xray не открыл TCP 443")
+        else:
+            logs=recent_canary_logs()
+            raise RuntimeError("Новый Xray не открыл TCP 443. Журнал Xray:\\n"+logs)
         # An unauthenticated TLS client must reach Nginx fallback over 443.
         code=tls_probe("127.0.0.1",443)
         if code>=500:raise RuntimeError("Новый внешний 443 вернул HTTP "+str(code))
@@ -370,7 +420,7 @@ def switch():
         print("Если не заработает: sudo python3 "+str(SCRIPT)+" --rollback")
         print("Не перезагружай VPS во время проверки HAPP.")
     except Exception as exc:
-        print("! Ошибка переключения, восстанавливаю прежний TCP443: "+str(exc)[:350])
+        print("! Ошибка переключения, восстанавливаю прежний TCP443: "+str(exc)[:1400])
         try:
             restore()
         except Exception as rexc:
