@@ -352,6 +352,13 @@ def main():
     before=source.read_text(encoding="utf-8")
     updated_reality=patch_reality(before,panel,count)
     original_agent=agent.read_text(encoding="utf-8") if node else None
+    if (node and count==1 and candidate==current
+            and "# WPO_SINGLE_REALITY_V32" in before
+            and ENDPOINT in original_agent
+            and (NODE/"wpo_xray_node_view.py").is_file()):
+        print("✓ Уже установлена проверенная конфигурация Швеции (V32 + JSON API)")
+        print("✓ Изменений не требуется")
+        return
     updated_agent=patch_agent(original_agent) if node else None
     module_path=NODE/"wpo_xray_node_view.py"
     view_new=None
@@ -373,6 +380,16 @@ def main():
     lock_path.parent.mkdir(parents=True,exist_ok=True)
     with open(lock_path,"a+",encoding="ascii") as lock:
         fcntl.flock(lock.fileno(),fcntl.LOCK_EX)
+        # Never overwrite a newly provisioned UUID or updated SNI: reject
+        # if state changed between planning and acquiring the federation lock.
+        if json.loads(xray_path.read_text(encoding="utf-8")) != current:
+            raise RuntimeError("Xray changed during inspection (users/sync); retry safely.")
+        if json.loads(PROFILE.read_text(encoding="utf-8")) != profile:
+            raise RuntimeError("REALITY SNI/port changed during inspection; retry safely.")
+        if source.read_text(encoding="utf-8") != before:
+            raise RuntimeError("REALITY generator changed; retry safely.")
+        if node and agent.read_text(encoding="utf-8") != original_agent:
+            raise RuntimeError("Node Agent changed during inspection; retry safely.")
         with tempfile.TemporaryDirectory(prefix=".wpo-unified-v36-",dir=str(base)) as ws:
             tmp=Path(ws)
             source_preview=tmp/"wpo_reality_preview.py"
@@ -428,6 +445,12 @@ def main():
                 else:
                     oldstats[f]=None
             print("✓ Резервная копия:",backup)
+            # Re-check critical state immediately before modifying files;
+            # these may be changed by a second maintenance session.
+            if json.loads(xray_path.read_text(encoding="utf-8")) != current:
+                raise RuntimeError("Live Xray changed after candidate validation; nothing overwritten")
+            if json.loads(PROFILE.read_text(encoding="utf-8")) != profile:
+                raise RuntimeError("REALITY profile changed after validation; nothing overwritten")
             written=[]
             units=["web-panel-proxy-xray.service","wpo-tls-router.service",
                    "tproxy-panel.service"] if panel else [
