@@ -65,7 +65,7 @@ def is_enabled(mode, proto):
     return proto in allowed(mode)
 
 
-def tune_config(value, mode):
+def tune_config(value, mode, *, enable_extras=True):
     """Return a copy; skip ONLY the deselected REALITY/Hysteria inbound tags."""
     allow = allowed(mode)
     config = copy.deepcopy(value)
@@ -85,12 +85,14 @@ def tune_config(value, mode):
             if "reality" not in allow:
                 continue
             settings = stream.setdefault("realitySettings", {})
-            settings["minClientVer"] = "1.0.0"
+            if enable_extras:
+                settings["minClientVer"] = "1.0.0"
             # No xver=1 or Unix socket without a PROXY-v1 capable receiver.
         if protocol == "hysteria":
             if "hysteria" not in allow:
                 continue
-            stream["finalmask"] = {"quicParams": {"debug": False, "congestion": "bbr"}}
+            if enable_extras:
+                stream["finalmask"] = {"quicParams": {"debug": False, "congestion": "bbr"}}
         filtered.append(row)
     config["inbounds"] = filtered
     return config
@@ -123,14 +125,18 @@ def switch(path, mode, current_config, sync):
     """Atomic mode switch with live Xray apply and rollback on error."""
     mode = normalize(mode)
     old_mode = get(path)
-    if mode == old_mode:
+    had_file = Path(path).is_file()
+    if mode == old_mode and had_file:
         return {"ok": True, "mode": mode, "unchanged": True}
     refuse_live_drop(mode, current_config)
     save(path, mode)
     try:
         sync()
     except Exception:
-        save(path, old_mode)
+        if had_file:
+            save(path, old_mode)
+        else:
+            Path(path).unlink(missing_ok=True)
         try:
             sync()
         except Exception as rollback_error:
