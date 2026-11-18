@@ -218,25 +218,33 @@ def install(namespace):
         return original_link(protocol, secret, name, settings)
 
     def do_GET(self):
-        if (self.path == "/wpp-api/v1/federation/reality"
-            and managed()):
+        if self.path == "/wpp-api/v1/federation/reality":
             if not self.authorized():
                 return self.respond({"ok": False, "message": "Unauthorized"}, 401)
-            profile = effective_profile(
-                namespace["wpo_reality"].read_profile(), _domain())
-            return self.respond({"ok": True, "profile": profile})
+            try:
+                if managed():
+                    profile = effective_profile(
+                        namespace["wpo_reality"].read_profile(), _domain())
+                    return self.respond({"ok": True, "profile": profile})
+            except (OSError, RuntimeError, ValueError) as exc:
+                return self.respond({"ok": False,
+                                     "message": "REALITY Швеции недоступен: "+str(exc)[:140]}, 503)
         return original_get(self)
 
     def do_POST(self):
-        if (self.path == "/wpp-api/v1/federation/reality"
-            and managed()):
+        if self.path == "/wpp-api/v1/federation/reality":
             if not self.authorized():
                 return self.respond({"ok": False, "message": "Unauthorized"}, 401)
-            return self.respond({
-                "ok": False,
-                "message": "REALITY Швеции работает напрямую на 443: изменение SNI "
-                           "заблокировано до полноценной миграции генератора."
-            }, 409)
+            try:
+                if managed():
+                    return self.respond({
+                        "ok": False,
+                        "message": "REALITY Швеции работает напрямую на 443: изменение SNI "
+                                   "заблокировано до полноценной миграции генератора."
+                    }, 409)
+            except (OSError, RuntimeError, ValueError) as exc:
+                return self.respond({"ok": False, "message": "REALITY-конфигурация недоступна: "+
+                                     str(exc)[:140]}, 503)
         return original_post(self)
 
     namespace["apply"] = apply
