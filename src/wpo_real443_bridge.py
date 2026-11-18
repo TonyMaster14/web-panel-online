@@ -10,7 +10,6 @@ installer. This is a compatibility bridge, not the final one-process layout.
 from __future__ import annotations
 
 import copy
-import grp
 import json
 import os
 from pathlib import Path
@@ -69,9 +68,11 @@ def mirror_config(canonical, running):
     clients = src.get("settings", {}).get("clients")
     if not isinstance(clients, list):
         raise RuntimeError("Canonical WPO REALITY client list missing")
+    if any(not isinstance(c, dict) for c in clients):
+        raise RuntimeError("Invalid WPO REALITY client record")
     ids = [c.get("id") for c in clients]
     if (len(ids) != len(set(ids)) or
-        any(not isinstance(c, dict) or not isinstance(c.get("id"), str)
+        any(not isinstance(c.get("id"), str) or not c["id"]
             or c.get("flow") != "xtls-rprx-vision" for c in clients)):
         raise RuntimeError("Invalid or duplicate WPO REALITY clients")
     if (src.get("settings", {}).get("decryption") != "none"
