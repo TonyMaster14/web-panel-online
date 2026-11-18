@@ -25,6 +25,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -354,6 +355,21 @@ def main():
                  else ("wpo-node-xray.service","wpo-node-vpn.service","wpo-tls-router.service")):
         if not active(unit):
             raise RuntimeError("Important service not active: "+unit)
+    if node:
+        # A crashed or endlessly restarting old agent can look momentarily
+        # systemd-active, while nothing accepts connections on 9089.
+        # Refuse to modify VPN when the baseline Node API is already down.
+        for attempt in range(8):
+            try:
+                with socket.create_connection(("127.0.0.1",9089),timeout=2):
+                    break
+            except OSError:
+                if attempt == 7:
+                    raise RuntimeError(
+                        "Node Agent port 9089 is unavailable BEFORE changes. "
+                        "Check journalctl -u wpo-node-vpn.service; nothing modified.")
+                time.sleep(1)
+        print("✓ Node Agent port 9089 reachable before changes")
     profile=json.loads(PROFILE.read_text(encoding="utf-8"))
     if not isinstance(profile,dict) or not isinstance(profile.get("sni"),str):
         raise RuntimeError("REALITY profile missing SNI")
