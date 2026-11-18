@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""WPO REALITY modal: safe, reversible display for managed-direct443 nodes.
+"""WPO REALITY modal: safe, reversible node-domain SNI display.
 
-Does not change any node or REALITY/Xray settings. The *old* UI file must
-exactly match its known audited Git blob; never clobber local UI patches.
+Adds only tightly validated UI changes to the current locally installed
+module, preserving all existing UI translations, CSS and button behavior.
+Does NOT modify real node/REALITY settings.
 """
 from __future__ import annotations
 import argparse
@@ -28,11 +29,10 @@ SERVICE="tproxy-panel.service"
 DATA=Path("/var/lib/tproxy-panel")
 STATE=DATA/"wpo-reality-domain-modal-v1-state.json"
 LOCK=Path("/run/wpo-reality-domain-modal-v1.lock")
-REF="67d3eb65e4e2c68f7cc256d3aed5e22241f51f92"
-OLD_BLOB="d266455b4e0253fea6b620e5e6c97acaf6471859"
+REF="39997122e191c515b9edcbfd4290d3fba391120b"
 URL=("https://raw.githubusercontent.com/TonyMaster14/web-panel-online/"
-     +REF+"/src/wpo_reality_ui.py")
-MARK="data-reality-legacy-target"
+     +REF+"/src/wpo_reality_domain_ui_transform_v1.py")
+MARK="# WPO_REALITY_DOMAIN_MODAL_V1"
 MAX_BYTES=200000
 
 
@@ -66,19 +66,21 @@ def blob(raw):
     return hashlib.sha1(b"blob "+str(len(raw)).encode()+b"\0"+raw).hexdigest()
 
 
-def download():
+def download_transform():
+    import importlib.util
     opener=build_opener(ProxyHandler({}))
     with opener.open(Request(URL,headers={"User-Agent":"WPO-reality-domain-modal-v1"}),timeout=15) as response:
         raw=response.read(MAX_BYTES+1)
-    if not 10000<len(raw)<MAX_BYTES:
-        raise RuntimeError("Неожиданный размер нового UI-файла")
-    s=raw.decode("utf-8")
-    ast.parse(s)
-    for keyword in (MARK,"managedNodeReadonly","function presentMode(",
-                    "Домен ноды · SNI","[data-reality-mode=\"direct443\"]"):
-        if keyword not in s:
-            raise RuntimeError("В обновлении отсутствует проверка: "+keyword)
-    return raw
+    if not 3000<len(raw)<MAX_BYTES:
+        raise RuntimeError("Неожиданный размер проверяемого патча UI")
+    source=raw.decode("utf-8")
+    ast.parse(source)
+    spec=importlib.util.spec_from_loader("wpo_domain_ui_patcher",loader=None)
+    module=importlib.util.module_from_spec(spec)
+    exec(compile(source,"<WPO UI patch>","exec"),module.__dict__)
+    if not callable(module.patch) or MARK!=module.MARK:
+        raise RuntimeError("Неизвестный патч REALITY")
+    return module.patch
 
 
 def check():
@@ -87,13 +89,14 @@ def check():
     if STATE.exists():
         raise RuntimeError("Обновление уже применялось; используй --status или --rollback")
     installed=MODULE.read_bytes()
-    if blob(installed)!=OLD_BLOB:
-        raise RuntimeError("Версия REALITY UI отличается от проверенной: "+
-                           blob(installed)[:12]+". Ничего не изменено.")
-    candidate=download()
+    try:
+        candidate=download_transform()(installed.decode("utf-8")).encode("utf-8")
+    except ValueError as e:
+        raise RuntimeError("Локальный REALITY UI несовместим: "+str(e)[:210]) from e
+    ast.parse(candidate.decode("utf-8"))
     if cmd("systemctl","is-active","--quiet",SERVICE,timeout=5).returncode:
         raise RuntimeError("Основная панель WPO не активна")
-    print("✓ Версия REALITY UI совместима с безопасным обновлением")
+    print("✓ Локальная версия REALITY UI совместима с точечным обновлением")
     print("✓ Старые ноды сохраняют свои существующие NVIDIA/Apple/SNI настройки")
     print("✓ Новые managed REALITY ноды показывают доменный SNI только для чтения")
     print("✓ Протоколы, подписки и Xray не меняются")
@@ -144,7 +147,8 @@ def apply():
     backup=folder/"wpo_reality_ui.py"
     shutil.copy2(MODULE,backup)
     os.chmod(backup,0o600)
-    state={"backup":str(backup),"updated_blob":blob(data)}
+    state={"backup":str(backup),"updated_blob":blob(data),
+           "old_blob":blob(MODULE.read_bytes())}
     atomic(STATE,json.dumps(state).encode(),mode=0o600)
     try:
         atomic(MODULE,data,MODULE.stat())
