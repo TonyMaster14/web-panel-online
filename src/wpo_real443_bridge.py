@@ -218,7 +218,7 @@ def install(namespace):
         return original_link(protocol, secret, name, settings)
 
     def do_GET(self):
-        if self.path == "/wpp-api/v1/federation/reality":
+        if getattr(self, "path", None) == "/wpp-api/v1/federation/reality":
             if not self.authorized():
                 return self.respond({"ok": False, "message": "Unauthorized"}, 401)
             try:
@@ -232,7 +232,7 @@ def install(namespace):
         return original_get(self)
 
     def do_POST(self):
-        if self.path == "/wpp-api/v1/federation/reality":
+        if getattr(self, "path", None) == "/wpp-api/v1/federation/reality":
             if not self.authorized():
                 return self.respond({"ok": False, "message": "Unauthorized"}, 401)
             try:
