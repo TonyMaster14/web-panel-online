@@ -349,6 +349,12 @@ def restore():
         raise RuntimeError("Одна из рабочих служб WPO неактивна")
     # Restore exactly the pre-trial privilege state after port 443 is back.
     remove_bind_capability()
+    if data.get("canary_x_running",True):
+        # Drop the temporary privileged-port capability from the running
+        # canary process as well, not just from its on-disk systemd unit.
+        need("systemctl","restart",CX,timeout=20)
+        if not active(CX):
+            raise RuntimeError("Тестовый Xray не восстановился на 24443 без повышенных прав")
     STATE.unlink(missing_ok=True)
     Path("/root/wpo-sweden-real443-happ-link.txt").unlink(missing_ok=True)
     cancel_timer()
