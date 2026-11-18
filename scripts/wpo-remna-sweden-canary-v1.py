@@ -339,6 +339,22 @@ def apply():
             if SOCKET.is_socket() and active(UNIT_N):break
             time.sleep(.3)
         if not SOCKET.is_socket():raise RuntimeError("Nginx не поднял Unix TLS сокет")
+        # Real local TLS+PROXY-v1 probe: prove nginx actually accepts the
+        # protocol that Xray REALITY xver=1 will send to this Unix socket.
+        decoy=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+        decoy.settimeout(6)
+        try:
+            decoy.connect(str(SOCKET))
+            decoy.sendall(b"PROXY TCP4 127.0.0.1 127.0.0.1 12345 443\\r\\n".replace(b"\\\\r",b"\\r").replace(b"\\\\n",b"\\n"))
+            tlscontext=ssl.create_default_context()
+            with tlscontext.wrap_socket(decoy,server_hostname=domain) as tls:
+                tls.sendall(("GET / HTTP/1.1\\r\\nHost: "+domain+"\\r\\nConnection: close\\r\\n\\r\\n").encode())
+                response=tls.recv(512)
+                if not response.startswith(b"HTTP/1.1 200"):
+                    raise RuntimeError("Nginx Unix TLS вернул не HTTP 200")
+        finally:
+            decoy.close()
+        print("✓ Nginx Unix socket: PROXY protocol v1 + TLS + HTTP 200")
         ok_command("systemctl","start",UNIT_X,timeout=20)
         for _ in range(20):
             if active(UNIT_X):
@@ -355,6 +371,8 @@ def apply():
         # can be browser-version-specific. Mandatory is local listener + services.
         if not active(UNIT_N) or not active(UNIT_X):
             raise RuntimeError("Тестовая служба остановилась после TLS-пробы")
+        if not all(active(u) for u in ("wpo-node-xray.service","wpo-tls-router.service","wpo-node-vpn.service")):
+            raise RuntimeError("Одна из исходных служб WPO неактивна после запуска теста")
         atomic_bytes(LINK,(uri+"\n").encode(),0o600,0)
         files_created.append(LINK)
         ok_command("systemctl","enable",UNIT_N,UNIT_X,timeout=15)
