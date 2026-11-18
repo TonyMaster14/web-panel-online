@@ -33,6 +33,7 @@ STYLES = r'''<style id="wpo-xray-view-v28-style">
 #wpoXrayCodeDialog h3{font-size:17px;margin:0}
 #wpoXrayCodeDialog small{display:block;margin-top:4px;font-size:10px;color:var(--muted)}
 #wpoXrayCodeDialog .wpo-xray-code-close{width:34px;height:34px;padding:0}
+#wpoXrayCodeDialog .wpo-xray-code-meta{margin:11px 19px 0;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--input);font-size:10px;color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
 #wpoXrayCodeDialog .wpo-xray-code-info{margin:13px 19px 0;font-size:11px;color:var(--muted);line-height:1.5}
 #wpoXrayCodeDialog textarea{display:block;box-sizing:border-box;min-height:0;flex:1;width:calc(100% - 38px);
  margin:12px 19px;resize:none;overflow:auto;white-space:pre;tab-size:2;
@@ -56,6 +57,7 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
  const revealButton=dialog.querySelector('[data-wpo-code-reveal]');
  const copyButton=dialog.querySelector('[data-wpo-code-copy]');
  const note=dialog.querySelector('[data-wpo-code-note]');
+ const metadata=dialog.querySelector('[data-wpo-xray-meta]');
  let selected='',generation=0,revealed=false;
  async function fetchConfig(reveal){
    const current=++generation;
@@ -72,6 +74,14 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
      if(!res.ok||!body.ok)throw Error(body.message||'Не удалось загрузить конфигурацию');
      if(current!==generation||!dialog.open)return;
      code.value=JSON.stringify(body.config,null,2);
+     const meta=body.meta||{}, realityPorts=Array.isArray(meta.reality_internal)?meta.reality_internal:[],
+           hyPorts=Array.isArray(meta.hysteria_udp)?meta.hysteria_udp:[];
+     const reality=realityPorts.length
+       ?'REALITY: TCP '+(meta.reality_tcp||443)+' → Xray '+realityPorts.join(', ')
+       :'REALITY: нет активного inbound';
+     const hysteria=hyPorts.length?'Hysteria2: UDP '+hyPorts.join(', '):'Hysteria2: нет активного inbound';
+     metadata.textContent=[reality,hysteria,meta.address?'Адрес: '+meta.address:'',
+       meta.sni?'SNI: '+meta.sni:''].filter(Boolean).join('  ·  ');
      revealed=Boolean(body.secrets_visible);
      revealButton.textContent=revealed?'Скрыть ключи':'Показать ключи';
      revealButton.disabled=false;copyButton.disabled=false;
@@ -81,6 +91,7 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
    }catch(error){
      if(current!==generation||!dialog.open)return;
      code.value='Ошибка: '+(error.message||'Неизвестная ошибка');
+     metadata.textContent='';
      revealButton.disabled=false;
      note.textContent='Не удалось получить рабочую конфигурацию ноды.';
    }
@@ -88,6 +99,7 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
  document.querySelectorAll('[data-wpo-xray-code-open]').forEach(button=>{
    button.addEventListener('click',()=>{
      selected=button.dataset.wpoXrayCodeOpen;
+     metadata.textContent='';
      title.textContent=button.dataset.wpoXrayCodeName||'Нода';
      revealed=false;
      dialog.showModal();
@@ -187,6 +199,7 @@ def attach(html, nodes, path, csrf):
         '<h3>Конфигурация Xray</h3><small data-wpo-code-node></small></div>'
         '<button type="button" class="wpo-xray-code-close" data-wpo-xray-code-close '
         'aria-label="Закрыть">×</button></div>'
+        '<div class="wpo-xray-code-meta" data-wpo-xray-meta></div>'
         '<p class="wpo-xray-code-info" data-wpo-code-note>Рабочая конфигурация выбранной ноды.</p>'
         '<textarea data-wpo-code readonly spellcheck="false" aria-label="Xray JSON"></textarea>'
         '<div class="wpo-xray-code-actions">'
