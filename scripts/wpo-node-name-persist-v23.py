@@ -18,10 +18,12 @@ import time
 ROOT = Path('/opt/tproxy-panel')
 PANEL = ROOT / 'panel.py'
 UI = ROOT / 'wpp_ui.py'
+REMOTE = ROOT / 'wpo_node_remote.py'
 SERVICE = 'tproxy-panel.service'
 BACKUPS = Path('/var/backups/web-panel-online')
 MARK_PANEL = '# WPO_NODE_RENAME_PERSIST_V23'
 MARK_UI = '# WPO_NODE_RENAME_NO_RELOAD_V23'
+MARK_REMOTE = '# WPO_REMOTE_NODE_NAME_LIVE_V23'
 
 JS_OLD = 'editDlg.close();location.reload()'
 JS_NEW = r"""{
@@ -164,6 +166,32 @@ def patch_ui(source):
     return updated, True
 
 
+def patch_remote(source):
+    """Show the live name in already-created remote connection cards."""
+    if MARK_REMOTE in source:
+        return source, False
+    anchor = '        node_name=h(r.get("node_name","Нода"))'
+    if source.count(anchor) != 1 or source.count('    records=load()["users"]') != 1:
+        raise RuntimeError('Неизвестный формат удалённых подключений; изменений нет')
+    old_records = '    records=load()["users"]\n    if not records:\n        return ""'
+    new_records = '''    records=load()["users"]
+    if not records:
+        return ""
+    try:
+        current_nodes=nodes.load_nodes("/var/lib/tproxy-panel/nodes.json")
+        current_names={str(n.get("id")):str(n.get("name") or "") for n in current_nodes if isinstance(n,dict)}
+    except (OSError,ValueError):
+        current_names={}'''
+    if source.count(old_records) != 1:
+        raise RuntimeError('Неизвестная загрузка карточек подключений; изменений нет')
+    updated=source.replace(old_records,new_records,1)
+    updated=updated.replace(anchor,
+       '        node_name=h(current_names.get(str(r.get("node_id"))) or r.get("node_name","Нода"))',1)
+    updated=updated.rstrip()+'\n\n'+MARK_REMOTE+'\n'
+    compile(updated,str(REMOTE),'exec')
+    return updated,True
+
+
 def service_active():
     return subprocess.run(['systemctl','is-active','--quiet',SERVICE],
                           check=False).returncode == 0
@@ -180,10 +208,12 @@ def main():
     for path in (PANEL, UI):
         if not path.is_file() or path.is_symlink():
             raise RuntimeError('Не найден файл WPO: ' + str(path))
-    original = {path:path.read_text(encoding='utf-8') for path in (PANEL, UI)}
+    paths = (PANEL, UI) + ((REMOTE,) if REMOTE.is_file() and not REMOTE.is_symlink() else ())
+    original = {path:path.read_text(encoding='utf-8') for path in paths}
     panel, panel_changed = patch_panel(original[PANEL])
     ui, ui_changed = patch_ui(original[UI])
-    if not panel_changed and not ui_changed:
+    remote, remote_changed = patch_remote(original[REMOTE]) if REMOTE in original else ('', False)
+    if not panel_changed and not ui_changed and not remote_changed:
         print('✓ V23 уже установлен, ничего не меняем')
         return
     if panel_changed != ui_changed:
@@ -198,14 +228,16 @@ def main():
     if backup_dir.exists():
         raise RuntimeError('Резервная копия с таким именем уже существует')
     backup_dir.mkdir(parents=True, mode=0o700)
-    for path in (PANEL, UI):
+    for path in paths:
         shutil.copy2(path, backup_dir/path.name)
         os.chmod(backup_dir/path.name,0o600)
     print('✓ Резервные копии:', backup_dir)
     staged = []
     replaced = []
     try:
-        for path, data in ((PANEL,panel),(UI,ui)):
+        new_files = [(PANEL,panel),(UI,ui)]
+        if REMOTE in original: new_files.append((REMOTE,remote))
+        for path, data in new_files:
             with tempfile.NamedTemporaryFile('w', encoding='utf-8',
                     dir=path.parent, prefix='.wpo-v23-', suffix='.py',
                     delete=False) as file:
@@ -215,7 +247,7 @@ def main():
             old = path.stat()
             os.chown(temporary, old.st_uid, old.st_gid)
             os.chmod(temporary, stat.S_IMODE(old.st_mode))
-        for path, temporary in zip((PANEL,UI),staged):
+        for path, temporary in zip([p for p,_ in new_files],staged):
             os.replace(temporary,path)
             replaced.append(path)
         subprocess.run(['systemctl','restart',SERVICE],check=True,timeout=45)
