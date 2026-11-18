@@ -29,7 +29,7 @@ SERVICE="tproxy-panel.service"
 DATA=Path("/var/lib/tproxy-panel")
 STATE=DATA/"wpo-reality-domain-modal-v1-state.json"
 LOCK=Path("/run/wpo-reality-domain-modal-v1.lock")
-REF="39997122e191c515b9edcbfd4290d3fba391120b"
+REF="301eb72e4dea32598a76233d00fd611ebb4d9556"
 URL=("https://raw.githubusercontent.com/TonyMaster14/web-panel-online/"
      +REF+"/src/wpo_reality_domain_ui_transform_v1.py")
 MARK="# WPO_REALITY_DOMAIN_MODAL_V1"
