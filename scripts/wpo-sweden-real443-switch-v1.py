@@ -7,8 +7,8 @@ production Xray/Caddy config, changes ONLY canary configs, and pauses
 HAProxy while the independent canary Xray holds TCP443.
 
 The switch is automatically rolled back after 12 minutes unless
---confirm is called. Explicit --rollback works at any time. Reboot before
-confirmation is NOT supported: do not reboot during the test.
+--confirm is called. Explicit --rollback works at any time. A persistent
+rollback timer also re-arms on boot; avoid rebooting while testing.
 """
 from __future__ import annotations
 import argparse
@@ -44,6 +44,7 @@ ROUTER="wpo-tls-router.service"
 API="wpo-node-vpn.service"
 PROD="wpo-node-xray.service"
 TIMEOUT="wpo-sweden-443-auto-rollback"
+UNITDIR=Path("/etc/systemd/system")
 UNIX="/run/wpo-reality-remna-test/decoy.sock"
 MARK="WPO_REMNA_CANARY_V1"
 ROLLBACK_MINUTES=12
@@ -231,9 +232,43 @@ def backup_files():
         os.chmod(target,0o600)
     return folder
 
+def install_timer():
+    # Permanent systemd timer (not transient): survives a reboot during trial.
+    # The local script is saved before the switch, so no GitHub access needed.
+    service=UNITDIR/(TIMEOUT+".service")
+    timer=UNITDIR/(TIMEOUT+".timer")
+    for unit in (service,timer):
+        if unit.exists():raise RuntimeError("Конфликт существующего systemd unit: "+str(unit))
+    save(service,("""[Unit]
+Description=WPO Sweden REALITY 443 emergency rollback
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /root/wpo-sweden-real443-switch-v1.py --rollback
+""").encode(),0o644)
+    save(timer,("""[Unit]
+Description=WPO Sweden REALITY 443 timed automatic rollback
+[Timer]
+OnActiveSec=12min
+AccuracySec=5s
+Unit=wpo-sweden-443-auto-rollback.service
+[Install]
+WantedBy=timers.target
+""").encode(),0o644)
+    try:
+        need("systemctl","daemon-reload",timeout=15)
+        need("systemctl","enable","--now",TIMEOUT+".timer",timeout=15)
+        if not active(TIMEOUT+".timer"):raise RuntimeError("Таймер отката не активен")
+    except Exception:
+        cmd("systemctl","disable","--now",TIMEOUT+".timer",timeout=12)
+        service.unlink(missing_ok=True);timer.unlink(missing_ok=True)
+        cmd("systemctl","daemon-reload",timeout=10)
+        raise
+
 def cancel_timer():
-    # Stop timer only; if already firing, rollback is guarded by state.
-    cmd("systemctl","stop",TIMEOUT+".timer",timeout=10)
+    cmd("systemctl","disable","--now",TIMEOUT+".timer",timeout=10)
+    (UNITDIR/(TIMEOUT+".timer")).unlink(missing_ok=True)
+    (UNITDIR/(TIMEOUT+".service")).unlink(missing_ok=True)
+    cmd("systemctl","daemon-reload",timeout=12)
 
 def restore():
     if not STATE.exists():
@@ -260,10 +295,13 @@ def restore():
     if data.get("canary_x_running",True):
         need("systemctl","start",CX,timeout=20)
     need("systemctl","start",ROUTER,timeout=20)
+    if data.get("router_was_enabled"):
+        need("systemctl","enable",ROUTER,timeout=15)
     if not active(ROUTER):raise RuntimeError("HAProxy не восстановился")
     if not active(PROD) or not active(API):
         raise RuntimeError("Одна из рабочих служб WPO неактивна")
     STATE.unlink(missing_ok=True)
+    Path("/root/wpo-sweden-real443-happ-link.txt").unlink(missing_ok=True)
     cancel_timer()
     print("✓ HAProxy вернулся на 443, Xray старого WPO не изменён")
     print("✓ Тестовый Xray вернулся на TCP 24443")
@@ -272,20 +310,21 @@ def restore():
 def switch():
     old,nginx,nginx2,xray2=check()
     backup=backup_files()
+    enabled=cmd("systemctl","is-enabled",ROUTER,timeout=7).stdout.strip()
     state={"backup":str(backup),"canary_x_running":True,
            "created_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),
-           "original_router_running":True}
+           "original_router_running":True,
+           "router_was_enabled":enabled=="enabled"}
     save(STATE,json.dumps(state).encode(),0o600)
-    # Arm rollback BEFORE stopping HAProxy. systemd-run creates a transient
-    # local timer; no network connectivity is needed to trigger rollback.
+    # Arm a persistent rollback timer BEFORE stopping HAProxy.
+    # This timer is re-armed on reboot and needs no internet connection.
     try:
-        need("systemd-run","--unit="+TIMEOUT,"--on-active="+str(ROLLBACK_MINUTES)+"m",
-             "/usr/bin/python3",SCRIPT,"--rollback",timeout=20)
+        install_timer()
     except Exception:
         STATE.unlink(missing_ok=True)
         raise
     try:
-        need("systemctl","stop",ROUTER,timeout=20)
+        need("systemctl","disable","--now",ROUTER,timeout=20)
         need("systemctl","stop",CX,timeout=20)
         save(CANARY_N,nginx2.encode(),0o640)
         os.chown(CANARY_N,0,__import__("grp").getgrnam("xray").gr_gid)
@@ -327,7 +366,7 @@ def switch():
         print("✓ АВТОМАТИЧЕСКИЙ ОТКАТ ЧЕРЕЗ",ROLLBACK_MINUTES,"МИНУТ, если не подтвердить.")
         print("Если HAPP заработает: sudo python3 "+str(SCRIPT)+" --confirm")
         print("Если не заработает: sudo python3 "+str(SCRIPT)+" --rollback")
-        print("Не перезагружай VPS до подтверждения или отката.")
+        print("Не перезагружай VPS во время проверки HAPP.")
     except Exception as exc:
         print("! Ошибка переключения, восстанавливаю прежний TCP443: "+str(exc)[:350])
         try:
