@@ -16,7 +16,7 @@ import tempfile
 import time
 from urllib.request import Request, urlopen
 
-PIN="390c506cc3e3eced2c368f2bf6fcb93d69754b59"
+PIN="6053be7ba4b6295b259f3b8897ba23cf4bae1552"
 ROOT_URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/"+PIN+"/src/"
 MARK="# WPO_XRAY_NODE_VIEW_V28"
 BACKUPS=Path("/var/backups/web-panel-online")
@@ -62,7 +62,13 @@ def patch_panel(source):
                 uid=str(form.get("id",""))
                 reveal=form.get("reveal","0")=="1"
                 if uid=="local":
-                    result=wpo_xray_node_view.view(XRAY_CONFIG,reveal=reveal)
+                    try:
+                        import wpo_reality
+                        profile=wpo_reality.read_profile()
+                    except (ImportError,OSError,ValueError):
+                        profile=None
+                    result=wpo_xray_node_view.view(XRAY_CONFIG,reveal=reveal,
+                                                    reality_profile=profile)
                 else:
                     node=next((n for n in node_api.load_nodes(NODES_FILE)
                                if str(n.get("id"))==uid),None)
@@ -96,8 +102,12 @@ def patch_vpn(source):
     source=one(source,
         '            if operation == "xray-mode":',
         '''            if operation == "xray-config":
+                try:
+                    profile=wpo_reality.read_profile() if REALITY_READY else None
+                except (OSError,ValueError):
+                    profile=None
                 self.respond(wpo_xray_node_view.view(XRAY,
-                    reveal=data.get("reveal") is True))
+                    reveal=data.get("reveal") is True, reality_profile=profile))
                 return
             if operation == "xray-mode":''',
         "node inspector endpoint")
