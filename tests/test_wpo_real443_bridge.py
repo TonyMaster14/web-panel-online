@@ -137,6 +137,57 @@ class SwedenReal443BridgeTests(unittest.TestCase):
             self.assertFalse(bridge.reconcile(source()))
         self.assertEqual(calls,[])
 
+
+    def test_managed_node_api_exposes_effective_sni_and_blocks_changes(self):
+        self.enable()
+        class API:
+            path="/wpp-api/v1/federation/reality"
+            def authorized(self):return True
+            def respond(self, body, code=200):return code,body
+            def do_GET(self):return 200,{"legacy":True}
+            def do_POST(self):return 200,{"legacy":True}
+        class Reality:
+            @staticmethod
+            def read_profile():
+                return {"sni":"www.nvidia.com","address":"192.0.2.4",
+                        "public_key":"pub","short_id":"aabb",
+                        "fingerprint":"firefox"}
+        namespace={"apply":lambda state:None,
+                   "link":lambda *args:"legacy",
+                   "API":API,"SETTINGS":self.root/"settings.json",
+                   "read_json":lambda _:{"domain":DOMAIN},
+                   "render_xray":lambda state,settings:state,
+                   "wpo_reality":Reality}
+        bridge.install(namespace)
+        with patch.object(bridge,"verify_active"):
+            status,answer=API().do_GET()
+        self.assertEqual(status,200)
+        self.assertEqual(answer["profile"]["sni"],DOMAIN)
+        self.assertTrue(answer["profile"]["managed_readonly"])
+        self.assertEqual(API().do_POST()[0],409)
+
+    def test_managed_node_api_reports_unavailable_real443(self):
+        self.enable()
+        class API:
+            path="/wpp-api/v1/federation/reality"
+            def authorized(self):return True
+            def respond(self,body,code=200):return code,body
+            def do_GET(self):return (200,{})
+            def do_POST(self):return (200,{})
+        class Reality:
+            @staticmethod
+            def read_profile():return {"sni":"www.nvidia.com"}
+        ns={"apply":lambda state:None,"link":lambda *a:None,"API":API,
+            "SETTINGS":self.root/"settings.json",
+            "read_json":lambda _:{"domain":DOMAIN},
+            "render_xray":lambda state,settings:state,
+            "wpo_reality":Reality}
+        bridge.install(ns)
+        with patch.object(bridge,"verify_active",side_effect=RuntimeError("offline")):
+            code,body=API().do_GET()
+        self.assertEqual(code,503)
+        self.assertFalse(body["ok"])
+
     def test_install_hook_keeps_default_node_path_unchanged(self):
         class API:
             def do_GET(self): return {"ok": True}
