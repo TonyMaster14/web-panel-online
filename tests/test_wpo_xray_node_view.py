@@ -40,7 +40,13 @@ class NodeViewTests(unittest.TestCase):
             self.assertNotIn("hysteria-password",json.dumps(safe))
             self.assertIn("node.example.com",json.dumps(safe))
             self.assertEqual(safe["config"]["inbounds"][1]["port"],8443)
-            raw=view.view(path,reveal=True)
+            raw=view.view(path,reveal=True,
+                          reality_profile={"port":9443,"address":"poland.example.com",
+                                           "sni":"www.nvidia.com"})
+            self.assertEqual(raw["meta"]["reality_tcp"],9443)
+            self.assertEqual(raw["meta"]["hysteria_udp"],[8443])
+            self.assertEqual(raw["meta"]["address"],"poland.example.com")
+            self.assertEqual(raw["meta"]["sni"],"www.nvidia.com")
             self.assertEqual(raw["config"],original)
             self.assertEqual(json.loads(path.read_text()),original)
 
