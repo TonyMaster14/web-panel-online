@@ -66,6 +66,21 @@ class NodeViewTests(unittest.TestCase):
         self.assertEqual(ui.display("both",self.routing(reality=3))[0],"partial")
         self.assertEqual(ui.display("both",self.routing())[0],"off")
 
+    def test_saved_routing_counts_seven_switches(self):
+        flags=list(ui.wpp_routing.ROUTING_FLAGS)
+        self.assertEqual(len(flags),7)
+        connection={"id":"reality-primary","protocol":"reality","enabled":True}
+        for count in (0,3,7):
+            stored={key:i<count for i,key in enumerate(flags)}
+            stored["enabled"]=True
+            with self.subTest(count=count), patch.object(ui.wpp_connections,"load",
+                     return_value={"connections":[connection]}), patch.object(
+                     ui.wpp_routing,"load",return_value={"profiles":{"reality-primary":stored}}):
+                result=ui.routing_flags()
+                self.assertEqual(result["reality"]["count"],count)
+                self.assertEqual(ui.display("both",result)[0],
+                                 "off" if count==0 else "on" if count==7 else "partial")
+
     def test_card_and_popup_inside_configuration_selector(self):
         local='<div class="wpo-xray-mode-card"><button type="button" data-wpo-xray-mode-open="local">Конфигурация Xray</button></div>'
         remote='<div class="wpo-xray-mode-card"><button type="button" data-wpo-xray-mode-open="0123456789abcdef">Конфигурация Xray</button></div>'
