@@ -151,3 +151,82 @@ def reality_link(secret, name, domain, profile, link_fn):
         raise RuntimeError("Missing WPO REALITY public key")
     selected = dict(profile, sni=domain, address=domain, port=443)
     return link_fn(secret, name, selected)
+
+
+def effective_profile(profile, domain):
+    """Public REALITY profile shown by the panel for the managed Swedish node."""
+    if not enabled_for(domain):
+        return profile
+    result = dict(profile)
+    result.update({"preset": "custom", "sni": domain, "port": 443,
+                   "managed_reality": "remna-443-mirror-v1",
+                   "managed_readonly": True})
+    return result
+
+
+def install(namespace):
+    """Opt-in Node Agent integration without replacing existing runtime patches.
+
+    This hook is additive to V37 and later patched render_xray()/API and is
+    installed once when the agent module is imported. The marker is checked
+    on each call, so non-Swedish nodes retain their original behavior.
+    """
+    if namespace.get("_wpo_real443_bridge_installed"):
+        return
+    namespace["_wpo_real443_bridge_installed"] = True
+    original_apply = namespace["apply"]
+    original_link = namespace["link"]
+    original_get = namespace["API"].do_GET
+    original_post = namespace["API"].do_POST
+    settings_path = namespace["SETTINGS"]
+
+    def _domain():
+        return namespace["read_json"](settings_path)["domain"]
+
+    def managed():
+        return enabled_for(_domain())
+
+    def apply(state):
+        # Keep the existing canonical Xray (XHTTP/Hysteria/API) in sync first,
+        # then mirror REALITY clients to the working separate Xray on TCP443.
+        # The caller's federation transaction rolls back through apply(old)
+        # if a later step fails.
+        result = original_apply(state)
+        if managed():
+            reconcile(namespace["render_xray"](state,
+                       namespace["read_json"](settings_path)))
+        return result
+
+    def link(protocol, secret, name, settings):
+        if protocol == "reality" and enabled_for(settings["domain"]):
+            profile = namespace["wpo_reality"].read_profile()
+            return reality_link(secret, name, settings["domain"], profile,
+                                namespace["wpo_reality"].link)
+        return original_link(protocol, secret, name, settings)
+
+    def do_GET(self):
+        if (self.path == "/wpp-api/v1/federation/reality"
+            and managed()):
+            if not self.authorized():
+                return self.respond({"ok": False, "message": "Unauthorized"}, 401)
+            profile = effective_profile(
+                namespace["wpo_reality"].read_profile(), _domain())
+            return self.respond({"ok": True, "profile": profile})
+        return original_get(self)
+
+    def do_POST(self):
+        if (self.path == "/wpp-api/v1/federation/reality"
+            and managed()):
+            if not self.authorized():
+                return self.respond({"ok": False, "message": "Unauthorized"}, 401)
+            return self.respond({
+                "ok": False,
+                "message": "REALITY Швеции работает напрямую на 443: изменение SNI "
+                           "заблокировано до полноценной миграции генератора."
+            }, 409)
+        return original_post(self)
+
+    namespace["apply"] = apply
+    namespace["link"] = link
+    namespace["API"].do_GET = do_GET
+    namespace["API"].do_POST = do_POST
