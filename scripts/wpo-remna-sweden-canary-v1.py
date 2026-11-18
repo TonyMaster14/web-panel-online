@@ -345,10 +345,10 @@ def apply():
         decoy.settimeout(6)
         try:
             decoy.connect(str(SOCKET))
-            decoy.sendall(b"PROXY TCP4 127.0.0.1 127.0.0.1 12345 443\\r\\n".replace(b"\\\\r",b"\\r").replace(b"\\\\n",b"\\n"))
+            decoy.sendall(b"PROXY TCP4 127.0.0.1 127.0.0.1 12345 443\r\n")
             tlscontext=ssl.create_default_context()
             with tlscontext.wrap_socket(decoy,server_hostname=domain) as tls:
-                tls.sendall(("GET / HTTP/1.1\\r\\nHost: "+domain+"\\r\\nConnection: close\\r\\n\\r\\n").encode())
+                tls.sendall(("GET / HTTP/1.1\r\nHost: "+domain+"\r\nConnection: close\r\n\r\n").encode())
                 response=tls.recv(512)
                 if not response.startswith(b"HTTP/1.1 200"):
                     raise RuntimeError("Nginx Unix TLS вернул не HTTP 200")
