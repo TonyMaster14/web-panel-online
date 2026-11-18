@@ -96,7 +96,7 @@ def attach(html, nodes, path, csrf):
      dialog.showModal();
    });
  });
- dialog.querySelector('[data-xray-mode-close]').addEventListener('click',()=>dialog.close());
+ dialog.querySelectorAll('[data-xray-mode-close]').forEach(btn=>btn.addEventListener('click',()=>dialog.close()));
 })();
 </script>
 """
