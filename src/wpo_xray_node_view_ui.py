@@ -145,7 +145,10 @@ def display(mode, status):
 def attach(html, nodes, path, csrf):
     if "wpo-xray-view-v28-style" in html:
         return html
-    state = routing_flags()
+    try:
+        state = routing_flags()
+    except (OSError, ValueError, wpp_routing.RoutingError, wpp_connections.ConnectionError):
+        state = None
     node_map = {str(n.get("id")):n for n in nodes if isinstance(n,dict)}
     marker = re.compile(r'(<div class="wpo-xray-mode-card">.*?</button>)(</div>)', re.S)
     found = set()
@@ -161,8 +164,8 @@ def attach(html, nodes, path, csrf):
         found.add(uid)
         mode=modes.get(modes.PANEL_STATE) if uid=="local" else modes.normalize(node.get("xray_mode","both"))
         name="Основная нода" if uid=="local" else str(node.get("name") or node.get("country_name") or "Нода")[:80]
-        variant,label=display(mode,state)
-        detail='REALITY: '+('вкл.' if state["reality"] else 'выкл.')+' · Hysteria2: '+('вкл.' if state["hysteria"] else 'выкл.')
+        variant,label=display(mode,state) if state is not None else ("off", "JSON · Ошибка проверки")
+        detail=('REALITY: '+('вкл.' if state["reality"] else 'выкл.')+' · Hysteria2: '+('вкл.' if state["hysteria"] else 'выкл.')) if state is not None else "Не удалось проверить маршрутизацию"
         ui=(
             '<div class="wpo-xray-route" title="'+escape(detail,quote=True)+'">'
             '<span class="wpo-xray-route-dot '+variant+'" aria-hidden="true"></span>'
