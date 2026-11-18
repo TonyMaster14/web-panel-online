@@ -404,18 +404,45 @@ def apply():
         print("! ТЕСТ НЕ УСТАНОВЛЕН: свои файлы/юниты убраны. Рабочие службы не трогал.")
         raise RuntimeError(str(exc)+"; backup="+str(backup)) from exc
 
+def remove():
+    """Remove ONLY the isolated test, never production WPO or backups."""
+    if os.geteuid()!=0:raise RuntimeError("Требуется sudo")
+    for name in (UNIT_N,UNIT_X):
+        unit=UNITDIR/name
+        if not unit.exists():
+            continue
+        content=unit.read_text(encoding="utf-8")
+        if "WPO isolated RemnaWave-style" not in content:
+            raise RuntimeError("Неизвестный systemd unit: "+str(unit)+"; не удаляю.")
+    if ROOT.exists():
+        conf=ROOT/"nginx.conf"
+        if not conf.is_file() or MARK not in conf.read_text(encoding="utf-8"):
+            raise RuntimeError("Неизвестная директория "+str(ROOT)+"; не удаляю.")
+    for unit in (UNIT_X,UNIT_N):
+        command("systemctl","disable","--now",unit,timeout=20)
+        (UNITDIR/unit).unlink(missing_ok=True)
+    command("systemctl","daemon-reload",timeout=15)
+    if ROOT.exists():shutil.rmtree(ROOT)
+    if LOCAL_BIN.exists():shutil.rmtree(LOCAL_BIN)
+    LINK.unlink(missing_ok=True)
+    print("✓ Тестовый REALITY TCP 24443 удалён; рабочие службы WPO не тронуты.")
+    print("✓ Резервные копии в "+str(BACKUP)+" сохранены.")
+
+
 def main():
     p=argparse.ArgumentParser(description="WPO isolated Remna-style REALITY test on SWEDEN")
     g=p.add_mutually_exclusive_group(required=True)
     g.add_argument("--check",action="store_true")
     g.add_argument("--apply",action="store_true")
+    g.add_argument("--remove",action="store_true")
     a=p.parse_args()
     with open(LOCK,"a+") as lf:
         fcntl.flock(lf,fcntl.LOCK_EX|fcntl.LOCK_NB)
         if a.check:
             preflight()
             print("✓ Только проверка. Изменений НЕТ.")
-        else:apply()
+        elif a.apply:apply()
+        else:remove()
 
 if __name__=="__main__":
     try:main()
