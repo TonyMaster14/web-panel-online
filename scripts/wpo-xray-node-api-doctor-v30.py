@@ -188,8 +188,10 @@ def repair_node():
     else:
         module=_download_viewer()
     if not patched and module is None:
-        print("✓ Обработчик уже присутствует. Изменений не требуется.")
-        print("  Если API всё ещё не отвечает, используйте --check: восстановление исходников не поможет.")
+        print("✓ Обработчик уже присутствует; изменения не требуются.")
+        print("Проверяю, почему API ноды может не отдавать JSON:")
+        if not node_check():
+            raise RuntimeError("API чтения не прошёл диагностику. Смотрите строки с ✗ выше.")
         return
     changes={SRC:after} if patched else {}
     if module is not None:changes[VIEW]=module
