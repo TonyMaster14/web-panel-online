@@ -43,7 +43,7 @@ def patch_panel(source):
     # len(distinct_nodes)>1, enabling HAPP auto-failover even if only one
     # verified node survived. Use real returned host diversity instead.
     body=output[begin:end]
-    match=re.search(r'(?m)^([ \\t]*failover=.*?)len\\(chosen\\)>1',body)
+    match=re.search(r'(?m)^([ \\t]*failover=.*?)len\(chosen\)>1',body)
     if match:
         body=body[:match.start()]+match.group(0).replace(
              'len(chosen)>1','len(distinct_nodes)>1')+body[match.end():]
@@ -66,7 +66,7 @@ def patch_feed(source):
     if source.count(old)!=1:
         raise ValueError("Unexpected asynchronous retry schedule")
     source=source.replace(old,
-        '# WPO_HAPP_FEED_RECOVERY_V1: prompt recovery without hot-looping Node API.\\n'
+        '# WPO_HAPP_FEED_RECOVERY_V1: prompt recovery without hot-looping Node API.\n'
         'RETRY_DELAY = 8',1)
     old='''        print("wpo asynchronous node sync failed:", key[0], error_kind,
               file=sys.stderr, flush=True)'''
