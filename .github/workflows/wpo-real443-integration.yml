@@ -6,6 +6,8 @@ on:
       - 'src/wpo_real443_bridge.py'
       - 'src/wpo_node_vpn.py'
       - 'src/wpo_reality_ui.py'
+      - 'scripts/wpo-reality-domain-modal-v1.py'
+      - 'tests/test_wpo_reality_domain_modal_v1.py'
       - 'scripts/wpo-sweden-real443-managed-v1.py'
       - 'tests/test_wpo_real443_bridge.py'
       - '.github/workflows/wpo-real443-integration.yml'
@@ -22,10 +24,11 @@ jobs:
         run: bash scripts/prepare-source-layout.sh
       - name: Compile integration and installer
         run: |
-          python3 -m py_compile src/wpo_real443_bridge.py src/wpo_node_vpn.py src/wpo_reality_ui.py scripts/wpo-sweden-real443-managed-v1.py
+          python3 -m py_compile src/wpo_real443_bridge.py src/wpo_node_vpn.py src/wpo_reality_ui.py scripts/wpo-sweden-real443-managed-v1.py scripts/wpo-reality-domain-modal-v1.py
       - name: Validate Sweden managed REALITY without touching VPS
         run: |
           python3 -m unittest discover -s tests -p 'test_wpo_real443_bridge.py' -v
           python3 -m unittest discover -s tests -p 'test_node_vpn_federation.py' -v
           python3 -m unittest discover -s tests -p 'test_wpo_reality_single_inbound.py' -v
           python3 -m unittest discover -s tests -p 'test_reality_modal_save_flow.py' -v
+          python3 -m unittest discover -s tests -p 'test_wpo_reality_domain_modal_v1.py' -v
