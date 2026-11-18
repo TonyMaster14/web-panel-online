@@ -153,6 +153,13 @@ def link(protocol, secret, name, settings):
         profile=wpo_reality.read_profile()
         # Use the enrolled node hostname for authenticated federation validation.
         profile['address']=settings['domain']
+        # Opt-in compatibility with the tested Sweden direct-443 REALITY.
+        # The marker is never present on normal/legacy WPO nodes.
+        marker=Path("/etc/wpo-reality-remna-test/managed.json")
+        if marker.exists():
+            import wpo_real443_bridge
+            return wpo_real443_bridge.reality_link(
+                secret,name,settings['domain'],profile,wpo_reality.link)
         return wpo_reality.link(secret,name,profile)
     domain = settings["domain"]
     title = quote(name + (" · XHTTP" if protocol == "vless" else " · Hysteria2"), safe="")
@@ -215,6 +222,21 @@ def apply(state):
             command("systemctl", "restart", UNIT, timeout=30)
         raise
 
+
+
+# The existing production node Xray remains the canonical configuration.
+# On the explicitly opted-in Swedish test node, mirror only REALITY clients to
+# the working direct-443 canary as part of the same federation transaction.
+_wpo_apply_original = apply
+def apply(state):
+    result = _wpo_apply_original(state)
+    marker=Path("/etc/wpo-reality-remna-test/managed.json")
+    if marker.exists():
+        import wpo_real443_bridge
+        settings=read_json(SETTINGS)
+        if wpo_real443_bridge.enabled_for(settings["domain"]):
+            wpo_real443_bridge.reconcile(render_xray(state,settings))
+    return result
 
 def mutate(operation, data):
     # A process lock guards against parallel subscription imports and updates.
