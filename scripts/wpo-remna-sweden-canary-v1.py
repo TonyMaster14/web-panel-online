@@ -32,6 +32,7 @@ from urllib.parse import quote, urlencode
 PORT = 24443
 RUN = Path("/run/wpo-reality-remna-test")
 SOCKET = RUN / "decoy.sock"
+NGINX_TEMP = ("client_body", "proxy_temp", "fastcgi_temp", "uwsgi_temp", "scgi_temp")
 ROOT = Path("/etc/wpo-reality-remna-test")
 LOCAL_BIN = Path("/opt/wpo-reality-remna-test")
 LINK = Path("/root/wpo-reality-remna-sweden-test-link.txt")
@@ -170,6 +171,13 @@ error_log stderr warn;
 events { worker_connections 128; }
 http {
   access_log off;
+  # Isolated paths: the unpacked Ubuntu nginx binary otherwise looks for
+  # /var/lib/nginx/body, which does not exist without apt installation.
+  client_body_temp_path /run/wpo-reality-remna-test/client_body;
+  proxy_temp_path /run/wpo-reality-remna-test/proxy_temp;
+  fastcgi_temp_path /run/wpo-reality-remna-test/fastcgi_temp;
+  uwsgi_temp_path /run/wpo-reality-remna-test/uwsgi_temp;
+  scgi_temp_path /run/wpo-reality-remna-test/scgi_temp;
   server {
     listen unix:/run/wpo-reality-remna-test/decoy.sock ssl proxy_protocol;
     server_name DOMAIN;
@@ -232,6 +240,7 @@ Group=xray
 UMask=0000
 RuntimeDirectory=wpo-reality-remna-test
 RuntimeDirectoryMode=0750
+ExecStartPre=/usr/bin/install -d -o xray -g xray -m 0750 /run/wpo-reality-remna-test/client_body /run/wpo-reality-remna-test/proxy_temp /run/wpo-reality-remna-test/fastcgi_temp /run/wpo-reality-remna-test/uwsgi_temp /run/wpo-reality-remna-test/scgi_temp
 ExecStart=NGINX -c /etc/wpo-reality-remna-test/nginx.conf -g 'daemon off;'
 Restart=on-failure
 RestartSec=2
@@ -316,6 +325,13 @@ def apply():
             RUN.mkdir(mode=0o750,parents=False,exist_ok=True)
             os.chown(RUN,0,grp.getgrnam("xray").gr_gid)
             os.chmod(RUN,0o750)
+            xray_uid=__import__("pwd").getpwnam("xray").pw_uid
+            xray_gid=grp.getgrnam("xray").gr_gid
+            for name in NGINX_TEMP:
+                temp=RUN/name
+                temp.mkdir(mode=0o750,exist_ok=True)
+                os.chown(temp,xray_uid,xray_gid)
+                os.chmod(temp,0o750)
             check=command(nginx,"-t","-c",candidate,timeout=15)
             if check.returncode:
                 raise RuntimeError("Nginx preflight failed: "+check.stderr[-1000:])
