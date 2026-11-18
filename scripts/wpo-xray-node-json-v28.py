@@ -16,7 +16,7 @@ import tempfile
 import time
 from urllib.request import Request, urlopen
 
-PIN="6053be7ba4b6295b259f3b8897ba23cf4bae1552"
+PIN="25471b1c3f5f605578539bdf88a4e01cd7c8e088"
 ROOT_URL="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/"+PIN+"/src/"
 MARK="# WPO_XRAY_NODE_VIEW_V28"
 BACKUPS=Path("/var/backups/web-panel-online")
