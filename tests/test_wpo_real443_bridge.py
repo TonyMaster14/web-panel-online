@@ -136,12 +136,29 @@ class SwedenReal443BridgeTests(unittest.TestCase):
             self.assertFalse(bridge.reconcile(source()))
         self.assertEqual(calls,[])
 
-    def test_wrapper_keeps_default_node_path_unchanged(self):
-        with patch.object(vpn,"_wpo_apply_original",return_value="ok") as original, \
-             patch.object(vpn,"SETTINGS",self.root/"settings.json"), \
-             patch("pathlib.Path.exists",return_value=False):
-            self.assertEqual(vpn.apply({}),"ok")
-            original.assert_called_once_with({})
+    def test_install_hook_keeps_default_node_path_unchanged(self):
+        class API:
+            def do_GET(self): return {"ok": True}
+            def do_POST(self): return {"ok": True}
+        calls = []
+        def original_apply(state):
+            calls.append(("apply", state))
+            return "ok"
+        def original_link(*args):
+            calls.append(("link", args))
+            return "legacy"
+        ns={"apply":original_apply, "link":original_link, "API": API,
+            "SETTINGS":self.root/"settings.json",
+            "read_json": lambda _: {"domain": "other.example.com"},
+            "render_xray": lambda state, settings: state,
+            "wpo_reality": object()}
+        bridge.install(ns)
+        self.assertEqual(ns["apply"]({}),"ok")
+        self.assertEqual(ns["link"]("reality","uuid","title",{"domain":"other.example.com"}),"legacy")
+        self.assertEqual(calls,[("apply",{}),
+                                ("link",("reality","uuid","title",{"domain":"other.example.com"}))])
+        self.assertEqual(API().do_GET(),{"ok":True})
+        self.assertEqual(API().do_POST(),{"ok":True})
 
 
 if __name__=="__main__":
