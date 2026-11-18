@@ -31,9 +31,10 @@ class Handler:
         remote_id="redacted"
         wanted=["reality"]
         remote_links,pending=wpo_happ_async_feed.collect(None,remote_nodes,remote_id,wanted)
-        if pending:
-            self.send_data("Подписка готовится. Повторите обновление.",503,headers={"Retry-After":"2"}); return
-        lines.extend(remote_links)
+        if True:
+                if pending:
+                    self.send_data("Подписка готовится. Повторите обновление.",503,headers={"Retry-After":"2"}); return
+                lines.extend(remote_links)
         distinct_nodes={"node-a" for _ in lines}
         failover=bool(lines) and len(chosen)>1
         return lines,failover
