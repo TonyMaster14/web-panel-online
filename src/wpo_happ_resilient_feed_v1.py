@@ -39,6 +39,11 @@ def patch_panel(source):
     if not begin < source.index(OLD) < end:
         raise ValueError("Async readiness code not in the subscription endpoint")
     output=source.replace(OLD,NEW,1)
+    # The new code is longer. Recompute the method boundary before rewriting
+    # the failover line, or the old index truncates the updated method.
+    begin=output.index(method)
+    end=output.find('    def serve_direct_profile(self,token):',begin)
+    if end<0:raise ValueError("Subscription endpoint boundary changed")
     # The previous REALITY migration substituted len(chosen)>1 for
     # len(distinct_nodes)>1, enabling HAPP auto-failover even if only one
     # verified node survived. Use real returned host diversity instead.
