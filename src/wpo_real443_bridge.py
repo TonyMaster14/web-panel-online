@@ -143,12 +143,24 @@ def reconcile(canonical):
     return True
 
 
+def verify_active():
+    """The direct-443 REALITY listener must actually be running."""
+    if _run("systemctl", "is-active", "--quiet", SERVICE, timeout=5).returncode:
+        raise RuntimeError("Managed REALITY TCP443 Xray is not active")
+    try:
+        with socket.create_connection(("127.0.0.1", 443), timeout=3):
+            pass
+    except OSError as exc:
+        raise RuntimeError("Managed REALITY TCP443 listener is unavailable") from exc
+
+
 def reality_link(secret, name, domain, profile, link_fn):
     """Generate WPO subscription URI using the known-working 443 domain SNI."""
     if not enabled_for(domain):
         return link_fn(secret, name, profile)
     if not isinstance(profile, dict) or not profile.get("public_key"):
         raise RuntimeError("Missing WPO REALITY public key")
+    verify_active()
     selected = dict(profile, sni=domain, address=domain, port=443)
     return link_fn(secret, name, selected)
 
@@ -157,6 +169,7 @@ def effective_profile(profile, domain):
     """Public REALITY profile shown by the panel for the managed Swedish node."""
     if not enabled_for(domain):
         return profile
+    verify_active()
     result = dict(profile)
     result.update({"preset": "custom", "sni": domain, "port": 443,
                    "managed_reality": "remna-443-mirror-v1",
