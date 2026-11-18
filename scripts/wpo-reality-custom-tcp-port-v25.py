@@ -103,6 +103,22 @@ def configure(request, apply_xray):
         "    atomic(config_path,haproxy_config(new['sni']))",
         "    _wpo_v25_firewall(new['port'])\n    atomic(config_path,haproxy_config(new['sni'],new['port']))",
         'HAProxy port save')
+    source=once(source,
+        "        apply_xray()\n        subprocess.run(['systemctl','reload','wpo-tls-router'],check=True,capture_output=True)\n    except Exception:",
+        """        apply_xray()
+        subprocess.run(['systemctl','reload','wpo-tls-router'],check=True,capture_output=True)
+        # The router may acknowledge reload before the new listener is ready.
+        if new['port']!=443:
+            for _ in range(15):
+                try:
+                    with socket.create_connection(('127.0.0.1',new['port']),timeout=1):
+                        break
+                except OSError:
+                    __import__('time').sleep(0.2)
+            else:
+                raise RuntimeError('Новый TCP-порт REALITY не открылся после перезапуска HAProxy.')
+    except Exception:""",
+        'post-save HAProxy listener validation')
     source=source.rstrip()+'\n\n'+MARK+'\n'
     compile(source,'wpo_reality.py','exec')
     return source,True
