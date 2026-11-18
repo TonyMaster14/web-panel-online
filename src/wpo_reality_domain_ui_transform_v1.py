@@ -28,6 +28,9 @@ CSS=r"""
 #wpoRealityDialog [data-reality-mode="direct443"] [data-reality-sni-label] input{
  cursor:default;background:var(--raised,var(--input));color:var(--muted)
 }
+#wpoRealityDialog form[data-reality-mode="direct443"] .actions{
+ display:none!important
+}
 """
 
 
