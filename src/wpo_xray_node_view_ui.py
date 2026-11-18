@@ -104,7 +104,7 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
       setTimeout(()=>{copyButton.textContent=original},1600);
    }catch(_e){copyButton.textContent='Не удалось скопировать';}
  });
- dialog.querySelector('[data-wpo-xray-code-close]').addEventListener('click',()=>dialog.close());
+ dialog.querySelectorAll('[data-wpo-xray-code-close]').forEach(btn=>btn.addEventListener('click',()=>dialog.close()));
  dialog.addEventListener('close',()=>{generation++;code.value='';selected='';revealed=false;});
 })();
 </script>'''
