@@ -455,12 +455,20 @@ def main():
             units=["web-panel-proxy-xray.service","wpo-tls-router.service",
                    "tproxy-panel.service"] if panel else [
                    "wpo-node-xray.service","wpo-tls-router.service","wpo-node-vpn.service"]
+            # Restart only services whose configuration/code actually changed.
+            restart_units=[]
+            if xray_path in changes:
+                restart_units.append("web-panel-proxy-xray.service" if panel else "wpo-node-xray.service")
+            if ROUTER in changes:
+                restart_units.append("wpo-tls-router.service")
+            if panel and source in changes:
+                restart_units.append("tproxy-panel.service")
+            if node and (source in changes or agent in changes or module_path in changes):
+                restart_units.append("wpo-node-vpn.service")
             try:
                 for f,raw in changes.items():
                     atomic(f,raw,oldstats[f]);written.append(f)
-                for unit in units:
-                    if (unit=="wpo-tls-router.service" and ROUTER not in changes):
-                        continue
+                for unit in restart_units:
                     r=run("systemctl","restart",unit,timeout=50)
                     if r.returncode:
                         raise RuntimeError("Restart failed: "+unit)
@@ -483,9 +491,9 @@ def main():
                 for f in written:
                     if oldstats[f] is None:f.unlink(missing_ok=True)
                     else:atomic(f,(backup/f.name).read_bytes(),oldstats[f])
-                for unit in units:
+                for unit in restart_units:
                     run("systemctl","restart",unit,timeout=50)
-                print("! ОШИБКА: исходные файлы восстановлены, сервисы перезапущены")
+                print("! ОШИБКА: исходные файлы восстановлены, затронутые сервисы перезапущены")
                 raise
 
 if __name__=="__main__":
