@@ -108,7 +108,7 @@ const editForm=document.getElementById('wpoEditNodeForm');if(editForm){const b=d
 document.querySelectorAll('[data-reality-open]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('dialog[open]').forEach(x=>x.close());if(!fleet)f.elements.node_id.value='local';d.showModal();load()}));
 d.querySelector('[data-reality-close]').addEventListener('click',requestStop);
 async function execute(save){
- if(running||managedNodeReadonly)return;
+ if(running||(typeof managedNodeReadonly!=='undefined'&&managedNodeReadonly))return;
  cancelRequested=false;closeAfterStop=false;restoreFailed=false;
  resetChecks();togglePicker(false);area.hidden=false;setRunning(true);
  const request={preset:f.elements.preset.value,sni:f.elements.sni.value.trim(),fingerprint:f.elements.fingerprint.value};
