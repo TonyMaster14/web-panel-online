@@ -43,13 +43,15 @@ def patch_panel(source):
     # len(distinct_nodes)>1, enabling HAPP auto-failover even if only one
     # verified node survived. Use real returned host diversity instead.
     body=output[begin:end]
-    match=re.search(r'(?m)^([ \\t]*failover=.*?)len\(chosen\)>1',body)
-    if match:
-        body=body[:match.start()]+match.group(0).replace(
-             'len(chosen)>1','len(distinct_nodes)>1')+body[match.end():]
-        if "distinct_nodes=" not in body:
-            raise ValueError("Failover depends on undefined distinct_nodes")
-        output=output[:begin]+body+output[end:]
+    lines=body.splitlines(keepends=True)
+    indices=[i for i,line in enumerate(lines)
+             if line.lstrip().startswith("failover=") and "len(chosen)>1" in line]
+    if indices:
+        if len(indices)!=1 or "distinct_nodes=" not in body:
+            raise ValueError("Unexpected failover guard in subscription handler")
+        idx=indices[0]
+        lines[idx]=lines[idx].replace("len(chosen)>1","len(distinct_nodes)>1",1)
+        output=output[:begin]+"".join(lines)+output[end:]
     ast.parse(output)
     return output
 
