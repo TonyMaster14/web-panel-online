@@ -127,7 +127,7 @@ def rollback():
     if not backup.is_file() or DATA not in backup.parents:
         raise RuntimeError("Резервная копия не найдена")
     current=MODULE.read_bytes()
-    if blob(current)!=data.get("updated_blob"):
+    if blob(current) not in (data.get("updated_blob"),data.get("old_blob")):
         raise RuntimeError("REALITY UI изменён после обновления, автоматический откат запрещён")
     atomic(MODULE,backup.read_bytes(),MODULE.stat())
     need("systemctl","restart",SERVICE,timeout=25)
