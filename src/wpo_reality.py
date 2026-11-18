@@ -80,11 +80,10 @@ def initialize(xray, address):
 def reality_routes(profile=None):
     profile = profile or read_profile()
     current = normalize({'preset': 'custom', 'sni': profile['sni']})['sni']
-    hosts = [current]
-    for _title, host in PRESETS.values():
-        if host != current and host not in hosts:
-            hosts.append(host)
-    return [(host, PORT + offset) for offset, host in enumerate(hosts)]
+    # One REALITY inbound for the selected decoy SNI. The old multiple
+    # preset-SNI backends were retained for historical links but make new
+    # installations inconsistent with the tested single-inbound layout.
+    return [(current, PORT)]
 
 
 def inbound(clients, profile=None):
@@ -98,7 +97,8 @@ def _inbound_for_sni(clients, profile, sni, port, tag):
             'streamSettings': {'network': 'tcp', 'security': 'reality',
                 'realitySettings': {'show': False, 'target': sni + ':443',
                     'serverNames': [sni], 'privateKey': PRIVATE.read_text().strip(),
-                    'shortIds': [profile['short_id']]}},
+                    'shortIds': [profile['short_id']],
+                    'minClientVer': '1.0.0'}},
             'sniffing': {'enabled': True, 'destOverride': ['http','tls','quic'], 'routeOnly': True}}
 
 
