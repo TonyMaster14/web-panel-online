@@ -183,11 +183,13 @@ def real(item):
     return (isinstance(item,dict) and item.get("protocol")=="vless" and
             item.get("streamSettings",{}).get("security")=="reality")
 
-def patch_reality(source,panel):
+def patch_reality(source,panel,live_count):
     tree=ast.parse(source)
     functions={node.name for node in tree.body if isinstance(node,ast.FunctionDef)}
-    if "read_profile" not in functions or "haproxy_config" not in functions:
-        raise RuntimeError("Unexpected WPO REALITY generator; no changes made")
+    if "read_profile" not in functions:
+        raise RuntimeError("Unexpected WPO REALITY profile generator; no changes made")
+    if (panel or live_count>1) and "haproxy_config" not in functions:
+        raise RuntimeError("Cannot consolidate SNI without a HAProxy generator")
     changed=source
     if "reality_routes" in functions and ROUTES_MARK not in changed:
         changed += "\n"+ROUTES_HOOK
@@ -348,7 +350,7 @@ def main():
     if count>1: print("! Старые ссылки с другими SNI после обновления перестанут работать.")
 
     before=source.read_text(encoding="utf-8")
-    updated_reality=patch_reality(before,panel)
+    updated_reality=patch_reality(before,panel,count)
     original_agent=agent.read_text(encoding="utf-8") if node else None
     updated_agent=patch_agent(original_agent) if node else None
     module_path=NODE/"wpo_xray_node_view.py"
