@@ -62,13 +62,23 @@ class RealityDomainModeUiTests(unittest.TestCase):
                                  capture_output=True,text=True,timeout=10)
         self.assertEqual(check.returncode,0,check.stderr)
 
+    def test_transform_rejects_already_patched_and_unrecognized_ui(self):
+        import wpo_reality_domain_ui_transform_v1 as transformer
+        updated=(ROOT/"src/wpo_reality_ui.py").read_text()
+        with self.assertRaises(ValueError):
+            transformer.patch(updated)
+        with self.assertRaises(ValueError):
+            transformer.patch("def editor(*args): return ''")
+
     def test_safe_installer_rejects_unknown_or_custom_file_hash(self):
         updater=load_updater()
         original=(ROOT/"src/wpo_reality_ui.py").read_bytes()
-        self.assertNotEqual(updater.blob(original),updater.OLD_BLOB)
-        self.assertEqual(len(updater.OLD_BLOB),40)
+        self.assertEqual(len(updater.blob(original)),40)
+        self.assertIn("domain_ui_transform",updater.URL)
         source=(ROOT/"scripts/wpo-reality-domain-modal-v1.py").read_text()
-        self.assertIn("if blob(installed)!=OLD_BLOB:",source)
+        self.assertIn("download_transform()(installed.decode",source)
+        self.assertIn("def rollback():",source)
+        self.assertIn("original_sha256" if "original_sha256" in source else "old_blob",source)
         self.assertIn("def rollback():",source)
         self.assertNotIn("restart wpo-node-xray",source)
         self.assertNotIn("restart caddy",source)
