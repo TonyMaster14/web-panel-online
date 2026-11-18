@@ -98,6 +98,30 @@ def node():
                             "port":i.get("port"),"tls":str(mode)[:15],
                             "clients":count})
         print(label,json.dumps(summary,ensure_ascii=False))
+    print("=== READ-ONLY REALITY CLIENT MIRROR TEST ===")
+    try:
+        import sys
+        sys.path.insert(0,"/opt/wpp-node-agent")
+        import wpo_node_vpn as vpn
+        import wpo_real443_bridge as bridge
+        local=vpn.read_json(vpn.STATE,{"profiles":{}}).get("profiles",{})
+        if not isinstance(local,dict):raise ValueError("registry invalid")
+        canonical=vpn.render_xray(local,vpn.read_json(vpn.SETTINGS))
+        current=read_json(Path("/etc/wpo-reality-remna-test/xray.json"))
+        candidate=bridge.mirror_config(canonical,current)
+        print("MIRROR compatible",True,"clients_already_equal",candidate==current)
+    except Exception as exc:
+        # Only type and known static categories; never print arbitrary exception
+        # text that might contain a token, UUID or internal path.
+        category="other"
+        msg=str(exc)
+        if "key/Short ID mismatch" in msg:category="key_shortid_mismatch"
+        elif "no longer the tested" in msg:category="canary_structure_mismatch"
+        elif "Expected exactly one source" in msg:category="inbound_count_mismatch"
+        elif "client" in msg.lower():category="client_validation"
+        elif "reality" in msg.lower():category="reality_config_error"
+        print("MIRROR compatible",False,"category",category,
+              "exception",type(exc).__name__)
     print("=== READ-ONLY LOCAL AUTHENTICATED API ===")
     config=read_json(Path("/etc/wpp-node-agent/config.json"))
     key=config.get("api_key")
@@ -127,7 +151,7 @@ def node():
             print("API",label,"error",type(exc).__name__)
     print("=== SANITIZED RECENT NODE ERRORS ===")
     p=run("journalctl","-u","wpo-node-vpn.service","-u","wpo-node-xray.service",
-          "--since","-45min","--no-pager","-o","cat",timeout=12)
+          "--since","-120min","--no-pager","-o","cat",timeout=12)
     if p:
         lines=p.stdout.splitlines()
         kept=[]
@@ -148,7 +172,7 @@ def panel():
     path=Path("/opt/tproxy-panel/wpo_happ_async_feed.py")
     print("ASYNC FEED present",present(path))
     try:
-        p=run("journalctl","-u","tproxy-panel.service","--since","-45min",
+        p=run("journalctl","-u","tproxy-panel.service","--since","-120min",
               "-o","cat","--no-pager",timeout=14)
         if p:
             classes=[]
