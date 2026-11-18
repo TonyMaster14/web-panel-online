@@ -53,21 +53,34 @@ class NodeViewTests(unittest.TestCase):
     def test_detect_both_live_protocols(self):
         self.assertEqual(view.protocol_status(self.config),{"reality":True,"hysteria":True})
 
-    def test_status_per_mode(self):
-        status={"reality":True,"hysteria":False}
-        self.assertEqual(ui.display("reality",status)[0],"on")
-        self.assertEqual(ui.display("both",status)[0],"partial")
-        self.assertEqual(ui.display("hysteria",status)[0],"off")
+    @staticmethod
+    def routing(reality=0,hysteria=0):
+        return {"reality":{"count":reality,"total":7,"custom":False,"found":True},
+                "hysteria":{"count":hysteria,"total":7,"custom":False,"found":True}}
 
-    def test_card_and_popup_with_authenticated_endpoint(self):
+    def test_status_per_mode_and_all_seven_flags(self):
+        whole=self.routing(reality=7,hysteria=0)
+        self.assertEqual(ui.display("reality",whole)[0],"on")
+        self.assertEqual(ui.display("both",whole)[0],"on")
+        self.assertEqual(ui.display("hysteria",whole)[0],"off")
+        self.assertEqual(ui.display("both",self.routing(reality=3))[0],"partial")
+        self.assertEqual(ui.display("both",self.routing())[0],"off")
+
+    def test_card_and_popup_inside_configuration_selector(self):
         local='<div class="wpo-xray-mode-card"><button type="button" data-wpo-xray-mode-open="local">Конфигурация Xray</button></div>'
         remote='<div class="wpo-xray-mode-card"><button type="button" data-wpo-xray-mode-open="0123456789abcdef">Конфигурация Xray</button></div>'
-        with patch.object(ui,"routing_flags",return_value={"reality":True,"hysteria":False}):
-            html=ui.attach(local+remote,[{"id":"0123456789abcdef","name":"Poland",
-                         "xray_mode":"reality"}],"/panel-abc","csrf123")
-        self.assertEqual(html.count("data-wpo-xray-code-open="),2)
+        chooser=('<dialog id="wpoXrayModeDialog"><form>'
+                 '<input type="hidden" name="id" value="local">'
+                 '<select name="mode"><option value="both">REALITY + Hysteria2</option>'
+                 '</select></label></form></dialog>')
+        with patch.object(ui,"routing_flags",return_value=self.routing(7,0)):
+            html=ui.attach(local+remote+chooser,[{"id":"0123456789abcdef",
+                        "name":"Poland","xray_mode":"reality"}],"/panel-abc","csrf123")
+        self.assertNotIn('data-wpo-xray-code-open=',html)
+        self.assertEqual(html.count('data-wpo-xray-config-preview'),2)
+        self.assertEqual(html.count('wpo-xray-route-dot on'),2)
         self.assertIn("JSON · Маршрутизация включена",html)
-        self.assertIn("JSON · Частично включена",html)
+        self.assertIn("Просмотр конфигурации Xray",html)
         self.assertIn("/panel-abc/node-xray-view",html)
         self.assertIn("Показать ключи",html)
         self.assertIn("readonly spellcheck",html)
