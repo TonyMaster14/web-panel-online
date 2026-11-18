@@ -49,8 +49,17 @@ config=vpn.render_xray(state,settings)
 real=[i for i in config["inbounds"] if i.get("protocol")=="vless"
       and i.get("streamSettings",{}).get("security")=="reality"]
 if len(real)!=1:raise RuntimeError("Expected exactly one REALITY inbound")
-rs=real[0]["streamSettings"]["realitySettings"]
+current=json.loads(vpn.XRAY.read_text(encoding="utf-8"))
+old_real=[i for i in current.get("inbounds",[]) if i.get("protocol")=="vless"
+          and i.get("streamSettings",{}).get("security")=="reality"]
 profile=mod.read_profile()
+matching=[i for i in old_real if
+          i.get("streamSettings",{}).get("realitySettings",{}).get(
+          "serverNames")==[profile["sni"]]]
+if len(matching)!=1 or matching[0].get("settings",{}).get("clients",[])!=real[0].get(
+    "settings",{}).get("clients",[]):
+    raise RuntimeError("Saved node users do not match the live REALITY configuration")
+rs=real[0]["streamSettings"]["realitySettings"]
 if rs.get("minClientVer")!="1.0.0" or rs.get("serverNames")!=[profile["sni"]]:
     raise RuntimeError("Incorrect SNI or minClientVer")
 if real[0]["port"]!=mod.PORT or real[0]["listen"]!="127.0.0.1":
