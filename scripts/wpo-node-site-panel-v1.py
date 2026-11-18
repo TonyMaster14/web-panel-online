@@ -34,6 +34,8 @@ APP=Path("/opt/tproxy-panel")
 DATA=Path("/var/lib/tproxy-panel")
 UI=APP/"wpp_ui.py"
 LIB=APP/"wpp_presets.py"
+PANEL=APP/"panel.py"
+AUTO=APP/"wpo_node_autotemplate.py"
 UI_ADD=APP/"wpo_node_site_view_v1.py"
 LIB_ADD=APP/"wpo_node_site_pack_v1.py"
 STATE=DATA/"wpo-node-site-panel-v1-state.json"
@@ -120,8 +122,16 @@ def module(source,name):
 def preview():
     if os.geteuid()!=0:
         raise RuntimeError("Требуется root")
-    for p in (UI,LIB):
+    for p in (UI,LIB,PANEL,AUTO):
         plain(p)
+    # Never claim auto-sites are active if the existing WPO controller
+    # does not actually contain its reserved-template and worker logic.
+    panel_source=PANEL.read_text(encoding="utf-8")
+    auto_source=AUTO.read_text(encoding="utf-8")
+    if (("# wpo-node-auto-v20" not in panel_source) or
+        ("# wpo-node-template-save-v25" not in panel_source) or
+        ("# wpo-node-template-sync-v25" not in auto_source)):
+        raise RuntimeError("Контроллер WPO не содержит действующий автоподбор шаблонов v25")
     if UI_ADD.exists() or LIB_ADD.exists() or STATE.exists():
         raise RuntimeError("Найдена предыдущая установка; используй --status или --rollback")
     ui=UI.read_text(encoding="utf-8")
