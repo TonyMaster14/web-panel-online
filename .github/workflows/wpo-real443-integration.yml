@@ -7,6 +7,7 @@ on:
       - 'src/wpo_node_vpn.py'
       - 'src/wpo_reality_ui.py'
       - 'scripts/wpo-reality-domain-modal-v1.py'
+      - 'src/wpo_reality_domain_ui_transform_v1.py'
       - 'tests/test_wpo_reality_domain_modal_v1.py'
       - 'scripts/wpo-sweden-real443-managed-v1.py'
       - 'tests/test_wpo_real443_bridge.py'
@@ -24,7 +25,25 @@ jobs:
         run: bash scripts/prepare-source-layout.sh
       - name: Compile integration and installer
         run: |
-          python3 -m py_compile src/wpo_real443_bridge.py src/wpo_node_vpn.py src/wpo_reality_ui.py scripts/wpo-sweden-real443-managed-v1.py scripts/wpo-reality-domain-modal-v1.py
+          python3 -m py_compile src/wpo_real443_bridge.py src/wpo_node_vpn.py src/wpo_reality_ui.py src/wpo_reality_domain_ui_transform_v1.py scripts/wpo-sweden-real443-managed-v1.py scripts/wpo-reality-domain-modal-v1.py
+      - name: Validate original UI to domain-SNI transformation
+        run: |
+          curl -fsSL --retry 2 https://raw.githubusercontent.com/TonyMaster14/web-panel-online/28be7dc1e0ed1a098db0b66fb7f9dfb6e905385a/src/wpo_reality_ui.py -o /tmp/wpo-reality-before.py
+          PYTHONPATH=src python3 - <<'PY'
+          from pathlib import Path
+          import wpo_reality_domain_ui_transform_v1 as p
+          before=Path("/tmp/wpo-reality-before.py").read_text()
+          after=p.patch(before)
+          compile(after,"wpo_reality_ui.py","exec")
+          assert "function presentMode(" in after
+          assert "data-reality-legacy-target" in after
+          assert "Домен ноды · SNI" in after
+          assert "async function execute(save)" in after
+          assert len(after) > 26000
+          Path("/tmp/wpo-reality-after.py").write_text(after)
+          print("Original to node-domain REALITY UI patch passed")
+          PY
+          python3 -m py_compile /tmp/wpo-reality-after.py
       - name: Validate Sweden managed REALITY without touching VPS
         run: |
           python3 -m unittest discover -s tests -p 'test_wpo_real443_bridge.py' -v
