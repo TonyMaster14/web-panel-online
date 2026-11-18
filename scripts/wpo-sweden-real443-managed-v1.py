@@ -48,7 +48,7 @@ REAL443 = "wpo-reality-remna-xray-test.service"
 ROUTER = "wpo-tls-router.service"
 PROD = "wpo-node-xray.service"
 HOOK = "# WPO_SWEDEN_REAL443_MANAGED_HOOK_V1"
-URL = "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/06f8c9f16828933d34fab9860ddb89be40c808b1/src/wpo_real443_bridge.py"
+URL = "https://raw.githubusercontent.com/TonyMaster14/web-panel-online/73c9dd2b876263f43bf06282ff6aee8bde0a41bb/src/wpo_real443_bridge.py"
 LOCK=Path("/run/wpo-sweden-real443-managed.lock")
 MAX_BYTES = 65536
 
