@@ -17,7 +17,7 @@ import time
 from urllib.request import urlopen,Request
 
 REPO="https://raw.githubusercontent.com/TonyMaster14/web-panel-online/"
-PIN="fea5e65576c3545c25af8bf282375a9b7b635415"
+PIN="30999fb5670a7ddb22dd0889412dd39e69ca7776"
 BACKUP=Path("/var/backups/web-panel-online")
 MARK="# WPO_XRAY_MODES_V27"
 
@@ -32,7 +32,7 @@ def patch_reality(source):
     old="config=copy.deepcopy(config); config['inbounds'].extend(inbounds(clients))"
     new="""config=copy.deepcopy(config); config['inbounds'].extend(inbounds(clients))
             import wpo_xray_modes
-            config=wpo_xray_modes.tune_config(config,wpo_xray_modes.get(wpo_xray_modes.PANEL_STATE))"""
+            config=wpo_xray_modes.tune_config(config,wpo_xray_modes.get(wpo_xray_modes.PANEL_STATE),enable_extras=wpo_xray_modes.PANEL_STATE.is_file())"""
     return swap(source,old,new,'manager REALITY inbound')+"\n"+MARK+"\n"
 
 def patch_manager(source):
@@ -76,8 +76,22 @@ def patch_panel(source):
                             {"mode":mode},timeout=95)
                         if not response.get("ok") or response.get("mode")!=mode:
                             raise node_api.NodeError("Нода не подтвердила конфигурацию Xray.")
+                        previous=node_api.request(target,"GET",
+                            node_api.API_PREFIX+"/federation/xray-mode",timeout=20)
+                        previous_mode=wpo_xray_modes.normalize(previous.get("mode","both"))
+                        # The authenticated agent applied the change, but registry
+                        # persistence may still fail; roll the agent back.
                         target["xray_mode"]=mode
-                        node_api.save_nodes(NODES_FILE,nodes)
+                        try:
+                            node_api.save_nodes(NODES_FILE,nodes)
+                        except Exception:
+                            try:
+                                node_api.request(target,"POST",
+                                    node_api.API_PREFIX+"/federation/xray-mode",
+                                    {"mode":previous_mode},timeout=95)
+                            except Exception:
+                                raise node_api.NodeError("Сохранение реестра сорвалось. Проверьте режим на ноде.")
+                            raise
                     import wpo_happ_async_feed
                     wpo_happ_async_feed.invalidate_all()
                 elif operation=="location":'''
@@ -131,7 +145,7 @@ def patch_vpn(source):
     source=swap(source,
         '            "outbounds": [{"tag": "direct", "protocol": "freedom"}]}\n\n\ndef link',
         '''            "outbounds": [{"tag": "direct", "protocol": "freedom"}]}
-    return wpo_xray_modes.tune_config(config,wpo_xray_modes.get(wpo_xray_modes.NODE_STATE))
+    return wpo_xray_modes.tune_config(config,wpo_xray_modes.get(wpo_xray_modes.NODE_STATE),enable_extras=wpo_xray_modes.NODE_STATE.is_file())
 
 
 def link''',
