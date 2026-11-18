@@ -41,7 +41,7 @@ const list=document.getElementById('wpoRealityChecksList'),selector=f?.querySele
 if(!d||!f)return;
 const presets=PRESETS, allNodes=NODES, fleet=FLEET;
 const actions=Array.from(f.querySelectorAll('.actions button'));
-let running=false,cancelRequested=false,closeAfterStop=false,phase='idle',activeAbort=null,verified=null,restoreFailed=false;
+let running=false,cancelRequested=false,closeAfterStop=false,phase='idle',activeAbort=null,verified=null,restoreFailed=false,managedNodeReadonly=false;
 function requestKey(nodes,request){return JSON.stringify([nodes.map(n=>n.id),request.preset,request.sni,request.fingerprint])}
 function ensureActive(){if(cancelRequested)throw Error('Операция отменена пользователем')}
 function requestStop(){
@@ -69,9 +69,9 @@ row.className='wpo-reality-check-row pending';head.className='wpo-reality-check-
 caption.textContent=title;head.append(state,caption);details.className='wpo-reality-check-row-details';row.append(head,details);list.append(row);return {row,details}}
 function update(row,status,message,chips=[]){row.row.className='wpo-reality-check-row '+status;row.details.replaceChildren();if(message){const text=document.createElement('small');text.textContent=message;row.details.append(text)}for(const chip of chips){const tag=document.createElement('span');tag.className='wpo-reality-chip';tag.textContent=chip;row.details.append(tag)}}
 function setRunning(value){
- running=value;actions.forEach(x=>x.disabled=value);
- f.querySelector('[data-reality-toggle]').disabled=value;
- selector.querySelectorAll('button').forEach(x=>x.disabled=value);
+ running=value;actions.forEach(x=>x.disabled=value||managedNodeReadonly);
+ f.querySelector('[data-reality-toggle]').disabled=value||managedNodeReadonly;
+ selector.querySelectorAll('button').forEach(x=>x.disabled=value||managedNodeReadonly);
  if(f.elements.node_id?.tagName==='SELECT')f.elements.node_id.disabled=value;
  d.querySelector('[data-reality-close]').disabled=false;
  if(!value){phase='idle';activeAbort=null}
@@ -81,18 +81,25 @@ function currentNodes(){return fleet?[{id:'local',name:'Основная нод�
 function isFullCheck(j){return Array.isArray(j.checks)&&j.checks.some(x=>x.status==='ok'&&x.name.includes('REALITY'))&&j.checks.some(x=>x.status==='ok'&&x.name.includes('HTTPS'))}
 async function load(){
  if(running)return;
- resetChecks();togglePicker(false);verified=null;cancelRequested=false;closeAfterStop=false;restoreFailed=false;
+ resetChecks();togglePicker(false);verified=null;cancelRequested=false;closeAfterStop=false;restoreFailed=false;managedNodeReadonly=false;
+ f.elements.fingerprint.readOnly=false;
  const id=fleet?'local':f.elements.node_id.value;
  setRunning(true);phase='reading';activeAbort=new AbortController();
  try{
   const j=await send(id,{read_only:'1'},{signal:activeAbort.signal});
   ensureActive();
   const p=j.profile;
+  managedNodeReadonly=!fleet&&p.managed_readonly===true;
   f.elements.preset.value=(presets[p.preset]&&presets[p.preset][1]===p.sni)?p.preset:(Object.entries(presets).find(([k,v])=>v[1]===p.sni)?.[0]||'custom');
   f.elements.sni.value=p.sni;f.elements.fingerprint.value=p.fingerprint;
   f.elements.public_key.value=p.public_key;f.elements.short_id.value=p.short_id;
   document.getElementById('wpoRealityAddress').value=p.address||'';
   displayPreset();if(f.elements.preset.value==='custom')f.elements.sni.value=p.sni;
+  if(managedNodeReadonly){
+    f.elements.sni.readOnly=true;
+    f.elements.fingerprint.readOnly=true;
+    out.textContent='Швеция: REALITY работает напрямую на TCP 443. Изменение SNI временно заблокировано; пользователи и подписки управляются через WPO.';
+  }
  }catch(err){if(!cancelRequested)out.textContent=err.message}
  finally{setRunning(false)}
 }
@@ -101,7 +108,7 @@ const editForm=document.getElementById('wpoEditNodeForm');if(editForm){const b=d
 document.querySelectorAll('[data-reality-open]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('dialog[open]').forEach(x=>x.close());if(!fleet)f.elements.node_id.value='local';d.showModal();load()}));
 d.querySelector('[data-reality-close]').addEventListener('click',requestStop);
 async function execute(save){
- if(running)return;
+ if(running||managedNodeReadonly)return;
  cancelRequested=false;closeAfterStop=false;restoreFailed=false;
  resetChecks();togglePicker(false);area.hidden=false;setRunning(true);
  const request={preset:f.elements.preset.value,sni:f.elements.sni.value.trim(),fingerprint:f.elements.fingerprint.value};
