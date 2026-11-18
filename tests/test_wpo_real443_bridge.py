@@ -107,8 +107,9 @@ class SwedenReal443BridgeTests(unittest.TestCase):
         self.assertEqual(bridge.reality_link(UUID,"test",DOMAIN,profile,make_link),
                          DOMAIN+"|www.nvidia.com|443")
         self.enable()
-        self.assertEqual(bridge.reality_link(UUID,"test",DOMAIN,profile,make_link),
-                         DOMAIN+"|"+DOMAIN+"|443")
+        with patch.object(bridge, "verify_active"):
+            self.assertEqual(bridge.reality_link(UUID,"test",DOMAIN,profile,make_link),
+                             DOMAIN+"|"+DOMAIN+"|443")
 
     def test_reconcile_validates_and_restarts_only_isolated_canary(self):
         self.enable()
