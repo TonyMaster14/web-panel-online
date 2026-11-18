@@ -87,7 +87,7 @@ SCRIPT = r'''<script id="wpo-xray-view-v28-script">
      revealButton.disabled=false;copyButton.disabled=false;
      note.textContent=revealed
        ?'Приватные ключи и UUID отображаются. Не отправляйте этот JSON посторонним.'
-       :'Действующая серверная конфигурация. Секреты скрыты; JSON доступен только для чтения.';
+       :'Серверный Xray JSON. Клиентские DNS и routing для HAPP настраиваются отдельно. Секреты скрыты.';
    }catch(error){
      if(current!==generation||!dialog.open)return;
      code.value='Ошибка: '+(error.message||'Неизвестная ошибка');
@@ -200,7 +200,7 @@ def attach(html, nodes, path, csrf):
         '<button type="button" class="wpo-xray-code-close" data-wpo-xray-code-close '
         'aria-label="Закрыть">×</button></div>'
         '<div class="wpo-xray-code-meta" data-wpo-xray-meta></div>'
-        '<p class="wpo-xray-code-info" data-wpo-code-note>Рабочая конфигурация выбранной ноды.</p>'
+        '<p class="wpo-xray-code-info" data-wpo-code-note>Серверный Xray JSON. Правила HAPP находятся в разделе «Маршрутизация».</p>'
         '<textarea data-wpo-code readonly spellcheck="false" aria-label="Xray JSON"></textarea>'
         '<div class="wpo-xray-code-actions">'
         '<button type="button" data-wpo-code-reveal>Показать ключи</button>'
