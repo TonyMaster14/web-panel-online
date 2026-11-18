@@ -218,6 +218,27 @@ def main():
         for path,tmp in staged.items():
             os.replace(tmp,path)
             replaced.append(path)
+        # Smoke-test the exact mounted JSON using the newly installed,
+        # read-only inspector before restarting the application.
+        base=panel_dir if panel else node_dir
+        config="/etc/web-panel-proxy-xray/config.json" if panel else "/etc/wpp-node-vpn/xray.json"
+        smoke=(
+            "import sys;sys.path.insert(0,sys.argv[1]);"
+            "import wpo_xray_node_view as v;"
+            "assert v.view(sys.argv[2])['ok'];"
+        )
+        if panel:
+            smoke+=(
+                "import wpo_xray_node_view_ui as u;"
+                "s=lambda n:{'reality':{'count':n,'total':7,'custom':False},"
+                "'hysteria':{'count':0,'total':7,'custom':False}};"
+                "assert u.display('both',s(7))[0]=='on';"
+                "assert u.display('both',s(3))[0]=='partial';"
+                "assert u.display('both',s(0))[0]=='off';"
+            )
+        subprocess.run([sys.executable,"-c",smoke,str(base),config],
+                       check=True,capture_output=True,text=True,timeout=20)
+        print("✓ Проверено чтение живого Xray JSON; три цвета маршрутизации верны")
         for unit in units:
             subprocess.run(["systemctl","restart",unit],check=True,timeout=45)
         for attempt in range(15):
