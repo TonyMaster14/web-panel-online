@@ -379,7 +379,9 @@ def apply():
         if ROOT.exists():
             try:ROOT.rmdir()
             except OSError:pass
-        if nginx_installed and LOCAL_BIN.exists():
+        # LOCAL_BIN cannot pre-exist: preflight rejects any collision.
+        # Remove even if a standalone nginx download failed before returning.
+        if LOCAL_BIN.exists():
             shutil.rmtree(LOCAL_BIN,ignore_errors=True)
         print("! ТЕСТ НЕ УСТАНОВЛЕН: свои файлы/юниты убраны. Рабочие службы не трогал.")
         raise RuntimeError(str(exc)+"; backup="+str(backup)) from exc
